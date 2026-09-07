@@ -12,7 +12,6 @@
   --leading-*: initial;
   --ease-*: initial;
   --blur-*: initial;
-  --breakpoint-*: initial;
 
   /* Colors */
   --color-backdrop: var(--ds-color-backdrop);
@@ -110,17 +109,19 @@
   --blur-glass: var(--ds-blur-glass);
   --blur-chrome: var(--ds-blur-chrome);
   --blur-soft: var(--ds-blur-soft);
-
-  /* Breakpoints. Base styles must work at 320px, so build up with md: and lg:. */
-  --breakpoint-sm: var(--ds-breakpoint-sm);
-  --breakpoint-md: var(--ds-breakpoint-md);
-  --breakpoint-lg: var(--ds-breakpoint-lg);
-  --breakpoint-xl: var(--ds-breakpoint-xl);
-  --breakpoint-2xl: var(--ds-breakpoint-2xl);
 }
 
+/* Literal values, not var() references: media queries cannot resolve custom
+   properties, so breakpoints have to be readable at build time. Base styles
+   must work at 320px, so build up with md: and lg: rather than down. */
 @theme {
   --spacing: 0.25rem;
+
+  --breakpoint-sm: 30rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 100rem;
 }
 
 @utility glass {

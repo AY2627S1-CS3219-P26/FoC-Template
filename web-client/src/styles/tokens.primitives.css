@@ -154,10 +154,4 @@
   --ds-layout-min: 20rem;
   --ds-layout-gutter: var(--ds-space-4);
   --ds-layout-max: 90rem;
-
-  --ds-breakpoint-sm: 30rem;
-  --ds-breakpoint-md: 48rem;
-  --ds-breakpoint-lg: 64rem;
-  --ds-breakpoint-xl: 80rem;
-  --ds-breakpoint-2xl: 100rem;
 }

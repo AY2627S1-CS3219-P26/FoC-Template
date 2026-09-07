@@ -13,9 +13,16 @@ Three things differ from the prototype on purpose:
 
 | Prototype | Here | Reason |
 | --- | --- | --- |
-| Body text 15px | 16px | N6.1.2 requires at least 16dp body text |
-| Buttons around 43 to 46px tall | 44px minimum | N6.1.1 requires 44x44dp targets below 768px |
+| Body text 15px | 16px | readable default, and it leaves room to go smaller for labels |
+| Buttons around 43 to 46px tall | 44px minimum | usable touch target on a phone |
 | Ad hoc spacing (6, 7, 9, 11, 13px) | 4px grid | consistency across the team |
+
+These three are our own decisions, not requirements from the backlog. What the
+backlog does ask for under N5 is a layout with no horizontal scrolling on
+desktop, tablet and mobile, loading, empty and error states on every list and
+detail view, and support for the current and previous major versions of Chrome,
+Safari, Firefox and Edge. `backdrop-filter` carries the frosted surfaces and is
+available in all of those, with a fallback in `patterns.css` for anything older.
 
 ## Layers
 
@@ -57,22 +64,27 @@ Coral is the only accent. Violet and teal appear as status colours only.
 
 ## Status colours
 
-The Order Service owns the errand state machine, the client only presents it.
+The Order Service owns the errand state machine (backlog F3.3), the client only
+presents it. The six states it defines map to the four badge variants:
 
 | State | Variant |
 | --- | --- |
-| Open, Stalled | `danger` |
+| Open | `danger` |
 | Accepted, Picked up | `info` |
-| Delivered, Completed | `success` |
-| Expired, Cancelled | `neutral` |
+| Completed | `success` |
+| Cancelled, Expired | `neutral` |
+
+The prototype's admin screens also show a "Stalled" label for errands sitting too
+long. That is a derived view, not a stored state, and it reuses `danger`.
 
 Credit movements out of the wallet use `.ds-amount--out`, movements in use
 `.ds-amount--in`.
 
 ## Open
 
-- Product name: the prototype says Relay, the backlog says CampusRun, the
-  template says Friend on Campus. No token or class encodes any of them.
+- Product name: the prototype is branded Relay, the template calls the product
+  Friend on Campus, and the D1 backlog names it neither. No token or class
+  encodes any name, so this can be settled late.
 - Dark theme: the prototype is light only. If we want one, it is a
   `[data-theme="dark"]` block overriding `tokens.semantic.css`, nothing else.
 - Component primitives for dialog, combobox and tabs are not chosen yet.

@@ -53,8 +53,8 @@
     var(--ds-coral-600)
   );
 
-  /* Status. Open and stalled are danger, accepted and picked up are info,
-     delivered and completed are success, expired and cancelled are neutral. */
+  /* Status. Open is danger, accepted and picked up are info, completed is
+     success, cancelled and expired are neutral. */
   --ds-color-danger: var(--ds-coral-800);
   --ds-color-danger-surface: var(--ds-tint-accent);
   --ds-color-danger-mark: var(--ds-coral-600);

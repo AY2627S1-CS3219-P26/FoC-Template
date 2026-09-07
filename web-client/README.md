@@ -30,3 +30,16 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Web client
+
+The browser client for Friend on Campus. Presentation only, all domain rules
+live in the backend services.
+
+```bash
+npm install
+npm run dev
+```
+
+The design system lives in `src/styles/`. Read `DESIGN.md` before writing UI,
+and open `design-system.html` in a browser to see the tokens and patterns.

@@ -1,0 +1,115 @@
+/* Roles. Components use these, never the primitives. */
+
+:root {
+  /* Backdrop */
+  --ds-color-backdrop: var(--ds-wall-base);
+  --ds-gradient-backdrop:
+    radial-gradient(
+      78% 58% at 6% -4%,
+      var(--ds-peach-300) 0%,
+      rgb(255 192 166 / 0) 62%
+    ),
+    radial-gradient(
+      72% 56% at 98% 6%,
+      var(--ds-violet-300) 0%,
+      rgb(179 156 255 / 0) 64%
+    ),
+    radial-gradient(
+      96% 62% at 42% 106%,
+      var(--ds-teal-300) 0%,
+      rgb(138 227 214 / 0) 62%
+    ),
+    linear-gradient(var(--ds-wall-top), var(--ds-wall-bottom));
+
+  /* Surfaces */
+  --ds-color-surface: var(--ds-glass);
+  --ds-color-surface-raised: var(--ds-glass-hi);
+  --ds-color-surface-sunken: var(--ds-glass-lo);
+  --ds-color-surface-chrome: var(--ds-glass-chrome);
+  --ds-color-surface-selected: var(--ds-glass-strong);
+  --ds-color-track: var(--ds-ink-a06);
+
+  /* Text. Subtle is for labels and placeholders, never for prose. */
+  --ds-color-text: var(--ds-ink);
+  --ds-color-text-muted: var(--ds-ink-a60);
+  --ds-color-text-subtle: var(--ds-ink-a40);
+  --ds-color-text-on-accent: #ffffff;
+  --ds-color-text-link: var(--ds-coral-600);
+  --ds-color-text-link-hover: var(--ds-coral-700);
+
+  /* Borders */
+  --ds-color-border: var(--ds-ink-a10);
+  --ds-color-border-glass: var(--ds-hair);
+  --ds-color-border-glass-soft: var(--ds-hair-soft);
+
+  /* Accent */
+  --ds-color-accent: var(--ds-coral-600);
+  --ds-color-accent-hover: var(--ds-coral-700);
+  --ds-color-accent-on-tint: var(--ds-coral-800);
+  --ds-color-accent-subtle: var(--ds-tint-accent);
+  --ds-color-accent-on: #ffffff;
+  --ds-gradient-accent: linear-gradient(
+    var(--ds-coral-500),
+    var(--ds-coral-600)
+  );
+
+  /* Status. Open and stalled are danger, accepted and picked up are info,
+     delivered and completed are success, expired and cancelled are neutral. */
+  --ds-color-danger: var(--ds-coral-800);
+  --ds-color-danger-surface: var(--ds-tint-accent);
+  --ds-color-danger-mark: var(--ds-coral-600);
+
+  --ds-color-info: var(--ds-violet-600);
+  --ds-color-info-surface: var(--ds-tint-violet);
+  --ds-color-info-mark: var(--ds-violet-500);
+
+  --ds-color-success: var(--ds-teal-700);
+  --ds-color-success-surface: var(--ds-tint-teal);
+  --ds-color-success-mark: var(--ds-teal-500);
+
+  --ds-color-neutral: var(--ds-ink-a60);
+  --ds-color-neutral-surface: var(--ds-tint-ink);
+  --ds-color-neutral-mark: var(--ds-ink-a40);
+
+  --ds-color-warning: var(--ds-coral-700);
+  --ds-color-warning-surface: var(--ds-tint-accent);
+
+  /* Focus */
+  --ds-color-focus-ring: var(--ds-coral-600);
+  --ds-focus-ring-width: 2px;
+  --ds-focus-ring-offset: 3px;
+
+  /* Shape */
+  --ds-radius-card: var(--ds-radius-xl);
+  --ds-radius-panel: var(--ds-radius-2xl);
+  --ds-radius-inset: var(--ds-radius-lg);
+  --ds-radius-button: var(--ds-radius-md);
+  --ds-radius-field: var(--ds-radius-sm);
+  --ds-radius-tile: var(--ds-radius-xs);
+  --ds-radius-chip: var(--ds-radius-full);
+
+  /* Elevation */
+  --ds-elevation-card: var(--ds-shadow-card);
+  --ds-elevation-inset: var(--ds-shadow-inset);
+  --ds-elevation-button: var(--ds-shadow-button);
+  --ds-elevation-selected: var(--ds-shadow-segment);
+  --ds-elevation-panel: var(--ds-shadow-panel);
+  --ds-elevation-accent: var(--ds-shadow-accent);
+  --ds-elevation-field: var(--ds-shadow-field);
+
+  /* Motion */
+  --ds-motion-hover: var(--ds-duration-fast) var(--ds-ease-standard);
+  --ds-motion-enter: var(--ds-duration-base) var(--ds-ease-emphasized);
+
+  /* Charts */
+  --ds-chart-series-1: linear-gradient(
+    90deg,
+    var(--ds-coral-300),
+    var(--ds-coral-600)
+  );
+  --ds-chart-series-1-solid: var(--ds-coral-600);
+  --ds-chart-series-2-solid: var(--ds-violet-500);
+  --ds-chart-series-3-solid: var(--ds-teal-500);
+  --ds-chart-grid: var(--ds-color-border);
+  --ds-chart-axis-text: var(--ds-color-text-subtle);
+}

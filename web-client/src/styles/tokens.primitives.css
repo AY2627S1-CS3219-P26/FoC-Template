@@ -1,0 +1,163 @@
+/* Raw values, taken from the UI prototype. Only this file holds literals. */
+
+:root {
+  /* Coral */
+  --ds-coral-300: #ff8a63;
+  --ds-coral-400: #ff7a4d;
+  --ds-coral-500: #ff6a4d;
+  --ds-coral-600: #ff5a3c;
+  --ds-coral-700: #e0431f;
+  --ds-coral-800: #c0341a;
+
+  /* Violet */
+  --ds-violet-300: #b39cff;
+  --ds-violet-500: #7c5cf0;
+  --ds-violet-600: #5230d6;
+  --ds-violet-700: #4a2ac4;
+
+  /* Teal */
+  --ds-teal-300: #8ae3d6;
+  --ds-teal-500: #0fa889;
+  --ds-teal-700: #0a7a64;
+
+  /* Peach, backdrop only */
+  --ds-peach-300: #ffc0a6;
+
+  /* Ink. The secondary neutrals are ink at an alpha, not separate greys,
+     so they work on both the glass and the backdrop. */
+  --ds-ink: #14121f;
+  --ds-ink-a60: rgb(20 18 31 / 0.6);
+  --ds-ink-a40: rgb(20 18 31 / 0.4);
+  --ds-ink-a10: rgb(20 18 31 / 0.1);
+  --ds-ink-a07: rgb(20 18 31 / 0.07);
+  --ds-ink-a06: rgb(20 18 31 / 0.06);
+
+  /* Backdrop base */
+  --ds-wall-base: #f1eef7;
+  --ds-wall-top: #f8f5fb;
+  --ds-wall-bottom: #ece6f4;
+
+  /* Glass */
+  --ds-glass: rgb(255 255 255 / 0.56);
+  --ds-glass-hi: rgb(255 255 255 / 0.74);
+  --ds-glass-lo: rgb(255 255 255 / 0.34);
+  --ds-glass-chrome: rgb(255 255 255 / 0.62);
+  --ds-glass-strong: rgb(255 255 255 / 0.92);
+  --ds-hair: rgb(255 255 255 / 0.72);
+  --ds-hair-soft: rgb(255 255 255 / 0.5);
+
+  /* Status tints */
+  --ds-tint-accent: rgb(255 90 60 / 0.14);
+  --ds-tint-violet: rgb(124 92 255 / 0.16);
+  --ds-tint-teal: rgb(15 168 137 / 0.15);
+  --ds-tint-ink: rgb(20 18 31 / 0.07);
+
+  /* Spacing, 4px grid */
+  --ds-space-1: 0.25rem;
+  --ds-space-2: 0.5rem;
+  --ds-space-3: 0.75rem;
+  --ds-space-4: 1rem;
+  --ds-space-5: 1.25rem;
+  --ds-space-6: 1.5rem;
+  --ds-space-8: 2rem;
+  --ds-space-10: 2.5rem;
+  --ds-space-12: 3rem;
+  --ds-space-14: 3.5rem;
+  --ds-space-16: 4rem;
+  --ds-space-24: 6rem;
+
+  /* Radii. Buttons and fields are rounded rectangles, not pills. */
+  --ds-radius-xs: 0.75rem;
+  --ds-radius-sm: 1rem;
+  --ds-radius-md: 1.125rem;
+  --ds-radius-lg: 1.25rem;
+  --ds-radius-xl: 1.625rem;
+  --ds-radius-2xl: 1.875rem;
+  --ds-radius-full: 62.4375rem;
+
+  /* Typography. The prototype uses the platform UI font, no webfont. */
+  --ds-font-sans:
+    -apple-system, 'SF Pro Text', BlinkMacSystemFont, 'Segoe UI', system-ui,
+    'Helvetica Neue', Arial, sans-serif;
+  --ds-font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --ds-text-2xs: 0.6875rem;
+  --ds-text-xs: 0.75rem;
+  --ds-text-sm: 0.875rem;
+  --ds-text-base: 1rem;
+  --ds-text-lg: 1.1875rem;
+  --ds-text-xl: 1.375rem;
+  --ds-text-2xl: 1.625rem;
+  --ds-text-3xl: 1.9375rem;
+  --ds-text-4xl: 2.375rem;
+  --ds-text-5xl: 3.125rem;
+
+  --ds-leading-none: 1.08;
+  --ds-leading-tight: 1.2;
+  --ds-leading-snug: 1.35;
+  --ds-leading-normal: 1.45;
+  --ds-leading-relaxed: 1.55;
+
+  --ds-tracking-label: 0.07em;
+  --ds-tracking-normal: 0em;
+  --ds-tracking-body: -0.01em;
+  --ds-tracking-tight: -0.02em;
+  --ds-tracking-tighter: -0.03em;
+  --ds-tracking-num: -0.04em;
+
+  --ds-weight-regular: 400;
+  --ds-weight-medium: 500;
+  --ds-weight-semibold: 600;
+  --ds-weight-button: 650;
+  --ds-weight-bold: 700;
+
+  /* Elevation. The inset highlight is what makes glass read as a lit edge. */
+  --ds-shadow-card:
+    0 12px 34px rgb(20 18 31 / 0.11), inset 0 1px 0 rgb(255 255 255 / 0.8);
+  --ds-shadow-inset: inset 0 1px 0 rgb(255 255 255 / 0.6);
+  --ds-shadow-button: 0 4px 14px rgb(20 18 31 / 0.08);
+  --ds-shadow-segment: 0 2px 7px rgb(20 18 31 / 0.12);
+  --ds-shadow-panel: 0 26px 64px rgb(20 18 31 / 0.22);
+  --ds-shadow-accent:
+    0 8px 22px rgb(255 90 60 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.42);
+  --ds-shadow-field: inset 0 1px 3px rgb(20 18 31 / 0.05);
+
+  /* Blur. Without the saturate the backdrop goes grey behind glass. */
+  --ds-blur-glass: 28px;
+  --ds-blur-chrome: 30px;
+  --ds-blur-soft: 20px;
+  --ds-saturate-glass: 190%;
+  --ds-saturate-soft: 170%;
+
+  /* Motion */
+  --ds-duration-fast: 120ms;
+  --ds-duration-base: 200ms;
+  --ds-ease-standard: ease;
+  --ds-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --ds-press-scale: 0.985;
+
+  /* Stacking */
+  --ds-z-sticky: 100;
+  --ds-z-header: 200;
+  --ds-z-overlay: 800;
+  --ds-z-modal: 900;
+  --ds-z-toast: 1000;
+
+  /* Controls. 44px is the minimum touch target below the md breakpoint. */
+  --ds-control-h-sm: 2.25rem;
+  --ds-control-h-md: 2.75rem;
+  --ds-control-h-lg: 3.25rem;
+  --ds-tap-target-min: 2.75rem;
+
+  /* Layout */
+  --ds-layout-min: 20rem;
+  --ds-layout-gutter: var(--ds-space-4);
+  --ds-layout-max: 90rem;
+
+  --ds-breakpoint-sm: 30rem;
+  --ds-breakpoint-md: 48rem;
+  --ds-breakpoint-lg: 64rem;
+  --ds-breakpoint-xl: 80rem;
+  --ds-breakpoint-2xl: 100rem;
+}

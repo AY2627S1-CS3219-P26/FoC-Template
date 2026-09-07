@@ -28,6 +28,8 @@ This repository follows a **one-service-per-folder** structure: each
 microservice (`user-service/`, `supplier-service/`, `order-service/`,
 `credit-service/`) lives in its own top-level folder.
 
+The browser client (`web-client/`) sits alongside them as a peer folder.
+
 ```text
 .
 ├── user-service/
@@ -35,6 +37,7 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
 ├── order-service/
 ├── credit-service/
 ├── <n2h-service>/
+├── web-client/
 └── README.md
 ```
 
@@ -44,5 +47,9 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
 - Files for agentic coding tools (e.g. agent configs, prompts, skills)
   may be added as needed, but must still **respect the
   one-service-per-folder skeleton** for core implementation.
+- `web-client/` carries **no `-service` suffix on purpose**: it owns no
+  bounded context, no data store and no API. It is a peer *deployable*,
+  not a peer *service*. Its design system and the rules for working on it
+  are documented in `web-client/DESIGN.md` and `web-client/AGENTS.md`.
 
 ---

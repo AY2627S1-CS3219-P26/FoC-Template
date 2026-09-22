@@ -22,6 +22,15 @@ withdrawn, or exchanged for money, and only circulate within the platform.
 
 ---
 
+## Development Workflow
+
+Work is tracked in Linear (team `REL`). Every backlog requirement is an issue
+there, branches are cut from `dev` as `feat/rel-<n>-...`, and changes come back
+through a pull request into `dev`. Branch, commit and PR conventions and the
+Linear structure are described in [`docs/workflow.md`](docs/workflow.md).
+
+---
+
 ## Repository Structure
 
 This repository follows a **one-service-per-folder** structure: each

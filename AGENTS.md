@@ -32,12 +32,21 @@ Nothing secret may reach `web-client`. Anything the browser can read is public.
 
 ## Git
 
-- Branch per requirement: `<requirement-id>-<slug>`, for example
-  `F3.3.1-pickup-status`. Requirement ids come from the D1 backlog.
-- Commit messages follow Conventional Commits: `feat:`, `fix:`, `docs:`,
-  `chore:`.
-- Pull request titles start with the requirement id.
-- Work on a branch, not directly on `main`.
+The full workflow is in `docs/workflow.md`. The parts that matter when you
+touch the repository:
+
+- Every change belongs to a Linear issue (`REL-<n>`). Requirement issues carry
+  the requirement id from the D1 backlog in their title, for example
+  `F3.3.1 ...`. Check the backlog before changing behaviour and name the
+  requirement in the pull request.
+- Branch off `dev`, never off `main`. Name the branch
+  `<type>/rel-<n>-<short-description>` with type `feat`, `fix` or `chore`, for
+  example `feat/rel-42-reserve-credits`. The `rel-<n>` part links the branch
+  to the Linear issue.
+- Commit messages: `<type>: <short description>` with type `feat`, `fix`,
+  `chore`, `docs`, `refactor` or `test`.
+- Pull requests target `dev`, use the same title format, and fill in the
+  template (Linear issue and requirement id).
 
 Individual contribution is graded, so keep commits attributable to the person who
 did the work.

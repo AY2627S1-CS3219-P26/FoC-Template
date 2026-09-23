@@ -1,0 +1,44 @@
+name: relay
+
+services:
+  user-service:
+    build: ./user-service
+    environment:
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MONGO_URL: mongodb://user-db:27017/user-service
+    ports:
+      - "3001:3000"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  user-db:
+    image: mongo:8
+    volumes:
+      - user-db-data:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
+
+volumes:
+  user-db-data:

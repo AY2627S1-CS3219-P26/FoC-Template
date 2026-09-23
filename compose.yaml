@@ -7,6 +7,13 @@ services:
       PORT: 3000
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MONGO_URL: mongodb://user-db:27017/user-service
+      OTP_SECRET: ${OTP_SECRET:-dev-only-otp-secret-do-not-use-in-production}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Relay <no-reply@relay.local>}
     ports:
       - "3001:3000"
     depends_on:
@@ -38,6 +45,7 @@ services:
     image: axllent/mailpit
     ports:
       - "8025:8025"
+      - "127.0.0.1:1025:1025"
     restart: unless-stopped
 
 volumes:

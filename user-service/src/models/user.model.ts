@@ -10,6 +10,16 @@ export type AccountState = (typeof ACCOUNT_STATES)[number];
 // Usernames are unique regardless of case
 export const USERNAME_COLLATION = { locale: "en", strength: 2 } as const;
 
+const otpSchema = new Schema(
+    {
+        codeHash: { type: String, required: true },
+        expiresAt: { type: Date, required: true },
+        attemptsLeft: { type: Number, required: true },
+        sentAt: { type: Date, required: true },
+    },
+    { _id: false },
+);
+
 const userSchema = new Schema(
     {
         _id: { type: String, default: () => randomUUID() },
@@ -18,7 +28,8 @@ const userSchema = new Schema(
         username: { type: String, required: true, trim: true },
         passwordHash: { type: String, required: true, select: false },
         roles: { type: [{ type: String, enum: ROLES }], default: ["member"] },
-        state: { type: String, enum: ACCOUNT_STATES, default: "PendingVerification" }
+        state: { type: String, enum: ACCOUNT_STATES, default: "PendingVerification" },
+        otp: { type: otpSchema, select: false }
     },
     {
         timestamps: { createdAt: true, updatedAt: true },
@@ -28,6 +39,7 @@ const userSchema = new Schema(
 
 userSchema.index({ email: 1}, { unique: true })
 userSchema.index({ username: 1 }, { unique: true, collation: USERNAME_COLLATION });
+userSchema.index({ createdAt: 1}, {expireAfterSeconds: 24 * 60 * 60, partialFilterExpression: { state: "PendingVerification"}});
 
 export type User = InferSchemaType<typeof userSchema>;
 export const UserModel = model("User", userSchema);

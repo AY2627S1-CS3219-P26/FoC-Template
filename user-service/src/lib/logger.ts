@@ -10,7 +10,7 @@ export const logger = pino({
             "*.password",
             "*.passwordHash",
             "*.token",
-            "*.code"
+            "*.otp"
         ],
         censor: "[redacted]"
     }

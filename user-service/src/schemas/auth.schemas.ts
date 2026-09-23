@@ -22,4 +22,13 @@ export const RegisterBody = z.object({
         .max(128, "must be at most 128 characters"),
 });
 
+export const VerifyBody = z.object({
+    email: z.string().trim().toLowerCase().pipe(z.email("is not a valid email address")),
+    code: z.string().trim().regex(/^\d{6}$/, "must be 6 digits")
+});
+
+export const ResendBody = z.object({
+    email: z.string().trim().toLowerCase().pipe(z.email("is not a valid email address"))
+})
+
 export type RegisterInput = z.infer<typeof RegisterBody>;

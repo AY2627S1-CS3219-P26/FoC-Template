@@ -4,6 +4,9 @@ import { logger } from "../lib/logger.ts";
 import { fieldErrorsOf, validationError, type FieldErrors } from "../lib/validation.ts";
 import { toPublicUser, UserModel, USERNAME_COLLATION, type PublicUser } from "../models/user.model.ts";
 import { RegisterBody } from "../schemas/auth.schemas.ts";
+import { randomUUID } from "node:crypto";
+import { sendOtpMail } from "../lib/mailer.ts";
+import { createOtp } from "../lib/otp.ts";
 
 export async function registerUser(input: unknown): Promise<PublicUser> {
     const parsed = RegisterBody.safeParse(input);
@@ -20,8 +23,11 @@ export async function registerUser(input: unknown): Promise<PublicUser> {
 
     const { password, ...profile } = parsed.data;
     try {
-        const user = await UserModel.create({ ...profile, passwordHash: await hashPassword(password) });
+        const id = randomUUID();
+        const { code, otp } = createOtp(id);
+        const user = await UserModel.create({ _id: id, ...profile, passwordHash: await hashPassword(password), otp });
         logger.info({ accountId: user._id }, "account registered");
+        sendOtpMail(user.email, code);
         return toPublicUser(user);
     } catch (err) {
         if (err instanceof mongoose.mongo.MongoServerError && err.code === 11000) {

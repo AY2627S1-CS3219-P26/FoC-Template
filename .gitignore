@@ -10,6 +10,12 @@ out/
 *.pem
 *.key
 
+# Dependencies
+node_modules/
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Postman workspace link (per person)
+.postman/

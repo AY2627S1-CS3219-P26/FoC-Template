@@ -13,7 +13,9 @@ const EnvSchema = z.object({
     SMTP_SECURE: z.stringbool().default(false),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
-    MAIL_FROM: z.string().min(1)
+    MAIL_FROM: z.string().min(1),
+
+    COOKIE_SECURE: z.stringbool().default(true),
 })
 
 // Empty strings count as not set

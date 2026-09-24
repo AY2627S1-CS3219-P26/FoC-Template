@@ -31,4 +31,9 @@ export const ResendBody = z.object({
     email: z.string().trim().toLowerCase().pipe(z.email("is not a valid email address"))
 })
 
+export const LoginBody = z.object({
+    identifier: z.string().trim().min(1, "is required"),
+    password: z.string().min(1, "is required")
+});
+
 export type RegisterInput = z.infer<typeof RegisterBody>;

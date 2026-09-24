@@ -1,4 +1,5 @@
 $kind: http-request
+name: "register: invalid fields"
 url: "{{userServiceUrl}}/auth/register"
 method: POST
 body:
@@ -6,8 +7,8 @@ body:
   content: |-
     {
         "fullName": "Felix Haag",
-        "email": "felix@u.nus.edu",
-        "username": "felix",
-        "password": "test1234"
+        "email": "felix@gmail.com",
+        "username": "a",
+        "password": "short"
     }
-order: 3072975284260599
+order: 602181158699300

@@ -1,12 +1,14 @@
 import mongoose from "mongoose";
-import { hashPassword } from "../lib/password.ts";
+import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { logger } from "../lib/logger.ts";
 import { fieldErrorsOf, validationError, type FieldErrors } from "../lib/validation.ts";
 import { toPublicUser, UserModel, USERNAME_COLLATION, type PublicUser } from "../models/user.model.ts";
-import { RegisterBody } from "../schemas/auth.schemas.ts";
-import { randomUUID } from "node:crypto";
+import { RegisterBody, LoginBody } from "../schemas/auth.schemas.ts";
+import { randomUUID, randomBytes } from "node:crypto";
 import { sendOtpMail } from "../lib/mailer.ts";
 import { createOtp } from "../lib/otp.ts";
+import { AppError } from "../errors.ts";
+import { createSession } from "./session.service.ts";
 
 export async function registerUser(input: unknown): Promise<PublicUser> {
     const parsed = RegisterBody.safeParse(input);
@@ -53,4 +55,38 @@ async function findTakenFields(email: unknown, username: unknown): Promise<strin
     }
 
     return taken;
+}
+
+// Checked when no account matches, so an unknown identifier takes as long to
+// refuse as a wrong password and the response time reveals nothing
+const DUMMY_HASH = await hashPassword(randomBytes(16).toString("hex"));
+
+export async function loginUser(input: unknown): Promise<{ user: PublicUser; token: string }> {
+    const parsed = LoginBody.safeParse(input);
+    if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
+    const { identifier, password } = parsed.data;
+    
+    // Login either by email or username
+    const query = identifier.includes("@") ?
+        UserModel.findOne({ email: identifier.toLowerCase() }) :
+        UserModel.findOne({ username: identifier }).collation(USERNAME_COLLATION)
+    const user = await query.select("+passwordHash");
+
+    const passwordMatches = await verifyPassword(user?.passwordHash ?? DUMMY_HASH, password);
+    if (!user || !passwordMatches) {
+        throw new AppError(401, "INVALID_CREDENTIALS", "Wrong username, email, or password");
+    }
+
+    // Checked only after the password, so the state of an account is never
+    // revealed to someone who does not know its password
+    if (user.state === "PendingVerification") {
+        throw new AppError(403, "ACCOUNT_NOT_VERIFIED", "Please verify your email address first");
+    }
+    if (user.state !== "Active") {
+        throw new AppError(403, "ACCOUNT_SUSPENDED", "This account is suspended");
+    }
+
+    const token = await createSession(user._id);
+    logger.info({ accountId: user._id }, "login succeeded");
+    return { user: toPublicUser(user), token };
 }

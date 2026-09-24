@@ -31,8 +31,7 @@ export async function resolveSession(token: string): Promise<Auth | null> {
     if (!session) return null;
 
     const account = await UserModel.findById(session.accountId);
-    if (!account || account.state != "Active") {
-        await SessionModel.deleteOne({ _id: session._id });
+    if (!account || account.state !== "Active") {
         return null;
     }
 
@@ -48,4 +47,8 @@ export async function resolveSession(token: string): Promise<Auth | null> {
 
 export async function endSession(token: string): Promise<void> {
     await SessionModel.deleteOne({ _id: hashToken(token) });
+}
+
+export async function endAllSessions(accountId: string, exceptSessionId?: string): Promise<void> {
+    await SessionModel.deleteMany({ accountId, _id: { $ne: exceptSessionId } });
 }

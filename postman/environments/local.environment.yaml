@@ -6,3 +6,7 @@ values:
     value: ''
   - key: otpCode
     value: ''
+  - key: sessionToken
+    value: ''
+  - key: targetUserId
+    value: ''

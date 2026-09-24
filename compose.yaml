@@ -15,6 +15,9 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-Relay <no-reply@relay.local>}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nus.edu.sg}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
     ports:
       - "3001:3000"
     depends_on:

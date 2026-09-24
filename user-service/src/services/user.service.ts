@@ -62,7 +62,7 @@ export async function changePassword(accountId: string, sessionId: string, input
     const user = await UserModel.findById(accountId).select("+passwordHash");
     if (!user) throw notFound();
     if (!(await verifyPassword(user.passwordHash, currentPassword))) {
-        throw validationError({ currentPassword: ["is worong"]});
+        throw validationError({ currentPassword: ["is wrong"]});
     }
 
     user.passwordHash = await hashPassword(newPassword);

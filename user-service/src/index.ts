@@ -3,11 +3,13 @@ import { createApp } from "./app.ts";
 import { config } from "./config.ts";
 import { connectWithRetry } from "./db.ts";
 import { logger } from "./lib/logger.ts";
+import { ensureAdministrator } from "./bootstrap.ts";
 
 try {
     await connectWithRetry();
+    await ensureAdministrator();
 } catch(err) {
-    logger.fatal({ err }, "could not connect to MongoDB, exiting");
+    logger.fatal({ err }, "could not start, exiting");
     process.exit(1);
 }
 
@@ -18,7 +20,7 @@ const server = createApp().listen(config.PORT, () => {
 
 async function shutdown(signal: string) {
     logger.info({ signal }, "shutting down");
-    await new Promise((resolve) => server.close());
+    await new Promise((resolve) => server.close(resolve));
     await mongoose.disconnect();
     process.exit(0);
 }

@@ -106,7 +106,7 @@ describe('CachingAuthorizer', () => {
   it('asks the User Service once for a session that keeps reading', async () => {
     const { authorizer, calls } = setup(authorized)
     for (let i = 0; i < 20; i++) {
-      assert.deepEqual(await authorizer.authorize('Bearer x', 'supplier.read'), {
+      assert.deepEqual(await authorizer.authorize('relay_session=x', 'supplier.read'), {
         kind: 'authorized',
         accountId: 'a1',
       })
@@ -116,27 +116,27 @@ describe('CachingAuthorizer', () => {
 
   it('asks again once the answer is a few seconds old', async () => {
     const { authorizer, calls, advance } = setup(authorized)
-    await authorizer.authorize('Bearer x', 'supplier.read')
+    await authorizer.authorize('relay_session=x', 'supplier.read')
     advance(4999)
-    await authorizer.authorize('Bearer x', 'supplier.read')
+    await authorizer.authorize('relay_session=x', 'supplier.read')
     assert.equal(calls.length, 1)
     advance(1)
-    await authorizer.authorize('Bearer x', 'supplier.read')
+    await authorizer.authorize('relay_session=x', 'supplier.read')
     assert.equal(calls.length, 2)
   })
 
   it('keeps sessions apart', async () => {
     const { authorizer, calls } = setup(authorized)
-    await authorizer.authorize('Bearer one', 'supplier.read')
-    await authorizer.authorize('Bearer two', 'supplier.read')
+    await authorizer.authorize('relay_session=one', 'supplier.read')
+    await authorizer.authorize('relay_session=two', 'supplier.read')
     assert.equal(calls.length, 2)
   })
 
   it('asks every time for an operation that changes a supplier', async () => {
     const { authorizer, calls } = setup(authorized)
     for (const operation of ['supplier.create', 'supplier.update', 'supplier.deactivate'] as const) {
-      await authorizer.authorize('Bearer x', operation)
-      await authorizer.authorize('Bearer x', operation)
+      await authorizer.authorize('relay_session=x', operation)
+      await authorizer.authorize('relay_session=x', operation)
     }
     assert.equal(calls.length, 6)
   })
@@ -144,8 +144,8 @@ describe('CachingAuthorizer', () => {
   it('never remembers a refusal', async () => {
     for (const kind of ['denied', 'unauthenticated'] as const) {
       const { authorizer, calls } = setup(async () => ({ kind }))
-      await authorizer.authorize('Bearer x', 'supplier.read')
-      await authorizer.authorize('Bearer x', 'supplier.read')
+      await authorizer.authorize('relay_session=x', 'supplier.read')
+      await authorizer.authorize('relay_session=x', 'supplier.read')
       assert.equal(calls.length, 2, kind)
     }
   })
@@ -156,10 +156,24 @@ describe('CachingAuthorizer', () => {
       if (fail) throw new HttpError(503, 'AUTH_UNAVAILABLE', 'down')
       return { kind: 'authorized', accountId: 'a1' }
     })
-    await assert.rejects(authorizer.authorize('Bearer x', 'supplier.read'))
+    await assert.rejects(authorizer.authorize('relay_session=x', 'supplier.read'))
     fail = false
-    assert.equal((await authorizer.authorize('Bearer x', 'supplier.read')).kind, 'authorized')
+    assert.equal((await authorizer.authorize('relay_session=x', 'supplier.read')).kind, 'authorized')
     assert.equal(calls.length, 2)
+  })
+
+  it('passes a request with cookies but no session straight through', async () => {
+    const { authorizer, calls } = setup(async () => ({ kind: 'unauthenticated' }))
+    await authorizer.authorize('theme=dark; lang=en', 'supplier.read')
+    await authorizer.authorize('theme=dark; lang=en', 'supplier.read')
+    assert.equal(calls.length, 2)
+  })
+
+  it('remembers a session whatever other cookies come with it', async () => {
+    const { authorizer, calls } = setup(authorized)
+    await authorizer.authorize('theme=dark; relay_session=x', 'supplier.read')
+    await authorizer.authorize('relay_session=x; lang=en', 'supplier.read')
+    assert.equal(calls.length, 1)
   })
 
   it('passes a missing session straight through', async () => {
@@ -174,7 +188,7 @@ describe('CachingAuthorizer', () => {
       await new Promise((resolve) => setTimeout(resolve, 5))
       return { kind: 'authorized', accountId: 'a1' }
     })
-    await Promise.all(Array.from({ length: 100 }, () => authorizer.authorize('Bearer x', 'supplier.read')))
+    await Promise.all(Array.from({ length: 100 }, () => authorizer.authorize('relay_session=x', 'supplier.read')))
     assert.equal(calls.length, 1)
   })
 })

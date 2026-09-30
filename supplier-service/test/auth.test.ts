@@ -1,45 +1,70 @@
 import assert from 'node:assert/strict'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { after, before, describe, it } from 'node:test'
-import { createServer } from 'node:http'
-import { UserServiceAuthorizer } from '../src/auth.ts'
-import { HttpError } from '../src/errors.ts'
+import { UserServiceAuthorizer, sessionToken } from '../src/auth.ts'
 import { createFakeUserService } from '../dev/fake-user-service.ts'
 
-const bearer = (token: string) => `Bearer ${token}`
+const cookie = (token: string) => `relay_session=${token}`
 
-describe('UserServiceAuthorizer against the fake User Service', () => {
+async function listen(server: Server): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, resolve))
+  return `http://localhost:${(server.address() as AddressInfo).port}`
+}
+
+describe('sessionToken', () => {
+  it('finds the session among other cookies', () => {
+    assert.equal(sessionToken('relay_session=abc'), 'abc')
+    assert.equal(sessionToken('theme=dark; relay_session=abc; lang=en'), 'abc')
+    assert.equal(sessionToken('theme=dark;relay_session=abc'), 'abc')
+  })
+
+  it('is null when there is no session', () => {
+    assert.equal(sessionToken(undefined), null)
+    assert.equal(sessionToken(''), null)
+    assert.equal(sessionToken('theme=dark; lang=en'), null)
+    assert.equal(sessionToken('relay_session='), null)
+    assert.equal(sessionToken('relay_session'), null)
+  })
+
+  it('does not mistake a cookie whose name only contains the session name', () => {
+    assert.equal(sessionToken('my_relay_session=abc'), null)
+    assert.equal(sessionToken('relay_session_old=abc'), null)
+  })
+
+  it('keeps a value that itself contains an equals sign', () => {
+    assert.equal(sessionToken('relay_session=a=b'), 'a=b')
+  })
+})
+
+describe('UserServiceAuthorizer against the fake user-service', () => {
   const server = createFakeUserService()
   let authorizer: UserServiceAuthorizer
 
   before(async () => {
-    await new Promise<void>((resolve) => server.listen(0, resolve))
-    authorizer = new UserServiceAuthorizer(`http://localhost:${(server.address() as AddressInfo).port}`)
+    authorizer = new UserServiceAuthorizer(await listen(server))
   })
   after(() => server.close())
 
-  it('treats a request without a session as unauthenticated', async () => {
+  it('treats a request without a session as unauthenticated, without asking', async () => {
     assert.deepEqual(await authorizer.authorize(undefined, 'supplier.read'), { kind: 'unauthenticated' })
+    assert.deepEqual(await authorizer.authorize('theme=dark', 'supplier.read'), { kind: 'unauthenticated' })
   })
 
-  it('treats an unknown session as unauthenticated', async () => {
-    assert.deepEqual(await authorizer.authorize(bearer('nobody'), 'supplier.read'), {
-      kind: 'unauthenticated',
-    })
+  it('refuses a session the user-service does not know', async () => {
+    assert.deepEqual(await authorizer.authorize(cookie('nobody'), 'supplier.read'), { kind: 'denied' })
   })
 
   it('lets a member read and returns who they are', async () => {
-    assert.deepEqual(await authorizer.authorize(bearer('member-token'), 'supplier.read'), {
+    assert.deepEqual(await authorizer.authorize(cookie('member-token'), 'supplier.read'), {
       kind: 'authorized',
       accountId: 'member-account-1',
     })
   })
 
-  it('denies a member every operation that changes a supplier', async () => {
+  it('refuses a member every operation that changes a supplier', async () => {
     for (const operation of ['supplier.create', 'supplier.update', 'supplier.deactivate'] as const) {
-      assert.deepEqual(await authorizer.authorize(bearer('member-token'), operation), {
-        kind: 'denied',
-      })
+      assert.deepEqual(await authorizer.authorize(cookie('member-token'), operation), { kind: 'denied' })
     }
   })
 
@@ -50,137 +75,133 @@ describe('UserServiceAuthorizer against the fake User Service', () => {
       'supplier.update',
       'supplier.deactivate',
     ] as const) {
-      assert.equal((await authorizer.authorize(bearer('admin-token'), operation)).kind, 'authorized')
+      assert.equal((await authorizer.authorize(cookie('admin-token'), operation)).kind, 'authorized')
     }
   })
 
-  it('denies an account that is not active, even for reads', async () => {
-    assert.deepEqual(await authorizer.authorize(bearer('suspended-token'), 'supplier.read'), {
-      kind: 'denied',
-    })
+  it('refuses an account that is not active, even for reads', async () => {
+    assert.deepEqual(await authorizer.authorize(cookie('suspended-token'), 'supplier.read'), { kind: 'denied' })
+  })
+
+  it('finds the session among other cookies', async () => {
+    const decision = await authorizer.authorize(`theme=dark; ${cookie('admin-token')}; lang=en`, 'supplier.create')
+    assert.equal(decision.kind, 'authorized')
   })
 })
 
-describe('the fake User Service login', () => {
-  const lines: string[] = []
-  const server = createFakeUserService((line) => lines.push(line))
-  let base: string
+describe('what the authorizer sends to the user-service', () => {
+  const seen: { method?: string; url?: string; type?: string; cookie?: string; authorization?: string; body: unknown }[] = []
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const chunks: Buffer[] = []
+    request.on('data', (chunk: Buffer) => chunks.push(chunk))
+    request.on('end', () => {
+      seen.push({
+        method: request.method,
+        url: request.url,
+        type: request.headers['content-type'],
+        cookie: request.headers.cookie,
+        authorization: request.headers.authorization,
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+      })
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ decision: 'authorized', accountId: 'a1', roles: ['member'] }))
+    })
+  })
   let authorizer: UserServiceAuthorizer
 
   before(async () => {
-    await new Promise<void>((resolve) => server.listen(0, resolve))
-    base = `http://localhost:${(server.address() as AddressInfo).port}`
-    authorizer = new UserServiceAuthorizer(base)
+    authorizer = new UserServiceAuthorizer(await listen(server))
   })
   after(() => server.close())
 
-  const login = async (username: string, password: string) => {
-    const response = await fetch(`${base}/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
-    return { status: response.status, body: (await response.json()) as Record<string, unknown> }
-  }
-
-  it('gives a student a session that may read but not change suppliers', async () => {
-    const { status, body } = await login('student', 'student-pass')
-    assert.equal(status, 200)
-    assert.deepEqual(body.roles, ['member'])
-    const token = String(body.token)
-    assert.match(token, /^session-[0-9a-f]{18}$/)
-    assert.equal((await authorizer.authorize(bearer(token), 'supplier.read')).kind, 'authorized')
-    assert.equal((await authorizer.authorize(bearer(token), 'supplier.create')).kind, 'denied')
+  it('posts the token and the role to /internal/authorize as JSON', async () => {
+    seen.length = 0
+    await authorizer.authorize('relay_session=tok123', 'supplier.read')
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0]!.method, 'POST')
+    assert.equal(seen[0]!.url, '/internal/authorize')
+    assert.match(seen[0]!.type ?? '', /^application\/json/)
+    assert.deepEqual(seen[0]!.body, { token: 'tok123', requiredRole: 'member' })
   })
 
-  it('gives an administrator a session that may do everything', async () => {
-    const { status, body } = await login('admin', 'admin-pass')
-    assert.equal(status, 200)
-    assert.deepEqual(body.roles, ['member', 'administrator'])
-    assert.deepEqual(await authorizer.authorize(bearer(String(body.token)), 'supplier.deactivate'), {
-      kind: 'authorized',
-      accountId: 'admin-account-1',
-    })
+  it('asks for the administrator role for every operation that changes a supplier', async () => {
+    seen.length = 0
+    for (const operation of ['supplier.create', 'supplier.update', 'supplier.deactivate'] as const) {
+      await authorizer.authorize('relay_session=tok123', operation)
+    }
+    assert.deepEqual(
+      seen.map((s) => s.body),
+      Array(3).fill({ token: 'tok123', requiredRole: 'administrator' }),
+    )
   })
 
-  it('issues a different session on every login', async () => {
-    const first = await login('student', 'student-pass')
-    const second = await login('student', 'student-pass')
-    assert.notEqual(first.body.token, second.body.token)
-  })
-
-  it('gives an unknown user and a wrong password the identical refusal', async () => {
-    const wrong = await login('student', 'nope')
-    const unknown = await login('nobody', 'student-pass')
-    assert.equal(wrong.status, 401)
-    assert.deepEqual(wrong, unknown)
-  })
-
-  it('gives a suspended account no session at all', async () => {
-    const { status, body } = await login('suspended', 'suspended-pass')
-    assert.equal(status, 403)
-    assert.equal('token' in body, false)
-  })
-
-  it('does not know a name that only exists on every object', async () => {
-    assert.equal((await login('constructor', 'x')).status, 401)
-    assert.equal((await authorizer.authorize(bearer('constructor'), 'supplier.read')).kind, 'unauthenticated')
-  })
-
-  it('logs who logged in, and never the password', async () => {
-    await login('admin', 'admin-pass')
-    assert.ok(lines.some((line) => line === 'login admin -> 200'))
-    assert.ok(lines.every((line) => !line.includes('admin-pass') && !line.includes('student-pass')))
-  })
-
-  it('names a logged-in session in the log, and shortens its token', async () => {
-    const { body } = await login('admin', 'admin-pass')
-    await authorizer.authorize(bearer(String(body.token)), 'supplier.create')
-    const line = lines.filter((l) => l.startsWith('authorize supplier.create')).pop()!
-    assert.match(line, /^authorize supplier\.create for admin \([0-9a-f]{6}\) -> 200$/)
-    assert.ok(!line.includes(String(body.token)))
+  it('passes on the session token only, never the caller\'s other cookies', async () => {
+    seen.length = 0
+    await authorizer.authorize('tracking=abc; relay_session=tok123; theme=dark', 'supplier.read')
+    assert.equal(seen[0]!.cookie, undefined)
+    assert.equal(seen[0]!.authorization, undefined)
+    assert.deepEqual(seen[0]!.body, { token: 'tok123', requiredRole: 'member' })
   })
 })
 
-describe('UserServiceAuthorizer when the User Service misbehaves', () => {
-  const expectUnavailable = async (authorizer: UserServiceAuthorizer) => {
-    await assert.rejects(authorizer.authorize(bearer('member-token'), 'supplier.read'), (error) => {
-      assert.ok(error instanceof HttpError)
-      assert.equal(error.status, 503)
-      assert.equal(error.code, 'AUTH_UNAVAILABLE')
-      return true
+describe('UserServiceAuthorizer when the user-service misbehaves', () => {
+  const refusedAsUnavailable = { kind: 'denied', unavailable: true }
+
+  const answering = async (handler: (response: ServerResponse) => void) => {
+    const server = createServer((request, response) => {
+      request.resume()
+      request.on('end', () => handler(response))
     })
+    return { server, authorizer: new UserServiceAuthorizer(await listen(server)) }
   }
 
-  it('fails closed when nothing is listening', async () => {
+  it('refuses when nothing is listening', async () => {
     const closed = createServer()
-    await new Promise<void>((resolve) => closed.listen(0, resolve))
-    const port = (closed.address() as AddressInfo).port
+    const url = await listen(closed)
     await new Promise((resolve) => closed.close(resolve))
-    await expectUnavailable(new UserServiceAuthorizer(`http://localhost:${port}`))
+    const decision = await new UserServiceAuthorizer(url).authorize(cookie('member-token'), 'supplier.read')
+    assert.deepEqual(decision, refusedAsUnavailable)
   })
 
-  it('fails closed on an error response', async () => {
-    const broken = createServer((_request, response) => response.writeHead(500).end())
-    await new Promise<void>((resolve) => broken.listen(0, resolve))
+  it('refuses on an error status', async () => {
+    const { server, authorizer } = await answering((r) => r.writeHead(500).end())
     try {
-      await expectUnavailable(
-        new UserServiceAuthorizer(`http://localhost:${(broken.address() as AddressInfo).port}`),
-      )
+      assert.deepEqual(await authorizer.authorize(cookie('member-token'), 'supplier.read'), refusedAsUnavailable)
     } finally {
-      broken.close()
+      server.close()
     }
   })
 
-  it('fails closed on an approval it cannot read', async () => {
-    const vague = createServer((_request, response) => response.writeHead(200).end('{}'))
-    await new Promise<void>((resolve) => vague.listen(0, resolve))
+  it('refuses on an answer it cannot read', async () => {
+    for (const body of ['{}', 'not json', '{"decision":"maybe"}', '{"decision":"authorized"}', '{"decision":"authorized","accountId":""}']) {
+      const { server, authorizer } = await answering((r) => r.writeHead(200).end(body))
+      try {
+        assert.deepEqual(await authorizer.authorize(cookie('member-token'), 'supplier.read'), refusedAsUnavailable, body)
+      } finally {
+        server.close()
+      }
+    }
+  })
+
+  it('refuses, without calling it unavailable, when the user-service says denied', async () => {
+    const { server, authorizer } = await answering((r) => r.writeHead(200).end('{"decision":"denied"}'))
     try {
-      await expectUnavailable(
-        new UserServiceAuthorizer(`http://localhost:${(vague.address() as AddressInfo).port}`),
-      )
+      assert.deepEqual(await authorizer.authorize(cookie('member-token'), 'supplier.read'), { kind: 'denied' })
     } finally {
-      vague.close()
+      server.close()
+    }
+  })
+
+  it('refuses when the user-service does not answer within about two seconds', async () => {
+    const { server, authorizer } = await answering(() => {})
+    const started = Date.now()
+    try {
+      assert.deepEqual(await authorizer.authorize(cookie('member-token'), 'supplier.read'), refusedAsUnavailable)
+      const took = Date.now() - started
+      assert.ok(took >= 1900 && took < 4000, `gave up after ${took} ms`)
+    } finally {
+      server.closeAllConnections()
+      server.close()
     }
   })
 })

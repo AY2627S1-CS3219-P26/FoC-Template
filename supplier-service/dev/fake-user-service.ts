@@ -1,10 +1,7 @@
-// A stand-in for the User Service, so that the Supplier Service can be run and
-// tested before the real one exists. It answers two requests:
-//   POST /login      username and password in, a session out (placeholder users)
-//   POST /authorize  the question described in src/auth.ts
-// None of the passwords or tokens here are secrets. It is never part of the
-// service's container image, and it must never be reachable from outside.
-import { randomBytes } from 'node:crypto'
+// A fake of the user-service's authorization endpoint, for the automated tests.
+// It answers POST /internal/authorize in the shape documented in
+// user-service/README.md, with three fixed sessions. The running system and the
+// demo use the real user-service. This file is never part of the container image.
 import { createServer, type Server } from 'node:http'
 
 interface Session {
@@ -13,12 +10,8 @@ interface Session {
   roles: string[]
 }
 
-interface User extends Session {
-  password: string
-}
-
-// Sessions that already exist, as if issued earlier. The suspended one is a
-// session that was valid until its account was suspended.
+// The token is what the relay_session cookie would carry. The suspended one is a
+// session of an account that is no longer Active.
 export const SESSIONS: Record<string, Session> = {
   'member-token': { accountId: 'member-account-1', active: true, roles: ['member'] },
   'admin-token': {
@@ -29,105 +22,47 @@ export const SESSIONS: Record<string, Session> = {
   'suspended-token': { accountId: 'member-account-2', active: false, roles: ['member'] },
 }
 
-// The placeholder people who can log in. The real User Service will have real
-// accounts. The account ids match the sessions above.
-export const USERS: Record<string, User> = {
-  student: {
-    password: 'student-pass',
-    accountId: 'member-account-1',
-    active: true,
-    roles: ['member'],
-  },
-  admin: {
-    password: 'admin-pass',
-    accountId: 'admin-account-1',
-    active: true,
-    roles: ['member', 'administrator'],
-  },
-  suspended: {
-    password: 'suspended-pass',
-    accountId: 'member-account-2',
-    active: false,
-    roles: ['member'],
-  },
-}
-
-// Mirrors F1.5.4: administrators create, update and deactivate suppliers, and
-// any member may read them.
-const REQUIRED_ROLE: Record<string, string> = {
-  'supplier.read': 'member',
-  'supplier.create': 'administrator',
-  'supplier.update': 'administrator',
-  'supplier.deactivate': 'administrator',
-}
-
 export function createFakeUserService(log: (line: string) => void = () => {}): Server {
-  // The fixed sessions, and every session a login has issued since start-up.
-  const sessions = new Map<string, Session & { label: string }>()
-  for (const [token, session] of Object.entries(SESSIONS)) {
-    sessions.set(token, { ...session, label: token })
-  }
+  const sessions = new Map(Object.entries(SESSIONS))
 
   return createServer((request, response) => {
     const chunks: Buffer[] = []
     request.on('data', (chunk: Buffer) => chunks.push(chunk))
     request.on('end', () => {
-      const send = (status: number, payload?: object) => {
+      const send = (status: number, payload: object) => {
         response.writeHead(status, { 'content-type': 'application/json' })
-        response.end(payload ? JSON.stringify(payload) : undefined)
+        response.end(JSON.stringify(payload))
       }
 
-      let body: Record<string, unknown>
+      if (request.method !== 'POST' || request.url !== '/internal/authorize') {
+        return send(404, { error: { code: 'NOT_FOUND', message: 'No such route' } })
+      }
+
+      let body: Record<string, unknown> = {}
       try {
         const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
-        body = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+        if (typeof parsed === 'object' && parsed !== null) body = parsed as Record<string, unknown>
       } catch {
-        return send(400)
+        // An unreadable body is treated as an empty one, which fails validation.
       }
 
-      if (request.method === 'POST' && request.url === '/login') {
-        const username = typeof body.username === 'string' ? body.username : ''
-        const user = Object.hasOwn(USERS, username) ? USERS[username] : undefined
-        const answer = (status: number, payload: object) => {
-          log(`login ${username || '(none)'} -> ${status}`)
-          send(status, payload)
-        }
-
-        // An unknown user and a wrong password get the identical answer (F1.3.2).
-        if (!user || user.password !== body.password) {
-          return answer(401, { error: 'Invalid username or password' })
-        }
-        // An account that is not Active gets no session (F1.3.4).
-        if (!user.active) return answer(403, { error: 'This account is not active' })
-
-        const token = `session-${randomBytes(9).toString('hex')}`
-        sessions.set(token, {
-          accountId: user.accountId,
-          active: true,
-          roles: user.roles,
-          label: `${username} (${token.slice(-6)})`,
-        })
-        return answer(200, { token, accountId: user.accountId, roles: user.roles })
+      // The real service rejects a body without a token, or with a role that is
+      // neither member nor administrator.
+      const requiredRole = body.requiredRole ?? 'member'
+      if (typeof body.token !== 'string' || body.token === '' || (requiredRole !== 'member' && requiredRole !== 'administrator')) {
+        log('authorize (invalid request) -> 400')
+        return send(400, { error: { code: 'VALIDATION_FAILED', message: 'Invalid request' } })
       }
 
-      if (request.method === 'POST' && request.url === '/authorize') {
-        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
-        const session = token ? sessions.get(token) : undefined
-        const operation = body.operation
-        const reply = (status: number, payload?: object) => {
-          const who = session ? session.label : token ? '(unknown session)' : '(no session)'
-          log(`authorize ${String(operation ?? '-')} for ${who} -> ${status}`)
-          send(status, payload)
-        }
-
-        if (!session) return reply(401)
-        const role = typeof operation === 'string' ? REQUIRED_ROLE[operation] : undefined
-        if (!role) return reply(400)
-        if (!session.active || !session.roles.includes(role)) return reply(403)
-        return reply(200, { accountId: session.accountId })
+      const session = sessions.get(body.token)
+      const decided = (decision: object, label: string) => {
+        log(`authorize ${requiredRole} for ${label}`)
+        send(200, decision)
       }
-
-      send(404)
+      if (!session || !session.active || !session.roles.includes(requiredRole)) {
+        return decided({ decision: 'denied' }, `${session ? body.token : '(unknown session)'} -> denied`)
+      }
+      decided({ decision: 'authorized', accountId: session.accountId, roles: session.roles }, `${body.token} -> authorized`)
     })
   })
 }
@@ -135,8 +70,6 @@ export function createFakeUserService(log: (line: string) => void = () => {}): S
 if (import.meta.main) {
   const port = Number(new URL(process.env.USER_SERVICE_URL || 'http://localhost:3001').port || 3001)
   createFakeUserService((line) => console.log(line)).listen(port, () => {
-    console.log(`Fake user service on port ${port}.`)
-    console.log(`Log in at POST /login as: ${Object.keys(USERS).join(', ')}`)
-    console.log(`Or use a fixed session: ${Object.keys(SESSIONS).join(', ')}`)
+    console.log(`Fake user service on port ${port}. Sessions: ${Object.keys(SESSIONS).join(', ')}`)
   })
 }

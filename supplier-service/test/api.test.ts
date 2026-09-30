@@ -7,7 +7,6 @@ import { createFakeUserService } from '../dev/fake-user-service.ts'
 import { buildApp } from '../src/app.ts'
 import { UserServiceAuthorizer, type Authorizer } from '../src/auth.ts'
 import { createPool, migrate, type Pool } from '../src/db.ts'
-import { HttpError } from '../src/errors.ts'
 import { seedIfEmpty } from '../src/seed/seed.ts'
 
 // These tests empty the suppliers table, so they only run against a database
@@ -73,7 +72,7 @@ describe('supplier API', { skip }, () => {
     const response = await app.inject({
       method,
       url,
-      headers: token ? { authorization: `Bearer ${token}` } : {},
+      headers: token ? { cookie: `relay_session=${token}` } : {},
       payload,
     })
     return {
@@ -109,8 +108,8 @@ describe('supplier API', { skip }, () => {
       }
     })
 
-    it('answers 401 to a session the User Service does not know', async () => {
-      assert.equal((await call('GET', '/suppliers', 'forged-token')).status, 401)
+    it('answers 403 to a session the User Service does not know', async () => {
+      assert.equal((await call('GET', '/suppliers', 'forged-token')).status, 403)
     })
 
     it('answers 403 to an account that is not active, even for reads', async () => {
@@ -143,15 +142,13 @@ describe('supplier API', { skip }, () => {
       }
     })
 
-    it('answers 503 and changes nothing when the User Service cannot be asked', async () => {
+    it('refuses with 403 and changes nothing when the User Service cannot be asked', async () => {
       const down: Authorizer = {
-        authorize: async () => {
-          throw new HttpError(503, 'AUTH_UNAVAILABLE', 'down')
-        },
+        authorize: async () => ({ kind: 'denied', unavailable: true }),
       }
       const downApp = buildApp({ db: pool, authorizer: down, timeZone: TIME_ZONE, now: () => NOW })
       const response = await downApp.inject({ method: 'POST', url: '/suppliers', payload: cafe() })
-      assert.equal(response.statusCode, 503)
+      assert.equal(response.statusCode, 403)
       assert.equal((await snapshot()).length, 0)
     })
   })
@@ -201,7 +198,7 @@ describe('supplier API', { skip }, () => {
       const response = await app.inject({
         method: 'POST',
         url: '/suppliers',
-        headers: { authorization: 'Bearer admin-token', 'content-type': 'application/json' },
+        headers: { cookie: 'relay_session=admin-token', 'content-type': 'application/json' },
         payload: '{oops',
       })
       assert.equal(response.statusCode, 400)
@@ -436,7 +433,7 @@ describe('supplier API', { skip }, () => {
 
     const total = async () =>
       (
-        await cached.inject({ method: 'GET', url: '/suppliers', headers: { authorization: 'Bearer member-token' } })
+        await cached.inject({ method: 'GET', url: '/suppliers', headers: { cookie: 'relay_session=member-token' } })
       ).json().total
 
     it('answers a repeated search from memory', async () => {
@@ -456,7 +453,7 @@ describe('supplier API', { skip }, () => {
       const response = await cached.inject({
         method: 'POST',
         url: '/suppliers',
-        headers: { authorization: 'Bearer admin-token' },
+        headers: { cookie: 'relay_session=admin-token' },
         payload: cafe({ name: 'Second Cafe' }),
       })
       assert.equal(response.statusCode, 201)
@@ -466,7 +463,7 @@ describe('supplier API', { skip }, () => {
       await cached.inject({
         method: 'DELETE',
         url: `/suppliers/${id}`,
-        headers: { authorization: 'Bearer admin-token' },
+        headers: { cookie: 'relay_session=admin-token' },
       })
       assert.equal(await total(), 1, 'a deactivated supplier disappears from the listing at once')
     })
@@ -484,7 +481,7 @@ describe('supplier API', { skip }, () => {
         cached.inject({
           method: 'GET',
           url: `/suppliers/${id}/availability`,
-          headers: { authorization: 'Bearer member-token' },
+          headers: { cookie: 'relay_session=member-token' },
         })
       assert.equal((await ask()).json().orderable, true)
       await pool.query(`UPDATE suppliers SET status = 'Inactive' WHERE id = $1`, [id])

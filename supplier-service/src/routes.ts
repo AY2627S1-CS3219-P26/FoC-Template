@@ -56,17 +56,25 @@ function present(supplier: Supplier, moment: LocalMoment) {
 export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
   app.decorateRequest('actorId', '')
 
-  // Every route asks the User Service in an onRequest hook, which runs before
+  // Every route asks the user-service in an onRequest hook, which runs before
   // the body is parsed or validated and before the database is touched. A
   // refused caller learns nothing about which suppliers exist, and nothing is
   // changed.
   const requires = (operation: Operation) => async (request: FastifyRequest) => {
-    const decision = await deps.authorizer.authorize(request.headers.authorization, operation)
+    const decision = await deps.authorizer.authorize(request.headers.cookie, operation)
     if (decision.kind === 'unauthenticated') {
+      request.log.info({ operation }, 'refused: no session')
       throw new HttpError(401, 'UNAUTHENTICATED', 'A valid session is required')
     }
     if (decision.kind === 'denied') {
+      // Refused either way, but an operator needs to tell the two apart.
+      if (decision.unavailable) request.log.warn('The user-service could not be asked, so the request was refused')
+      request.log.info({ operation }, 'refused')
       throw new HttpError(403, 'FORBIDDEN', 'You are not allowed to do this')
+    }
+    // Reads are already in the request log, and there are a great many of them.
+    if (operation !== 'supplier.read') {
+      request.log.info({ operation, accountId: decision.accountId }, 'authorized')
     }
     request.actorId = decision.accountId
   }

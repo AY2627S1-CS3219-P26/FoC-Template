@@ -6,7 +6,6 @@ import { createFakeUserService } from '../dev/fake-user-service.ts'
 import { buildApp } from '../src/app.ts'
 import { UserServiceAuthorizer, type Authorizer } from '../src/auth.ts'
 import type { Pool } from '../src/db.ts'
-import { HttpError } from '../src/errors.ts'
 
 // The database stub records every query and refuses to answer. Everything in
 // this file has to be settled before the database is needed, so it must never
@@ -54,7 +53,7 @@ describe('requests that are settled before the database', () => {
       method,
       url,
       headers: {
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(token ? { cookie: `relay_session=${token}` } : {}),
         ...(typeof payload === 'string' ? { 'content-type': 'application/json' } : {}),
       },
       payload,
@@ -79,9 +78,18 @@ describe('requests that are settled before the database', () => {
     }
   })
 
-  it('answers 401 on every route with a session nobody issued', async () => {
+  it('answers 401 on every route when the cookies carry no session', async () => {
     for (const [method, url] of ROUTES) {
-      assert.equal((await call(method, url, 'forged-token')).status, 401, `${method} ${url}`)
+      const response = await app.inject({ method, url, headers: { cookie: 'theme=dark; relay_session=' } })
+      assert.equal(response.statusCode, 401, `${method} ${url}`)
+    }
+  })
+
+  it('answers 403 on every route with a session nobody issued', async () => {
+    for (const [method, url] of ROUTES) {
+      const response = await call(method, url, 'forged-token')
+      assert.equal(response.status, 403, `${method} ${url}`)
+      assert.equal(response.body.error.code, 'FORBIDDEN')
     }
   })
 
@@ -172,11 +180,9 @@ describe('requests that are settled before the database', () => {
 })
 
 describe('when the User Service cannot be asked', () => {
-  it('answers 503 on every route and never reaches the database', async () => {
+  it('refuses every route with 403 and never reaches the database', async () => {
     const down: Authorizer = {
-      authorize: async () => {
-        throw new HttpError(503, 'AUTH_UNAVAILABLE', 'down')
-      },
+      authorize: async () => ({ kind: 'denied', unavailable: true }),
     }
     const app = buildApp({ db: refusingDb, authorizer: down, timeZone: 'Asia/Singapore' })
     for (const [method, url] of [
@@ -184,9 +190,9 @@ describe('when the User Service cannot be asked', () => {
       ['POST', '/suppliers'],
       ['DELETE', `/suppliers/${ID}`],
     ] as const) {
-      const response = await app.inject({ method, url, headers: { authorization: 'Bearer admin-token' } })
-      assert.equal(response.statusCode, 503, `${method} ${url}`)
-      assert.equal(JSON.parse(response.body).error.code, 'AUTH_UNAVAILABLE')
+      const response = await app.inject({ method, url, headers: { cookie: 'relay_session=admin-token' } })
+      assert.equal(response.statusCode, 403, `${method} ${url}`)
+      assert.equal(JSON.parse(response.body).error.code, 'FORBIDDEN')
     }
     await app.close()
   })

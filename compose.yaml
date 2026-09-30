@@ -52,5 +52,48 @@ services:
       - "127.0.0.1:1025:1025"
     restart: unless-stopped
 
+  supplier-service:
+    build:
+      context: .
+      dockerfile: supplier-service/Dockerfile
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SUPPLIER_SERVICE_PORT: ${SUPPLIER_SERVICE_PORT:-3002}
+      SUPPLIER_DATABASE_URL: postgres://${SUPPLIER_DB_USER:-supplier}:${SUPPLIER_DB_PASSWORD:-change-me}@supplier-db:5432/${SUPPLIER_DB_NAME:-supplier}
+      USER_SERVICE_URL: http://user-service:3000
+      SUPPLIER_TIMEZONE: ${SUPPLIER_TIMEZONE:-Asia/Singapore}
+      SUPPLIER_SEED_ON_STARTUP: ${SUPPLIER_SEED_ON_STARTUP:-true}
+      SUPPLIER_AUTH_CACHE_SECONDS: ${SUPPLIER_AUTH_CACHE_SECONDS:-5}
+      SUPPLIER_READ_CACHE_SECONDS: ${SUPPLIER_READ_CACHE_SECONDS:-2}
+    ports:
+      - "127.0.0.1:${SUPPLIER_SERVICE_PORT:-3002}:${SUPPLIER_SERVICE_PORT:-3002}"
+    # Not tied to the user-service: while that is down every request is refused,
+    # and the supplier-service itself keeps running (N6.1.2).
+    depends_on:
+      supplier-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  supplier-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${SUPPLIER_DB_USER:-supplier}
+      POSTGRES_PASSWORD: ${SUPPLIER_DB_PASSWORD:-change-me}
+      POSTGRES_DB: ${SUPPLIER_DB_NAME:-supplier}
+    # Published to this machine only. The password is a placeholder for local use.
+    ports:
+      - "127.0.0.1:${SUPPLIER_DB_PORT:-5433}:5432"
+    volumes:
+      - supplier-db-data:/var/lib/postgresql/data
+      # Gives the tests a database of their own, so they never touch real data.
+      - ./supplier-service/db/create-test-database.sql:/docker-entrypoint-initdb.d/create-test-database.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   user-db-data:
+  supplier-db-data:

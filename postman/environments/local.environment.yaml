@@ -1,0 +1,12 @@
+name: local
+values:
+  - key: userServiceUrl
+    value: ''
+  - key: mailpitUrl
+    value: ''
+  - key: otpCode
+    value: ''
+  - key: sessionToken
+    value: ''
+  - key: targetUserId
+    value: ''

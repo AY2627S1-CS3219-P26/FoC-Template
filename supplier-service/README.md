@@ -5,8 +5,8 @@ errands can be picked up. It is a standalone HTTP API with its own PostgreSQL
 database. The web client and the Order Service call it, and it needs neither to
 run. Requirements F2.1 to F2.5 and N2 of the backlog.
 
-Who may call what is decided by the User Service. Until that service exists, the
-`dev/` folder holds a small stand-in for it.
+Who may call what is decided by the user-service, the platform's single authority
+on who is logged in and what they may do.
 
 For the milestone demo, see `DEMO.md`.
 
@@ -15,37 +15,46 @@ For the milestone demo, see `DEMO.md`.
 You need Docker Desktop. From the repository root:
 
 ```bash
-cp .env.example .env
 docker compose up --build
 ```
 
-That starts the Supplier Service on <http://localhost:3002>, its PostgreSQL
-database, and a stand-in for the User Service. The tables are created and the
-seed data is loaded on first start, and a from-scratch start takes about 15
-seconds once the images are downloaded. Everything is published to your own
-machine only, because the stand-in accepts fixed tokens.
+That starts the whole system: the user-service with its MongoDB and Mailpit, and
+the Supplier Service with its PostgreSQL database. No `.env` is needed, because
+`compose.yaml` has a development default for every variable. The tables are
+created and the seed data is loaded on first start.
 
-Try it with the tokens of the stand-in, `member-token` and `admin-token`:
+| Component | Address on your machine |
+| --- | --- |
+| supplier-service | <http://localhost:3002> |
+| user-service | <http://localhost:3001> |
+| Mailpit, the local inbox for the verification emails | <http://localhost:8025> |
+| the supplier database, for the tests and for looking around | `localhost:5433` |
+
+Every request needs a session, and the sessions come from the user-service. Log in
+as the first administrator, which the user-service creates at start-up (username
+`admin`, password `change-me` unless `ADMIN_PASSWORD` is set), keep the cookie it
+sets, and send it back:
 
 ```bash
-curl -H "Authorization: Bearer member-token" "http://localhost:3002/suppliers?q=coffee"
+curl -s -c cookies.txt -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" -d '{"identifier":"admin","password":"change-me"}'
+curl -b cookies.txt "http://localhost:3002/suppliers?q=coffee"
 ```
 
-To work on the code instead, keep the database in Docker and run the service on
-your machine (Node 24):
+To work on the code instead, keep the databases and the user-service in Docker and
+run the service on your machine (Node 24):
 
 ```bash
-docker compose up -d supplier-db
+docker compose up -d supplier-db user-service
 cd supplier-service
 npm install
-npm run dev:fake-user-service   # terminal 1: stand-in for the User Service, port 3001
-npm run dev                     # terminal 2: the Supplier Service, port 3002
+npm run dev
 ```
 
 | Command | What it does |
 | --- | --- |
 | `docker compose up --build` | run everything in containers |
-| `docker compose down -v` | stop, and delete the database so the next start is fresh |
+| `docker compose down -v` | stop, and delete the databases so the next start is fresh |
 | `npm run dev` | run the service on your machine and restart on file changes |
 | `npm run typecheck` | check the types |
 | `npm test` | run all tests, needs `docker compose up -d supplier-db` |
@@ -150,8 +159,8 @@ days that join up (`src/domain/availability.ts`).
 
 ## API
 
-All routes except `/health` need `Authorization: Bearer <session>`. Request and
-response bodies are JSON.
+All routes except `/health` need a session: the `relay_session` cookie that the
+user-service sets when someone logs in. Request and response bodies are JSON.
 
 | Method and path | Who | What |
 | --- | --- | --- |
@@ -221,7 +230,7 @@ Blank optional fields and `null` clear the value.
 
 ```bash
 curl -X POST http://localhost:3002/suppliers \
-  -H "Authorization: Bearer admin-token" -H "Content-Type: application/json" \
+  -b cookies.txt -H "Content-Type: application/json" \
   -d '{"name":"Test Cafe","type":"Food","zone":"Central",
        "building":"Central Library","address":"Central Library, Level 1",
        "hours":[{"day":"monday","opens":"09:00","closes":"18:00"}]}'
@@ -241,79 +250,67 @@ names every invalid field, so a form can show them all at once.
 | Status | Code | When |
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST` | invalid fields or query, malformed JSON |
-| 401 | `UNAUTHENTICATED` | no session, or not a valid one |
-| 403 | `FORBIDDEN` | valid session, not allowed |
+| 401 | `UNAUTHENTICATED` | no session cookie at all |
+| 403 | `FORBIDDEN` | the user-service did not confirm it: an unknown or ended session, an account that is not Active, a missing role, or the user-service could not be asked |
 | 404 | `NOT_FOUND` | no such supplier or route |
-| 503 | `AUTH_UNAVAILABLE` | the User Service could not be asked |
 | 500 | `INTERNAL_ERROR` | a bug, with no detail given |
 
 ## Access control
 
-The User Service is the single authority on who may do what (N1.1). This service
-never looks inside a session and never checks a role. For every request it asks
-the User Service, passing on the caller's `Authorization` header unchanged:
+The user-service is the single authority on who is logged in and what they may do
+(N1.1). This service never decides access from a cookie or a token, and keeps no
+copy of roles. For every request it asks the user-service, whose contract is
+documented in `user-service/README.md`:
 
 ```text
-POST {USER_SERVICE_URL}/authorize
-Authorization: Bearer <session>
-{"operation": "supplier.create"}
+POST {USER_SERVICE_URL}/internal/authorize
+{"token": "<the relay_session cookie>", "requiredRole": "member" | "administrator"}
 
-200 {"accountId": "..."}     authorized
-401                          no valid session
-403                          valid session, not permitted
+200 {"decision": "authorized", "accountId": "...", "roles": ["member", ...]}
+200 {"decision": "denied"}
 ```
 
-The operations are `supplier.read`, `supplier.create`, `supplier.update` and
-`supplier.deactivate`. The User Service maps each to the roles that may do it.
-The backlog (F1.5.4) says administrators create, update and deactivate
-suppliers and any member may read them.
+The role each operation needs is kept in `src/auth.ts`, as the platform rule
+F1.5.4 says: an administrator to create, update or deactivate a supplier, and any
+member to read.
 
 - **Before anything else.** The check runs before the body is parsed or the
   database is touched. A refused caller learns nothing about which suppliers
   exist: patching a real id, a missing id and text that is not an id all answer
   the same 403 (N1.1.1), and a denied request changes nothing (F1.5.3).
-- **Denied requests.** No session or an invalid one is a 401. A session that is
-  not allowed, including one for a Suspended account, is a 403.
-- **Fails closed.** If the User Service does not answer within a second, or
-  answers with something unexpected, the request gets a 503 and is not served.
+- **Denied requests.** A request with no session cookie at all is a 401. Anything
+  else the user-service does not confirm is a 403.
+- **Fails closed (N1.1.2).** A timeout of about two seconds, a network error, a
+  status other than 200 and any other answer all count as denied and get a 403. A
+  warning is logged when the reason is that the user-service could not be asked,
+  so that an operator can tell that apart from a plain refusal.
 - **The actor is recorded.** The `accountId` in the answer is stored as
   `created_by` and `updated_by`.
+- **Sessions end at once for changes.** Logging out is refused straight away on
+  every create, update and deactivate. A read may go on for up to 5 seconds,
+  because the approval of a read is remembered (see Speed).
 
-`dev/fake-user-service.ts` stands in for the User Service until the real one
-exists. It is only for development and the tests, and it is not in the container
-image. It answers the contract above, and it lets three placeholder users log in
-at `POST /login` and get a session:
-
-| Username | Password | Role | Login |
-| --- | --- | --- | --- |
-| `student` | `student-pass` | member | accepted |
-| `admin` | `admin-pass` | administrator, and member | accepted |
-| `suspended` | `suspended-pass` | member, account suspended | refused with 403 |
-
-An unknown user and a wrong password get the identical 401. It also accepts three
-fixed sessions, as if issued earlier: `member-token`, `admin-token` and
-`suspended-token`, the last for an account that has since been suspended. The
-real User Service will have real accounts, so none of this carries over.
-
-The contract above is this service's assumption. It must be agreed with whoever
-builds the User Service, and if it changes, only `src/auth.ts` needs to change.
+`dev/fake-user-service.ts` fakes the authorization endpoint for the automated
+tests, with three fixed sessions. It is not in the compose stack or the image, so
+the running system and the demo use the real user-service.
 
 ## Speed
 
 The backlog asks that every supplier read answer within 100 ms, also with 1000
 clients at once (N2.1.1, N2.2.1). One query is fast on its own, but a search
-also waits on the User Service and the database, and with a thousand clients
-that adds up. Two short-lived caches remove most of that waiting:
+also waits on the user-service, which looks the session up in its own database,
+and on this service's database, and with a thousand clients that adds up. Two
+short-lived caches remove most of that waiting:
 
 | Cache | What it remembers | For | Trade-off |
 | --- | --- | --- | --- |
-| Authorization | that a session may read | `SUPPLIER_AUTH_CACHE_SECONDS`, 5 | an account suspended in the last few seconds can still read until it expires |
+| Authorization | that a session may read | `SUPPLIER_AUTH_CACHE_SECONDS`, 5 | a session that has just ended, or an account that has just been suspended, can still read until the answer expires |
 | Search results | the suppliers found by a search or listing | `SUPPLIER_READ_CACHE_SECONDS`, 2 | a change made through another instance takes up to that long to show |
 
 What they never do:
 
 - They never remember a refusal or an error, and never touch a create, update or
-  deactivate. Those always go to the User Service and the database.
+  deactivate. Those always go to the user-service and the database.
 - A change made through this instance clears the search cache at once, so an
   administrator sees their own edit immediately.
 - The opening hours are evaluated on every request, and `/availability` is never
@@ -329,29 +326,36 @@ Set either to `0` to turn it off.
 clients that each search, look at the answer for about a second, and search
 again. They join over 15 seconds and only the requests made after all of them
 are in are judged. A fifth of the searches use a keyword nobody asked for a
-moment ago, so they cannot be answered from memory. Run it against the running
-stack from the repository root:
+moment ago, so they cannot be answered from memory.
+
+The sessions are real. Before it starts, the script logs in to the user-service
+50 times as the administrator, which gives 50 different sessions that the clients
+share, and it logs them out at the end. Run it against the running system from
+the repository root:
 
 ```bash
-docker run --rm -i --network foc-template_default   -v "$PWD/supplier-service/loadtest:/scripts:ro" -e BASE=http://supplier-service:3002   grafana/k6 run --summary-trend-stats "avg,med,p(95),p(99),p(99.9),max" /scripts/search.js
+docker run --rm -i --network relay_default \
+  -v "$PWD/supplier-service/loadtest:/scripts:ro" \
+  -e BASE=http://supplier-service:3002 -e USER_URL=http://user-service:3000 \
+  grafana/k6 run --summary-trend-stats "avg,med,p(95),p(99),p(99.9),max" /scripts/search.js
 ```
 
-Result on one developer laptop, one instance of the service, Docker Desktop,
-about 1000 requests per second, about 37,000 requests per run and none failed.
-The table covers the whole run including the ramp-up. Judged on the steady state
-alone, which is what the script's threshold checks, p99 was 2.7 ms with the
-caches on and 124 ms with them off.
+Result on one developer laptop, one instance of each service, Docker Desktop, at
+about 750 requests per second. The table covers the whole run including the
+ramp-up. Judged on the steady state alone, which is what the script's threshold
+checks, p99 was 4.9 ms with the caches on and 1.65 s with them off.
 
-| | median | p95 | p99 | p99.9 | max |
-| --- | --- | --- | --- | --- | --- |
-| Caches on (the default) | 0.6 ms | 1.9 ms | **2.8 ms** | 6.5 ms | 23 ms |
-| Caches off | 6.7 ms | 30 ms | 116 ms | 157 ms | 169 ms |
+| | requests | failed | median | p95 | p99 | p99.9 | max |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Caches on (the default) | 38,095 | 0 | 0.7 ms | 3.3 ms | **7.8 ms** | 74 ms | 113 ms |
+| Caches off | 31,672 | 39 (0.12%) | 101 ms | 937 ms | 1.67 s | 2.09 s | 2.68 s |
 
-So with the caches the 100 ms bound holds with a wide margin, and without them
-the 99th percentile misses it. Flat out, with 1000 connections that never pause,
-one instance served about 8,800 requests per second (median 94 ms), which is the
-ceiling of this setup. These are numbers from one machine, not a guarantee, and
-the User Service stand-in answers instantly, where the real one will not.
+So with the caches the 100 ms bound holds for the 99th percentile with a wide
+margin, and without them it fails badly. The approval cache is what makes the
+difference. Without it every read waits on the user-service's authorization
+lookup, and that lookup cannot keep up with about 600 a second. One request in the
+run, during the ramp-up when nothing was remembered yet, took 113 ms. These are
+numbers from one machine, not a guarantee.
 
 ## Seed data
 
@@ -378,8 +382,9 @@ cd supplier-service
 npm test
 ```
 
-The tests for opening hours, validation, the seed file, the caches and the User
-Service client need nothing. The API tests run the real routes and SQL against
+The tests for opening hours, validation, the seed file, the caches and the
+user-service client need nothing. They use `dev/fake-user-service.ts` in place of
+the real authorization endpoint. The API tests run the real routes and SQL against
 the `supplier_test` database that Compose creates, which they empty each time.
 They need `SUPPLIER_TEST_DATABASE_URL`, whose database name must end in `_test`.
 Without it they are skipped, and the summary says so.
@@ -393,22 +398,22 @@ invalid one is settled before the database is reached.
 - If the database restarts, the service stays up, logs the dropped connection,
   and serves again as soon as the database is back. A request that was running
   at that moment fails.
-- If the User Service cannot answer, reads and writes get a 503 and nothing is
-  served, except reads whose approval is still remembered for a few seconds.
+- If the user-service cannot answer, every request is refused with a 403 and a
+  warning is logged, except reads whose approval is still remembered for a few
+  seconds. The supplier-service itself keeps running (N6.1.2).
 - Compose restarts a container that stops, and the service reports a health
   check that includes the database.
 
 ## Not done yet
 
-- The web client (N5). This is the API only.
-- The real User Service. Everything above uses the stand-in and the contract
-  described under Access control, which has to be agreed with the User Service
-  owner.
+- The web client (N5). This is the API only. A browser on another address cannot
+  send the session cookie to this service without a proxy, or cross-origin access
+  that allows credentials, and neither is set up.
+- Suspended accounts (F1.6, sprint 2). The user-service has no way to suspend an
+  account yet, so a suspended account is only covered by the fake in the
+  automated tests.
 - Availability of 99.9% (N2.1.1) is not measured. There is one instance, and
   running more (N6.3) needs no change to the service, because it keeps no state
   of its own apart from the two short caches.
-- Cross-origin access for the web client. During development the client can
-  proxy through Vite instead.
-- Rate limiting.
 - Supplier images. The seed file has links for only 6 of the 21 suppliers, and
   they point at GitHub pages, not image files.

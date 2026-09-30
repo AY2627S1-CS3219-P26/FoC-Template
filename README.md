@@ -27,6 +27,7 @@ Requires only Docker. From the repository root:
 | Component | URL |
 | --- | --- |
 | user-service | http://localhost:3001 |
+| supplier-service | http://localhost:3002 |
 | Mailpit (local email inbox) | http://localhost:8025 |
 
 No `.env` is needed for local use; every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me` unless `ADMIN_PASSWORD` is set. To override values, copy `.env.example` to `.env`.

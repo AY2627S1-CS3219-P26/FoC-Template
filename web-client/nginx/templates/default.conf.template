@@ -1,3 +1,6 @@
+# DNS server for looking up the services (Docker's internal DNS, later kube-dns). Filled in at start.
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
 server {
   listen 8080;
   root /usr/share/nginx/html;

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSession } from '@/api/user/session'
 import { Page } from '@/components/Page'
 import { ApiError, request } from '@/lib/http'
 
@@ -47,43 +48,39 @@ export function DevUiPage() {
           </div>
         </section>
 
-        <WhoAmI />
+        <SessionDemo />
         <ErrorCases />
       </Page>
     </main>
   )
 }
 
-function WhoAmI() {
-  const [result, setResult] = useState('Not asked yet')
-  const [pending, setPending] = useState(false)
+function SessionDemo() {
+  const session = useSession()
 
-  async function askServer() {
-    setPending(true)
-    try {
-      const me = await request<unknown>('user', '/users/me')
-      setResult(JSON.stringify(me, null, 2))
-    } catch (error) {
-      setResult(
-        error instanceof ApiError ? `${error.status} ${error.code}: ${error.message}` : String(error),
-      )
-    } finally {
-      setPending(false)
-    }
-  }
+  let status: string
+  if (session.isPending) status = 'Loading…'
+  else if (session.isError) status = `Error: ${session.error.message}`
+  else if (session.data === null) status = 'Guest (not logged in)'
+  else status = `Logged in as ${session.data.username} (${session.data.roles.join(', ')})`
 
   return (
     <section className="ds-surface grid gap-4 p-5">
-      <h2>Session (request)</h2>
-      <p className="text-muted">Calls GET /api/user/users/me through the gateway.</p>
+      <h2>Session (useSession)</h2>
+      <p className="text-muted">Asks GET /api/user/users/me once and keeps the answer in the cache.</p>
+      <p>
+        <strong>{status}</strong>
+      </p>
       <div>
-        <button type="button" className="ds-btn ds-btn--glass" onClick={askServer} disabled={pending}>
-          {pending ? 'Asking…' : 'Who am I?'}
+        <button
+          type="button"
+          className="ds-btn ds-btn--glass"
+          onClick={() => session.refetch()}
+          disabled={session.isFetching}
+        >
+          {session.isFetching ? 'Fetching…' : 'Refetch'}
         </button>
       </div>
-      <pre className="ds-surface ds-surface--sunken p-3 font-mono text-sm whitespace-pre-wrap wrap-anywhere">
-        {result}
-      </pre>
     </section>
   )
 }

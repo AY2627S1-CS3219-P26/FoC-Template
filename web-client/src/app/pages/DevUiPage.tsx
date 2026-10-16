@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/EmptyState'
 import { ErrorState } from '@/components/ErrorState'
 import { FormError } from '@/components/FormError'
 import { Notice } from '@/components/Notice'
+import { useQuery } from '@tanstack/react-query'
+import { QueryView } from '@/components/QueryView'
 
 // Hand-made errors, so every error view can be seen without breaking a service.
 const offlineError = new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
@@ -88,8 +90,9 @@ export function DevUiPage() {
           <LoadingState label="Loading errands" rows={5} />
         </section>
 
-        <EmptyStateDemo />
+        <QueryViewDemo />
 
+        <EmptyStateDemo />
 
         <section className="grid grid-cols-1 gap-4">
           <h2>Notices</h2>
@@ -251,6 +254,68 @@ function EmptyStateDemo() {
           ))}
         </ul>
       )}
+    </section>
+  )
+}
+
+type DemoMode = 'data' | 'empty' | 'error'
+
+const demoModes: DemoMode[] = ['data', 'empty', 'error']
+
+// Pretends to be a service: answers after a second with data, nothing, or a 503.
+async function loadDemoSuppliers(mode: DemoMode): Promise<string[]> {
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+  if (mode === 'error') {
+    throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'This part of Relay is not reachable right now.')
+  }
+  return mode === 'empty' ? [] : ['CoffeeBean @ COM3', 'Fine Food @ UTown', 'Printers @ PC Commons']
+}
+
+function QueryViewDemo() {
+  const [mode, setMode] = useState<DemoMode>('data')
+  const suppliers = useQuery({
+    // A gallery-only key. Real keys start with the service name, e.g. ['supplier', 'list'].
+    queryKey: ['gallery', 'suppliers', mode],
+    queryFn: () => loadDemoSuppliers(mode),
+    retry: false,
+  })
+
+  return (
+    <section className="grid grid-cols-1 gap-4">
+      <h2>Query view</h2>
+      <div className="ds-segmented justify-self-start">
+        {demoModes.map((option) => (
+          <button key={option} type="button" aria-pressed={mode === option} onClick={() => setMode(option)}>
+            {option}
+          </button>
+        ))}
+      </div>
+      <QueryView
+        query={suppliers}
+        loadingLabel="Loading suppliers"
+        isEmpty={(list) => list.length === 0}
+        empty={
+          <EmptyState
+            title="No suppliers found"
+            description="Nothing matches this filter."
+            action={
+              <button type="button" className="ds-btn ds-btn--glass" onClick={() => setMode('data')}>
+                Show all suppliers
+              </button>
+            }
+          />
+        }
+      >
+        {(list) => (
+          <ul className="ds-surface ds-rows">
+            {list.map((name) => (
+              <li key={name} className="p-4">
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </QueryView>
     </section>
   )
 }

@@ -3,6 +3,7 @@ import { useSession } from '@/api/user/session'
 import { Page } from '@/components/Page'
 import { ApiError, request } from '@/lib/http'
 import { LoadingState } from '@/components/LoadingState'
+import { EmptyState } from '@/components/EmptyState'
 
 
 const statusBadges = [
@@ -75,6 +76,8 @@ export function DevUiPage() {
           <LoadingState label="Loading suppliers" />
           <LoadingState label="Loading errands" rows={5} />
         </section>
+
+        <EmptyStateDemo />
 
         <ErrorCases />
       </Page>
@@ -167,6 +170,53 @@ function ErrorCases() {
       <pre className="ds-surface ds-surface--sunken p-3 font-mono text-sm whitespace-pre-wrap wrap-anywhere">
         {result}
       </pre>
+    </section>
+  )
+}
+
+type DemoFilter = 'All' | 'Open' | 'Completed'
+
+const demoFilters: DemoFilter[] = ['All', 'Open', 'Completed']
+
+const demoErrands = [
+  { id: 'ER-2390', title: 'Fine Food @ UTown', state: 'Open' },
+  { id: 'ER-2377', title: 'Printers @ PC Commons', state: 'Open' },
+]
+
+function EmptyStateDemo() {
+  const [filter, setFilter] = useState<DemoFilter>('Completed')
+  const visible = filter === 'All' ? demoErrands : demoErrands.filter((errand) => errand.state === filter)
+
+  return (
+    <section className="grid grid-cols-1 gap-4">
+      <h2>Empty state</h2>
+      <div className="ds-segmented justify-self-start">
+        {demoFilters.map((option) => (
+          <button key={option} type="button" aria-pressed={filter === option} onClick={() => setFilter(option)}>
+            {option}
+          </button>
+        ))}
+      </div>
+      {visible.length === 0 ? (
+        <EmptyState
+          title={`No ${filter.toLowerCase()} errands`}
+          description="Errands show up here once they reach this state."
+          action={
+            <button type="button" className="ds-btn ds-btn--glass" onClick={() => setFilter('All')}>
+              Show all errands
+            </button>
+          }
+        />
+      ) : (
+        <ul className="ds-surface ds-rows">
+          {visible.map((errand) => (
+            <li key={errand.id} className="flex items-center justify-between gap-3 p-4">
+              <span className="min-w-0">{errand.title}</span>
+              <span className="ds-badge ds-badge--danger">{errand.state}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

@@ -98,6 +98,7 @@ services:
     build: ./web-client
     environment:
       USER_SERVICE_URL: http://user-service:3000
+      SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
     ports:
       - "8080:8080"
     # No depends_on on purpose: nginx looks the services up per request, so the web client

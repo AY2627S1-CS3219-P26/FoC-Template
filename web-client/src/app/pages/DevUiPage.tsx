@@ -9,6 +9,7 @@ import { FormError } from '@/components/FormError'
 import { Notice } from '@/components/Notice'
 import { useQuery } from '@tanstack/react-query'
 import { QueryView } from '@/components/QueryView'
+import { TextField } from '@/components/TextField'
 
 // Hand-made errors, so every error view can be seen without breaking a service.
 const offlineError = new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
@@ -117,6 +118,8 @@ export function DevUiPage() {
         </section>
 
         <ErrorCases />
+
+        <TextFieldDemo />
       </Page>
     </main>
   )
@@ -316,6 +319,36 @@ function QueryViewDemo() {
           </ul>
         )}
       </QueryView>
+    </section>
+  )
+}
+
+function TextFieldDemo() {
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('demo@gmail.com')
+
+  return (
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
+      <h2>Text field</h2>
+      <TextField
+        label="Full name"
+        name="fullName"
+        autoComplete="name"
+        value={fullName}
+        onChange={setFullName}
+        hint="As it should appear to other students."
+      />
+      <p className="text-muted">Typed so far: {fullName || '(nothing)'}</p>
+      <TextField
+        label="NUS email"
+        name="email"
+        type="email"
+        autoComplete="email"
+        inputMode="email"
+        value={email}
+        onChange={setEmail}
+        errors={validationError.fieldErrors.email}
+      />
     </section>
   )
 }

@@ -1,0 +1,31 @@
+server {
+  listen 8080;
+  root /usr/share/nginx/html;
+
+  # Liveness check for Docker and later Kubernetes. Never touches a service.
+  location = /healthz {
+    access_log off;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  # Each service routes its own paths in its own file (from step 6 on).
+  include /etc/nginx/conf.d/routes/*.conf;
+
+  # Any /api path no service file claimed. This is what keeps /internal unreachable.
+  location /api/ {
+    default_type application/json;
+    return 404 '{"error":{"code":"NOT_FOUND","message":"No such API route"}}';
+  }
+
+  # Vite puts a content hash in every file name here, so browsers may cache them for a year.
+  location /assets/ {
+    expires 1y;
+  }
+
+  # SPA fallback: every other path gets index.html and React Router picks the page.
+  location / {
+    try_files $uri /index.html;
+    expires -1;
+  }
+}

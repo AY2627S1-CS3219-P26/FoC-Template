@@ -94,6 +94,23 @@ services:
       retries: 10
     restart: unless-stopped
 
+  web-client:
+    build: ./web-client
+    environment:
+      USER_SERVICE_URL: http://user-service:3000
+    ports:
+      - "8080:8080"
+    # No depends_on on purpose: nginx looks the services up per request, so the web client
+    # starts and stays up while a service is down or being replaced (N6.1.2).
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+
 volumes:
   user-db-data:
   supplier-db-data:

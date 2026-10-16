@@ -4,6 +4,17 @@ import { Page } from '@/components/Page'
 import { ApiError, request } from '@/lib/http'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
+import { ErrorState } from '@/components/ErrorState'
+import { FormError } from '@/components/FormError'
+import { Notice } from '@/components/Notice'
+
+// Hand-made errors, so every error view can be seen without breaking a service.
+const offlineError = new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
+const forbiddenError = new ApiError(403, 'FORBIDDEN', 'You are not allowed to do this')
+const validationError = new ApiError(400, 'VALIDATION_FAILED', 'One or more fields are invalid', {
+  email: ['must end with @u.nus.edu or @nus.edu.sg'],
+  body: ['must contain fullName or username'],
+})
 
 
 const statusBadges = [
@@ -78,6 +89,29 @@ export function DevUiPage() {
         </section>
 
         <EmptyStateDemo />
+
+
+        <section className="grid grid-cols-1 gap-4">
+          <h2>Notices</h2>
+          <Notice tone="info" title="Code sent">
+            We sent a new 6-digit code to e0123456@u.nus.edu.
+          </Notice>
+          <Notice tone="success" title="Starter credits: 50 CR">
+            Granted once. Credits stay inside Relay and cannot be bought or cashed out.
+          </Notice>
+          <Notice tone="danger" title="This account is suspended" />
+        </section>
+
+        <section className="grid grid-cols-1 gap-4">
+          <h2>Error state</h2>
+          <ErrorState error={offlineError} onRetry={() => alert('Retry clicked')} />
+          <ErrorState error={forbiddenError} onRetry={() => alert('Retry clicked')} />
+        </section>
+
+        <section className="grid grid-cols-1 gap-4">
+          <h2>Form error</h2>
+          <FormError error={validationError} fields={['email']} />
+        </section>
 
         <ErrorCases />
       </Page>

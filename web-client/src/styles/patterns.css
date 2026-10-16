@@ -316,3 +316,28 @@
   border-radius: var(--ds-radius-tile);
   background: var(--ds-color-track);
 }
+
+/* Notice: a tinted box for information, confirmations and refused actions (N5.4). */
+.ds-notice {
+  display: grid;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-4);
+  border: 1px solid;
+  border-radius: var(--ds-radius-inset);
+  color: var(--ds-color-text);
+}
+
+.ds-notice--info {
+  background: var(--ds-color-info-surface);
+  border-color: var(--ds-color-info-mark);
+}
+
+.ds-notice--success {
+  background: var(--ds-color-success-surface);
+  border-color: var(--ds-color-success-mark);
+}
+
+.ds-notice--danger {
+  background: var(--ds-color-danger-surface);
+  border-color: var(--ds-color-danger-mark);
+}

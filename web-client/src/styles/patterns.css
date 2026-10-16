@@ -341,3 +341,9 @@
   background: var(--ds-color-danger-surface);
   border-color: var(--ds-color-danger-mark);
 }
+
+/* Select: the native arrow differs per browser, so it is hidden and SelectField draws its own. */
+.ds-select {
+  appearance: none;
+  padding-right: var(--ds-space-10);
+}

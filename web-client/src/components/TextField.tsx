@@ -1,11 +1,10 @@
-import { useId } from 'react'
+import { Field } from './Field'
 
 type TextFieldProps = {
   label: string
   name: string
   value: string
   onChange: (value: string) => void
-  // The server's messages for this field, e.g. error.fieldErrors.email (N5.4).
   errors?: string[]
   hint?: string
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url'
@@ -18,51 +17,26 @@ export function TextField({
   name,
   value,
   onChange,
-  errors = [],
+  errors,
   hint,
   type = 'text',
   autoComplete,
   inputMode,
 }: TextFieldProps) {
-  const id = useId()
-  const hintId = `${id}-hint`
-  const errorId = `${id}-error`
-  const hasErrors = errors.length > 0
-  // Screen readers read the hint and the error together with the label.
-  const describedBy = [hint && hintId, hasErrors && errorId].filter(Boolean).join(' ') || undefined
-
   return (
-    <div className="grid grid-cols-1">
-      <label htmlFor={id} className="ds-field-label">
-        {label}
-      </label>
-      <input
-        id={id}
-        name={name}
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={autoComplete}
-        inputMode={inputMode}
-        aria-invalid={hasErrors || undefined}
-        aria-describedby={describedBy}
-        className="ds-field"
-      />
-      {hint && (
-        <p id={hintId} className="mt-2 text-sm text-muted">
-          {hint}
-        </p>
+    <Field label={label} hint={hint} errors={errors}>
+      {(control) => (
+        <input
+          {...control}
+          name={name}
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          className="ds-field"
+        />
       )}
-      {hasErrors && (
-        <p id={errorId} className="ds-field-error">
-          {errors.map(capitalize).join('. ')}
-        </p>
-      )}
-    </div>
+    </Field>
   )
-}
-
-// The services phrase field errors as "must be at least 8 characters".
-function capitalize(message: string): string {
-  return message.charAt(0).toUpperCase() + message.slice(1)
 }

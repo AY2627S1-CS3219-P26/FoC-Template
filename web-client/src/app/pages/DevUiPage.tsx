@@ -10,6 +10,7 @@ import { Notice } from '@/components/Notice'
 import { useQuery } from '@tanstack/react-query'
 import { QueryView } from '@/components/QueryView'
 import { TextField } from '@/components/TextField'
+import { SelectField } from '@/components/SelectField'
 
 // Hand-made errors, so every error view can be seen without breaking a service.
 const offlineError = new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
@@ -120,6 +121,8 @@ export function DevUiPage() {
         <ErrorCases />
 
         <TextFieldDemo />
+
+        <SelectFieldDemo />
       </Page>
     </main>
   )
@@ -348,6 +351,33 @@ function TextFieldDemo() {
         value={email}
         onChange={setEmail}
         errors={validationError.fieldErrors.email}
+      />
+    </section>
+  )
+}
+
+const zoneOptions = [
+  { value: '', label: 'All zones' },
+  { value: 'Central', label: 'Central' },
+  { value: 'UTown', label: 'UTown' },
+  { value: 'Kent Ridge', label: 'Kent Ridge' },
+]
+
+function SelectFieldDemo() {
+  const [zone, setZone] = useState('')
+
+  return (
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
+      <h2>Select field</h2>
+      <SelectField label="Campus zone" name="zone" value={zone} onChange={setZone} options={zoneOptions} />
+      <p className="text-muted">Selected: {zone || '(all zones)'}</p>
+      <SelectField
+        label="Type"
+        name="type"
+        value=""
+        onChange={() => {}}
+        options={[{ value: '', label: 'Pick a type' }]}
+        errors={['is required']}
       />
     </section>
   )

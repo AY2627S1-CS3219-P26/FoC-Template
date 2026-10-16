@@ -20,7 +20,7 @@ export function DevUiPage() {
         subtitle="Every shared component in every state. Left out of production builds."
         actions={<span className="ds-badge ds-badge--neutral">Dev only</span>}
       >
-        <section className="ds-surface grid gap-4 p-5">
+        <section className="ds-surface grid grid-cols-1 gap-4 p-5">
           <h2>Buttons</h2>
           <div className="flex flex-wrap gap-3">
             <button type="button" className="ds-btn ds-btn--primary">
@@ -38,7 +38,26 @@ export function DevUiPage() {
           </div>
         </section>
 
-        <section className="ds-surface grid gap-4 p-5">
+        <section className="ds-surface grid grid-cols-1 gap-4 p-5">
+          <h2>Long content (N5.1)</h2>
+          <p className="text-muted">Nothing here may push the page wider than the screen.</p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="ds-btn ds-btn--primary">
+              A very long button label that has to wrap on a small phone
+            </button>
+          </div>
+          <p>e0123456789.with.a.very.long.name.that.does.not.fit@u.nus.edu</p>
+          <div className="ds-segmented">
+            <button type="button" aria-pressed="true">All</button>
+            <button type="button">Stores</button>
+            <button type="button">Facilities</button>
+            <button type="button">Landmarks</button>
+            <button type="button">Printers</button>
+          </div>
+        </section>
+
+
+        <section className="ds-surface grid grid-cols-1 gap-4 p-5">
           <h2>Status badges</h2>
           <div className="flex flex-wrap gap-3">
             {statusBadges.map((badge) => (
@@ -50,8 +69,8 @@ export function DevUiPage() {
         </section>
 
         <SessionDemo />
-        
-        <section className="grid gap-4">
+
+        <section className="grid grid-cols-1 gap-4">
           <h2>Loading state</h2>
           <LoadingState label="Loading suppliers" />
           <LoadingState label="Loading errands" rows={5} />
@@ -73,7 +92,7 @@ function SessionDemo() {
   else status = `Logged in as ${session.data.username} (${session.data.roles.join(', ')})`
 
   return (
-    <section className="ds-surface grid gap-4 p-5">
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
       <h2>Session (useSession)</h2>
       <p className="text-muted">Asks GET /api/user/users/me once and keeps the answer in the cache.</p>
       <p>
@@ -130,7 +149,7 @@ function ErrorCases() {
   }
 
   return (
-    <section className="ds-surface grid gap-4 p-5">
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
       <h2>Error handling (ApiError)</h2>
       <p className="text-muted">Each button triggers a refused request. Nothing is created.</p>
       <div className="flex flex-wrap gap-3">

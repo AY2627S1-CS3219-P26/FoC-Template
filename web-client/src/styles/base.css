@@ -24,6 +24,9 @@ body {
   color: var(--ds-color-text);
   text-wrap: pretty;
 
+  /* Words that do not fit, like long e-mail addresses or ids, break instead of widening the page (N5.1). */
+  overflow-wrap: break-word;
+
   background-color: var(--ds-color-backdrop);
   background-image: var(--ds-gradient-backdrop);
   background-attachment: fixed;

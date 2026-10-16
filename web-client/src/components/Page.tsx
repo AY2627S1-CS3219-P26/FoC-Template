@@ -21,7 +21,7 @@ export function Page({ title, subtitle, actions, children }: PageProps) {
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
       </header>
-      <div className="mx-auto grid w-full max-w-layout gap-4 px-4 py-6 md:px-8">{children}</div>
+      <div className="mx-auto grid w-full max-w-layout grid-cols-1 gap-4 px-4 py-6 md:px-8">{children}</div>
     </>
   )
 }

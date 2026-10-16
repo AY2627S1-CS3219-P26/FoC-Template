@@ -15,7 +15,7 @@ export function LoadingState({ label, rows = 3, variant = 'block' }: LoadingStat
   }
 
   return (
-    <div role="status" className="ds-surface grid gap-3 p-5">
+    <div role="status" className="ds-surface grid grid-cols-1 gap-3 p-5">
       <span className="sr-only">{label}</span>
       {Array.from({ length: rows }, (_, index) => (
         <span

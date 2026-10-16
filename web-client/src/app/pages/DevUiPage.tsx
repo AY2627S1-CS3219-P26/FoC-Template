@@ -13,6 +13,8 @@ import { SelectField } from '@/components/SelectField'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { SubmitEvent } from 'react'
 import { SubmitButton } from '@/components/SubmitButton'
+import { Pagination } from '@/components/Pagination'
+import { formatDate, formatDateTime, formatTime } from '@/lib/format'
 
 // Hand-made errors, so every error view can be seen without breaking a service.
 const offlineError = new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
@@ -95,6 +97,10 @@ export function DevUiPage() {
         </section>
 
         <QueryViewDemo />
+
+        <PaginationDemo />
+
+        <FormatDemo />
 
         <EmptyStateDemo />
 
@@ -459,6 +465,37 @@ function FormDemo() {
           Create account
         </SubmitButton>
       </form>
+    </section>
+  )
+}
+
+function PaginationDemo() {
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+  const total = 95
+  const first = (page - 1) * pageSize + 1
+  const last = Math.min(page * pageSize, total)
+
+  return (
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
+      <h2>Pagination</h2>
+      <p className="text-muted">
+        Showing {first} to {last} of {total} suppliers
+      </p>
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
+    </section>
+  )
+}
+
+const sampleTime = '2026-08-12T10:22:00.000Z'
+
+function FormatDemo() {
+  return (
+    <section className="ds-surface grid grid-cols-1 gap-2 p-5">
+      <h2>Dates and times (campus time)</h2>
+      <p>formatDate: {formatDate(sampleTime)}</p>
+      <p>formatTime: {formatTime(sampleTime)}</p>
+      <p>formatDateTime: {formatDateTime(sampleTime)}</p>
     </section>
   )
 }

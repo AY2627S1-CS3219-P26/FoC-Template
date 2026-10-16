@@ -10,15 +10,21 @@ export type Paginated<T> = {
   total: number
 }
 
+export type FieldErrors = Record<string, string[]>
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  readonly fieldErrors: FieldErrors
+  readonly details: unknown
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, fieldErrors: FieldErrors = {}, details?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.fieldErrors = fieldErrors
+    this.details = details
   }
 }
 
@@ -36,22 +42,33 @@ export async function request<T>(
 ): Promise<T> {
   const { method = 'GET', body, query, signal } = options
 
-  const response = await fetch(buildUrl(service, path, query), {
-    method,
-    signal,
-    // Same origin as the gateway, so the session cookie goes along automatically.
-    credentials: 'same-origin',
-    headers:
-      body === undefined
-        ? { Accept: 'application/json' }
-        : { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetch(buildUrl(service, path, query), {
+      method,
+      signal,
+      // Same origin as the gateway, so the session cookie goes along automatically.
+      credentials: 'same-origin',
+      headers:
+        body === undefined
+          ? { Accept: 'application/json' }
+          : { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  } catch (error) {
+    // A cancelled request is not a failure; whoever cancelled it handles that.
+    if (signal?.aborted) throw error
+    throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
+  }
 
   if (!response.ok) throw await toApiError(response)
   // 204 No Content has no body to parse, e.g. logout.
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  try {
+    return (await response.json()) as T
+  } catch {
+    throw new ApiError(response.status, 'UNEXPECTED_RESPONSE', 'The server sent a response Relay cannot read.')
+  }
 }
 
 function buildUrl(service: ServiceName, path: string, query: RequestOptions['query']): string {
@@ -63,24 +80,57 @@ function buildUrl(service: ServiceName, path: string, query: RequestOptions['que
   return `/api/${service}${path}${search ? `?${search}` : ''}`
 }
 
+type ErrorBody = {
+  error: { code: string; message: string; details?: unknown; fields?: unknown }
+}
+
 async function toApiError(response: Response): Promise<ApiError> {
   const body: unknown = await response.json().catch(() => null)
   if (isErrorBody(body)) {
-    return new ApiError(response.status, body.error.code, body.error.message)
+    const { code, message, details } = body.error
+    return new ApiError(response.status, code, message, readFieldErrors(body.error), details)
   }
-  return new ApiError(response.status, 'UNEXPECTED_RESPONSE', `Unexpected response (${response.status})`)
+  // No JSON at all usually means a proxy or server in between failed.
+  if (response.status >= 500) {
+    return new ApiError(response.status, 'SERVICE_UNAVAILABLE', 'This part of Relay is not reachable right now.')
+  }
+  return new ApiError(response.status, 'UNEXPECTED_RESPONSE', `Unexpected response (${response.status}).`)
 }
 
 // The services and the gateway all answer errors as {"error":{"code":"...","message":"..."}}.
-function isErrorBody(body: unknown): body is { error: { code: string; message: string } } {
-  if (typeof body !== 'object' || body === null || !('error' in body)) return false
-  const error = body.error
+function isErrorBody(body: unknown): body is ErrorBody {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof error.code === 'string' &&
-    'message' in error &&
-    typeof error.message === 'string'
+    isRecord(body) &&
+    isRecord(body.error) &&
+    typeof body.error.code === 'string' &&
+    typeof body.error.message === 'string'
   )
+}
+
+function readFieldErrors(error: ErrorBody['error']): FieldErrors {
+  const fieldErrors: FieldErrors = {}
+
+  // user-service: details.fields = { email: ['must end with @u.nus.edu or @nus.edu.sg'] }
+  if (isRecord(error.details) && isRecord(error.details.fields)) {
+    for (const [field, messages] of Object.entries(error.details.fields)) {
+      if (Array.isArray(messages)) fieldErrors[field] = messages.map(String)
+    }
+  }
+
+  // supplier-service, until it uses the shared shape: fields = [{ field: 'name', message: '...' }]
+  if (Array.isArray(error.fields)) {
+    for (const item of error.fields) {
+      if (isRecord(item) && typeof item.field === 'string' && typeof item.message === 'string') {
+        const messages = fieldErrors[item.field] ?? []
+        messages.push(item.message)
+        fieldErrors[item.field] = messages
+      }
+    }
+  }
+
+  return fieldErrors
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

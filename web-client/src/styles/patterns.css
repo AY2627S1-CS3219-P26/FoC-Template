@@ -303,3 +303,11 @@
   border-radius: var(--ds-radius-chip);
   background: var(--ds-chart-series-1);
 }
+
+/* Loading placeholder bar (N5.2). LoadingState adds animate-pulse; reduced motion stops it. */
+.ds-skeleton {
+  display: block;
+  height: var(--ds-space-4);
+  border-radius: var(--ds-radius-tile);
+  background: var(--ds-color-track);
+}

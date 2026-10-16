@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSession } from '@/api/user/session'
 import { Page } from '@/components/Page'
 import { ApiError, request } from '@/lib/http'
+import { LoadingState } from '@/components/LoadingState'
 
 
 const statusBadges = [
@@ -49,6 +50,13 @@ export function DevUiPage() {
         </section>
 
         <SessionDemo />
+        
+        <section className="grid gap-4">
+          <h2>Loading state</h2>
+          <LoadingState label="Loading suppliers" />
+          <LoadingState label="Loading errands" rows={5} />
+        </section>
+
         <ErrorCases />
       </Page>
     </main>

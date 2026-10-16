@@ -347,3 +347,9 @@
   appearance: none;
   padding-right: var(--ds-space-10);
 }
+
+/* A button whose request is running stays fully visible, so it reads as busy, not as unavailable. */
+.ds-btn[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}

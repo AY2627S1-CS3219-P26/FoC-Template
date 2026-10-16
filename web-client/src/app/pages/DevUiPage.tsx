@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useSession } from '@/api/user/session'
 import { Page } from '@/components/Page'
-import { ApiError, request } from '@/lib/http'
+import { ApiError, fieldErrorsOf, request } from '@/lib/http'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
 import { ErrorState } from '@/components/ErrorState'
 import { FormError } from '@/components/FormError'
 import { Notice } from '@/components/Notice'
-import { useQuery } from '@tanstack/react-query'
 import { QueryView } from '@/components/QueryView'
 import { TextField } from '@/components/TextField'
 import { SelectField } from '@/components/SelectField'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import type { SubmitEvent } from 'react'
+import { SubmitButton } from '@/components/SubmitButton'
 
 // Hand-made errors, so every error view can be seen without breaking a service.
 const offlineError = new ApiError(0, 'NETWORK_ERROR', 'Could not reach Relay. Check your connection and try again.')
@@ -123,6 +125,8 @@ export function DevUiPage() {
         <TextFieldDemo />
 
         <SelectFieldDemo />
+
+        <FormDemo />
       </Page>
     </main>
   )
@@ -379,6 +383,82 @@ function SelectFieldDemo() {
         options={[{ value: '', label: 'Pick a type' }]}
         errors={['is required']}
       />
+    </section>
+  )
+}
+
+type DemoSignUp = {
+  fullName: string
+  email: string
+  username: string
+  password: string
+}
+
+function FormDemo() {
+  const [values, setValues] = useState<DemoSignUp>({
+    fullName: 'Gallery Demo',
+    email: 'demo@gmail.com',
+    username: 'gallery-demo',
+    password: 'short',
+  })
+  // Inline only in the gallery. Real pages take their mutations from src/api/<service>/.
+  const signUp = useMutation({
+    mutationFn: (input: DemoSignUp) => request('user', '/auth/register', { method: 'POST', body: input }),
+  })
+  const fieldErrors = fieldErrorsOf(signUp.error)
+
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    signUp.mutate(values)
+  }
+
+  return (
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
+      <h2>Form (real request)</h2>
+      <p className="text-muted">
+        Sends a sign-up to the user-service. With these values it is refused and nothing is created.
+      </p>
+      <form noValidate onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <FormError error={signUp.error} fields={['fullName', 'email', 'username', 'password']} />
+        <TextField
+          label="Full name"
+          name="fullName"
+          autoComplete="name"
+          value={values.fullName}
+          onChange={(fullName) => setValues({ ...values, fullName })}
+          errors={fieldErrors.fullName}
+        />
+        <TextField
+          label="NUS email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          value={values.email}
+          onChange={(email) => setValues({ ...values, email })}
+          errors={fieldErrors.email}
+        />
+        <TextField
+          label="Username"
+          name="username"
+          autoComplete="username"
+          value={values.username}
+          onChange={(username) => setValues({ ...values, username })}
+          errors={fieldErrors.username}
+        />
+        <TextField
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          value={values.password}
+          onChange={(password) => setValues({ ...values, password })}
+          errors={fieldErrors.password}
+        />
+        <SubmitButton pending={signUp.isPending} pendingLabel="Creating account…">
+          Create account
+        </SubmitButton>
+      </form>
     </section>
   )
 }

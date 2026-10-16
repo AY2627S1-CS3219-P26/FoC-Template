@@ -28,6 +28,11 @@ export class ApiError extends Error {
   }
 }
 
+// The field messages of a refused request, or none. Forms pass these to their fields.
+export function fieldErrorsOf(error: unknown): FieldErrors {
+  return error instanceof ApiError ? error.fieldErrors : {}
+}
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown

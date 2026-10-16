@@ -1,11 +1,13 @@
 import { createBrowserRouter } from 'react-router'
 import { RootLayout } from './layouts/RootLayout'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { RouteErrorPage } from './pages/RouteErrorPage'
 
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: RootLayout,
+    ErrorBoundary: RouteErrorPage,
     children: [
       {
         index: true,

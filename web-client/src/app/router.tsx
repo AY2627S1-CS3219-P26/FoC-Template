@@ -4,6 +4,7 @@ import { RootLayout } from './layouts/RootLayout'
 import { DevUiPage } from './pages/DevUiPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { RouteErrorPage } from './pages/RouteErrorPage'
+import { RequireAdmin } from './guards/RequireAdmin'
 import { RequireGuest } from './guards/RequireGuest'
 import { RequireSession } from './guards/RequireSession'
 import { AuthLayout } from './layouts/AuthLayout'
@@ -38,7 +39,12 @@ export const router = createBrowserRouter([
       {
         path: 'admin',
         Component: RequireSession,
-        children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }, ...adminRoutes],
+        children: [
+          {
+            Component: RequireAdmin,
+            children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }, ...adminRoutes],
+          },
+        ],
       },
       // The gallery only exists in development. In a production build this branch is
       // removed completely, so the page is not even shipped.

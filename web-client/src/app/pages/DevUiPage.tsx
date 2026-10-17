@@ -140,6 +140,13 @@ export function DevUiPage() {
 
 function SessionDemo() {
   const session = useSession()
+  // Needs a session. Logged out, it answers 401, and the global handler turns the session to guest.
+  const protectedData = useQuery({
+    queryKey: ['gallery', 'protected'],
+    queryFn: () => request('supplier', '/suppliers', { query: { pageSize: 1 } }),
+    enabled: false,
+    retry: false,
+  })
 
   let status: string
   if (session.isPending) status = 'Loading…'
@@ -163,6 +170,14 @@ function SessionDemo() {
         >
           {session.isFetching ? 'Fetching…' : 'Refetch'}
         </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="ds-btn ds-btn--glass" onClick={() => protectedData.refetch()}>
+          Load protected data
+        </button>
+        <span className="text-muted">
+          {protectedData.isError ? `Refused: ${protectedData.error.message}` : protectedData.isSuccess ? 'Loaded' : ''}
+        </span>
       </div>
     </section>
   )

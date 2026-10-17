@@ -5,6 +5,7 @@ import { DevUiPage } from './pages/DevUiPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { RouteErrorPage } from './pages/RouteErrorPage'
 import { RequireGuest } from './guards/RequireGuest'
+import { RequireSession } from './guards/RequireSession'
 import { AuthLayout } from './layouts/AuthLayout'
 
 const guestRoutes = features.flatMap((feature) => feature.guest ?? [])
@@ -22,8 +23,9 @@ export const router = createBrowserRouter([
         Component: RequireGuest,
         children: [{ Component: AuthLayout, children: guestRoutes }],
       },
-      // The student app.
+      // The student app: only for logged-in accounts.
       {
+        Component: RequireSession,
         children: [
           { index: true, element: <Navigate to="/errands" replace /> },
           ...appRoutes,
@@ -32,6 +34,7 @@ export const router = createBrowserRouter([
       // The admin console. Reached only by typing /admin/..., the student app never links here.
       {
         path: 'admin',
+        Component: RequireSession,
         children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }, ...adminRoutes],
       },
       // The gallery only exists in development. In a production build this branch is

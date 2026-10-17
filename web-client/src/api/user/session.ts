@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { ApiError, request } from '@/lib/http'
 import type { PublicUser } from './types'
 
@@ -21,5 +21,14 @@ export function useSession() {
     queryFn: ({ signal }) => fetchSession(signal),
     // Only login and logout change the session, and they update this cache entry directly.
     staleTime: Infinity,
+  })
+}
+
+export function useLogout() {
+  return useMutation({
+    mutationFn: () => request<void>('user', '/auth/logout', { method: 'POST' }),
+    // A full page load wipes every cached answer of the account that just left, which matters on
+    // shared computers. replace() also drops the protected page from the back button history.
+    onSuccess: () => window.location.replace('/login'),
   })
 }

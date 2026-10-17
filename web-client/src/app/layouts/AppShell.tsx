@@ -1,4 +1,5 @@
 import { BalanceCard } from '@/features/credit/components/BalanceCard'
+import { LogoutButton } from '@/features/user/components/LogoutButton'
 import { appNav } from '../navigation'
 import { Shell } from './Shell'
 import { SideNav } from './SideNav'
@@ -10,7 +11,12 @@ export function AppShell() {
       label="Student"
       nav={<SideNav label="Main" items={appNav} />}
       mobileNav={<TabBar label="Main" items={appNav} />}
-      sidebarFooter={<BalanceCard />}
+      sidebarFooter={
+        <>
+          <BalanceCard />
+          <LogoutButton look="nav" />
+        </>
+      }
     />
   )
 }

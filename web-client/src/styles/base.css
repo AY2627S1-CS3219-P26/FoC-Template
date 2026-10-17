@@ -141,6 +141,11 @@ canvas {
   outline-offset: var(--ds-focus-ring-offset);
 }
 
+/* Containers that only get focus from code, like <main> after the skip link, need no ring. */
+[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
 /* Tables */
 table {
   border-collapse: collapse;

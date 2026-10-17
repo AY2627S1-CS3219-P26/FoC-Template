@@ -34,7 +34,7 @@ const statusBadges = [
 
 export function DevUiPage() {
   return (
-    <main>
+    <main id="main">
       <Page
         title="Relay UI gallery"
         subtitle="Every shared component in every state. Left out of production builds."

@@ -7,6 +7,7 @@ import { RouteErrorPage } from './pages/RouteErrorPage'
 import { RequireAdmin } from './guards/RequireAdmin'
 import { RequireGuest } from './guards/RequireGuest'
 import { RequireSession } from './guards/RequireSession'
+import { AdminShell } from './layouts/AdminShell'
 import { AuthLayout } from './layouts/AuthLayout'
 import { AppShell } from './layouts/AppShell'
 
@@ -42,7 +43,12 @@ export const router = createBrowserRouter([
         children: [
           {
             Component: RequireAdmin,
-            children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }, ...adminRoutes],
+            children: [
+              {
+                Component: AdminShell,
+                children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }, ...adminRoutes],
+              },
+            ],
           },
         ],
       },

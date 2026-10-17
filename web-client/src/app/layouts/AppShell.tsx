@@ -10,7 +10,7 @@ export function AppShell() {
     <Shell
       label="Student"
       nav={<SideNav label="Main" items={appNav} />}
-      mobileNav={<TabBar label="Main" items={appNav} />}
+      mobileTabBar={<TabBar label="Main" items={appNav} />}
       sidebarFooter={
         <>
           <BalanceCard />

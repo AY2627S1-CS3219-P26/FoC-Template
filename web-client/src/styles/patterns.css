@@ -353,3 +353,28 @@
   opacity: 1;
   cursor: progress;
 }
+
+/* Sidebar navigation item. NavLink marks the current page with aria-current="page". */
+.ds-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  min-height: var(--ds-control-h-md);
+  padding: var(--ds-space-2) var(--ds-space-4);
+  border-radius: var(--ds-radius-button);
+  color: var(--ds-color-text-muted);
+  font-weight: var(--ds-weight-medium);
+  transition:
+    background-color var(--ds-motion-hover),
+    color var(--ds-motion-hover);
+}
+
+.ds-nav-item:hover {
+  color: var(--ds-color-text);
+}
+
+.ds-nav-item[aria-current='page'] {
+  background: var(--ds-color-surface-selected);
+  color: var(--ds-color-accent);
+  box-shadow: var(--ds-elevation-selected);
+}

@@ -7,6 +7,7 @@ import { RouteErrorPage } from './pages/RouteErrorPage'
 import { RequireGuest } from './guards/RequireGuest'
 import { RequireSession } from './guards/RequireSession'
 import { AuthLayout } from './layouts/AuthLayout'
+import { AppShell } from './layouts/AppShell'
 
 const guestRoutes = features.flatMap((feature) => feature.guest ?? [])
 const appRoutes = features.flatMap((feature) => feature.app ?? [])
@@ -27,8 +28,10 @@ export const router = createBrowserRouter([
       {
         Component: RequireSession,
         children: [
-          { index: true, element: <Navigate to="/errands" replace /> },
-          ...appRoutes,
+          {
+            Component: AppShell,
+            children: [{ index: true, element: <Navigate to="/errands" replace /> }, ...appRoutes],
+          },
         ],
       },
       // The admin console. Reached only by typing /admin/..., the student app never links here.

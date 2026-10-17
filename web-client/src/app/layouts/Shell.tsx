@@ -1,0 +1,31 @@
+import { Outlet } from 'react-router'
+import type { ReactNode } from 'react'
+
+type ShellProps = {
+  // Shown under the wordmark, e.g. "Student" or "Admin console".
+  label: string
+  // The navigation in the sidebar.
+  nav: ReactNode
+}
+
+// The frame shared by the student app and the admin console: a sidebar from lg (1024px) up,
+// the page next to it. Below lg the sidebar is hidden and a mobile navigation takes over.
+export function Shell({ label, nav }: ShellProps) {
+  return (
+    <div className="min-h-dvh lg:flex">
+      <aside className="ds-surface ds-surface--chrome hidden rounded-none border-y-0 border-l-0 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-64 lg:shrink-0 lg:flex-col lg:gap-8 lg:p-5">
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="size-9 shrink-0 rounded-tile bg-accent-gradient" />
+          <div className="min-w-0">
+            <p className="text-lg font-bold">Relay</p>
+            <p className="ds-label">{label}</p>
+          </div>
+        </div>
+        {nav}
+      </aside>
+      <main id="main" className="min-w-0 flex-1">
+        <Outlet />
+      </main>
+    </div>
+  )
+}

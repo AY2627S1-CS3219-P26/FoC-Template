@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 import { features } from './features'
 import { RootLayout } from './layouts/RootLayout'
 import { DevUiPage } from './pages/DevUiPage'
@@ -20,16 +20,15 @@ export const router = createBrowserRouter([
       // The student app.
       {
         children: [
-          {
-            index: true,
-            // Stand-in until the app shell takes over this path.
-            element: <p className="p-8">Relay web client</p>,
-          },
+          { index: true, element: <Navigate to="/errands" replace /> },
           ...appRoutes,
         ],
       },
       // The admin console. Reached only by typing /admin/..., the student app never links here.
-      { path: 'admin', children: adminRoutes },
+      {
+        path: 'admin',
+        children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }, ...adminRoutes],
+      },
       // The gallery only exists in development. In a production build this branch is
       // removed completely, so the page is not even shipped.
       ...(import.meta.env.DEV ? [{ path: '_dev/ui', Component: DevUiPage }] : []),

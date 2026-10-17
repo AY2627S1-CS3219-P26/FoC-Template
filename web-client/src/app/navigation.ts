@@ -5,6 +5,8 @@ export type NavItem = {
   to: string
   label: string
   icon: LucideIcon
+  // A shorter label where space is tight, like the mobile tab bar.
+  shortLabel?: string
   // Only active on exactly this path, so "Errands" is not also highlighted on /errands/new.
   end?: boolean
 }
@@ -12,7 +14,7 @@ export type NavItem = {
 // Each path must match a route in a feature's routes.ts. Renaming a route means changing it here too.
 export const appNav: NavItem[] = [
   { to: '/errands', label: 'Errands', icon: Package, end: true },
-  { to: '/errands/new', label: 'Post an errand', icon: CirclePlus },
+  { to: '/errands/new', label: 'Post an errand', shortLabel: 'Post', icon: CirclePlus },
   { to: '/wallet', label: 'Wallet', icon: Wallet },
   { to: '/profile', label: 'Profile', icon: User },
 ]

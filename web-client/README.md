@@ -1,43 +1,77 @@
-# React + TypeScript + Vite
+# web-client
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The browser client of Relay (Friend on Campus): a React app, served by an nginx container that is also the gateway to the services. It presents what the services answer and owns no domain rules.
 
-Currently, two official plugins are available:
+Before you change anything, read `AGENTS.md` (rules, your files, templates) and `DESIGN.md` (the design system).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+React 19, React Router 8 (data mode), TanStack Query 5, Vite 8, TypeScript 6, Tailwind CSS 4 with our own theme, oxlint, lucide-react icons. nginx (unprivileged image) serves the build and forwards `/api/<service>/...` to the services.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Running it
 
-## Expanding the Oxlint configuration
+| What | Command | URL |
+| --- | --- | --- |
+| Everything, as built images | `docker compose up --build` in the repository root | http://localhost:8080 |
+| Development with live reload | the line above, then `npm install` and `npm run dev` in `web-client/` | http://localhost:5173 |
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Development needs Node 24 or newer; run `npm ci` after pulling to install exactly the locked packages. Develop on :5173. Vite forwards every `/api` request to the gateway on :8080, so development and production take the same path to the services. The gateway container must be running for that. :8080 shows the state of the last image build; after changing anything under `nginx/`, run `docker compose up --build -d web-client`.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+| Script | Does |
+| --- | --- |
+| `npm run dev` | dev server with hot reload on :5173 |
+| `npm run build` | type check, then the production build into `dist/` |
+| `npm run lint` | oxlint, including the import rules between areas |
+| `npm run preview` | serves `dist/` locally, without the gateway |
+
+## Logging in before the login screen exists
+
+The login page is still a placeholder. Log in from the browser console on :5173 (Chrome asks you to type "allow pasting" first):
+
+```js
+await fetch('/api/user/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: '<username or email>', password: '<password>' }) }); location.reload()
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The first administrator is described in the root `README.md`. For an account without the administrator role, register it through the gateway (`POST /api/user/auth/register`), take the six-digit code from Mailpit on http://localhost:8025 and send it to `POST /api/user/auth/verify`. The Postman collection in `postman/` does the same with `userServiceUrl` set to `http://localhost:8080/api/user`.
 
-## Web client
+Log out with `await fetch('/api/user/auth/logout', { method: 'POST' })` or the "Log out" entry in the app.
 
-The browser client for Friend on Campus. Presentation only, all domain rules live in the backend services.
+If the administrator login fails, check `ADMIN_PASSWORD` in your `.env`, or reset the local data with `docker compose down -v` (this deletes every local account).
 
-```bash
-npm install
-npm run dev
+## Running your own service on your machine
+
+To work on a service outside Docker while the web client keeps using it, point the gateway at your machine in a `compose.override.yaml` next to `compose.yaml`. Do not commit that file.
+
+```yaml
+services:
+  web-client:
+    environment:
+      SUPPLIER_SERVICE_URL: http://host.docker.internal:3002
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 ```
 
-The design system lives in `src/styles/`. Read `DESIGN.md` before writing UI, and open `design-system.html` in a browser to see the tokens and patterns.
+Then stop the container of your service (`docker compose stop supplier-service`), start your service on that port and run `docker compose up -d web-client`.
+
+## The gateway
+
+| Path | Goes to |
+| --- | --- |
+| `/healthz` | 200, used by the compose healthcheck |
+| `/api/user/(auth\|users)/...` | `USER_SERVICE_URL`, without the `/api/user` prefix |
+| `/api/supplier/suppliers/...` | `SUPPLIER_SERVICE_URL`, without the `/api/supplier` prefix |
+| any other `/api/...` | 404 as JSON. `/internal/*` and `/health` of the services stay unreachable. |
+| everything else | `index.html`, React Router picks the page |
+
+`nginx/templates/default.conf.template` holds the server. Each service has its own file in `nginx/templates/routes/`. The service addresses come from environment variables read when the container starts, so one image runs in every environment. How to add a service: "Gateway route for a new service" in `AGENTS.md`. Why it is built this way: `../docs/decisions/0002-web-client-gateway.md`.
+
+## Troubleshooting
+
+| You see | Usually |
+| --- | --- |
+| `SERVICE_UNAVAILABLE` (503) in the app | the service container is stopped or still starting. `docker compose ps` shows it. |
+| 502 on :5173 for every `/api` call | the gateway on :8080 is not running. Start it with `docker compose up -d web-client`. |
+| 404 JSON for a path your service has | the path is not listed in its file in `nginx/templates/routes/`, or the container was not rebuilt after you added it |
+| the web-client container restarts | a route file uses a variable that `compose.yaml` does not set. `docker compose logs web-client` names it. |
+| a red outline and a console warning | something is wider than the screen. The warning names the element (N5.1). |
+| an import error from `npm run lint` | an import crosses an area boundary. The message says what to import instead. |

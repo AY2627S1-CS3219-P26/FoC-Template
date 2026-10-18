@@ -36,3 +36,25 @@ export function useRegister() {
     mutationFn: (input: RegisterInput) => request<PublicUser>('user', '/auth/register', { method: 'POST', body: input }),
   })
 }
+
+export type VerifyInput = {
+  email: string
+  // The 6-digit code from the email.
+  code: string
+}
+
+// Activates the account. It does not log in: the user logs in afterwards with their password.
+export function useVerify() {
+  return useMutation({
+    mutationFn: (input: VerifyInput) => request<PublicUser>('user', '/auth/verify', { method: 'POST', body: input }),
+  })
+}
+
+// Always answers 202 with the same message, whether or not the account exists, so the
+// answer reveals nothing about which emails are registered.
+export function useResendCode() {
+  return useMutation({
+    mutationFn: (email: string) =>
+      request<{ message: string }>('user', '/auth/verify/resend', { method: 'POST', body: { email } }),
+  })
+}

@@ -40,7 +40,7 @@ Import another service's data through `@/api/<service>/`. Never change another t
 2. **Gateway** (order and credit only, user and supplier exist): copy `nginx/templates/routes/user.conf.template` to `<service>.conf.template` and follow "Gateway route for a new service" in Part B. Commit it on its own; the platform owner reviews it.
 3. **Types** in `src/api/<service>/types.ts`: copy the response shapes from your service's README or route code, never from memory. If neither shows a response, ask the service owner. A response you do not use is `request<void>`. Use string unions, not `enum`. Lists are `Paginated<T>` from `@/lib/http`.
 4. **Hooks** in `src/api/<service>/<resource>.ts`: `use<Things>`, `use<Thing>`, `use<Verb><Thing>`. Every query key starts with the service name and holds all filters. Every mutation invalidates the keys it changes. Copy Template 1.
-5. **Pages** in `src/features/<service>/pages/`: replace the placeholder file. Always wrap the page in `Page`, show server data with `QueryView` (Template 2), build forms like Template 3. Components only your feature uses go to `src/features/<service>/components/`.
+5. **Pages** in `src/features/<service>/pages/`: replace the placeholder file. Always wrap the page in `Page`, show server data with `QueryView` (Template 2), build forms like Template 3. Components only your feature uses go to `src/features/<service>/components/`. A finished feature to look at: `src/features/user/` with `src/api/user/`.
 6. **Routes** live in `src/features/<service>/routes.ts`. Registered paths are frozen, because navigation and other features link to them. A new page goes into the right group there (`guest`, `app` or `admin`), path without a leading slash.
 7. **Navigation** is in `src/app/navigation.ts` and changes only by pull request. Never link to `/admin` from the student app.
 8. **Something missing?** A missing endpoint is a question for the service owner. A missing token, pattern or shared component is a pull request to the platform owner. When unsure, stop and ask.
@@ -123,7 +123,15 @@ Two features that need to work together connect through the URL, never through i
 
 ## Templates
 
-Copy and adapt these. They were run against the real supplier-service.
+Copy and adapt these. They were run against the real supplier-service. For the same patterns in a finished feature, read `src/features/user/` and `src/api/user/`:
+
+| You need | Look at |
+| --- | --- |
+| a form that sends, shows field errors and keeps the input | `pages/SignupPage.tsx`, `components/EditProfileForm.tsx` |
+| a mutation that updates the session or other cached data | `api/user/auth.ts` (`useLogin`), `api/user/account.ts` (`useUpdateProfile`) |
+| a server reason with extra details, like attempts left | `pages/VerifyPage.tsx` |
+| a paged list with the page in the URL, table from `md`, cards below | `pages/AdminStudentsPage.tsx` |
+| status values shown as badges | `pages/AdminStudentsPage.tsx` (`stateBadges`) |
 
 ### Template 1: API module
 
@@ -403,7 +411,7 @@ export function EditSupplierForm({ supplier }: EditSupplierFormProps) {
 
 ## Session and access
 
-- `useSession()` from `@/api/user/session` is the only source of who is logged in: `undefined` while checking, `null` for a guest, otherwise a `PublicUser` with `roles`.
+- `useSession()` from `@/api/user/session` is the only source of who is logged in: `undefined` while checking, `null` for a guest, otherwise a `PublicUser` with `roles`. On a page in the `app` or `admin` group, `useCurrentUser()` returns that `PublicUser` directly, since the guard already made sure someone is logged in.
 - The guards in `src/app/guards/` decide which pages show. The admin console under `/admin` shows only for the `administrator` role, and everyone else sees "Administrator access required".
 - That is display only. Every service checks every request itself, so the client never decides access and never hides a check behind a role test.
 - Log out with `useLogout()` or `LogoutButton`. It reloads the page, which clears every cached answer.
@@ -427,7 +435,7 @@ export const supplierRoutes: FeatureRoutes = {
 
 | Group | Who sees it | Layout | Example path |
 | --- | --- | --- | --- |
-| `guest` | logged-out visitors only | narrow centred column | `login` becomes `/login` |
+| `guest` | logged-out visitors only | narrow centred column. Only the user feature has these pages; they use its `AuthCard` instead of `Page`. | `login` becomes `/login` |
 | `app` | any logged-in account | student shell, tab bar on phones | `wallet` becomes `/wallet` |
 | `admin` | administrators | admin console, menu on phones | `orders` becomes `/admin/orders` |
 

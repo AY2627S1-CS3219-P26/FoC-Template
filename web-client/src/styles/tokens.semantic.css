@@ -4,21 +4,9 @@
   /* Backdrop */
   --ds-color-backdrop: var(--ds-wall-base);
   --ds-gradient-backdrop:
-    radial-gradient(
-      78% 58% at 6% -4%,
-      var(--ds-peach-300) 0%,
-      rgb(255 192 166 / 0) 62%
-    ),
-    radial-gradient(
-      72% 56% at 98% 6%,
-      var(--ds-violet-300) 0%,
-      rgb(179 156 255 / 0) 64%
-    ),
-    radial-gradient(
-      96% 62% at 42% 106%,
-      var(--ds-teal-300) 0%,
-      rgb(138 227 214 / 0) 62%
-    ),
+    radial-gradient(70% 50% at 0% 0%, var(--ds-peach-wash) 0%, transparent 60%),
+    radial-gradient(60% 45% at 100% 0%, var(--ds-violet-wash) 0%, transparent 62%),
+    radial-gradient(80% 50% at 50% 110%, var(--ds-teal-wash) 0%, transparent 60%),
     linear-gradient(var(--ds-wall-top), var(--ds-wall-bottom));
 
   /* Surfaces */
@@ -28,6 +16,7 @@
   --ds-color-surface-chrome: var(--ds-glass-chrome);
   --ds-color-surface-selected: var(--ds-glass-strong);
   --ds-color-track: var(--ds-ink-a06);
+  --ds-color-surface-hover: var(--ds-ink-a04);
 
   /* Text. Subtle is for labels and placeholders, never for prose. */
   --ds-color-text: var(--ds-ink);
@@ -39,8 +28,9 @@
 
   /* Borders */
   --ds-color-border: var(--ds-ink-a10);
-  --ds-color-border-glass: var(--ds-hair);
-  --ds-color-border-glass-soft: var(--ds-hair-soft);
+  --ds-color-border-strong: var(--ds-ink-a16);
+  --ds-color-border-glass: var(--ds-ink-a07);
+  --ds-color-border-glass-soft: var(--ds-ink-a06);
 
   /* Accent */
   --ds-color-accent: var(--ds-coral-600);
@@ -78,17 +68,17 @@
   --ds-color-focus-ring: var(--ds-coral-600);
   --ds-focus-ring-width: 2px;
   --ds-focus-ring-offset: 3px;
-  /* Room kept free when focus scrolls into view: the sticky page header above, the
-     floating tab bar below. */
-  --ds-focus-scroll-top: calc(var(--ds-space-24) + var(--ds-space-8));
+  /* Room kept free when focus scrolls into view: a little air above, the floating tab
+     bar below. */
+  --ds-focus-scroll-top: var(--ds-space-6);
   --ds-focus-scroll-bottom: calc(var(--ds-space-24) + var(--ds-space-4));
 
   /* Shape */
-  --ds-radius-card: var(--ds-radius-xl);
-  --ds-radius-panel: var(--ds-radius-2xl);
-  --ds-radius-inset: var(--ds-radius-lg);
-  --ds-radius-button: var(--ds-radius-md);
-  --ds-radius-field: var(--ds-radius-sm);
+  --ds-radius-card: var(--ds-radius-sm);
+  --ds-radius-panel: var(--ds-radius-lg);
+  --ds-radius-inset: var(--ds-radius-xs);
+  --ds-radius-button: var(--ds-radius-xs);
+  --ds-radius-field: var(--ds-radius-xs);
   --ds-radius-tile: var(--ds-radius-xs);
   --ds-radius-chip: var(--ds-radius-full);
 
@@ -100,6 +90,7 @@
   --ds-elevation-panel: var(--ds-shadow-panel);
   --ds-elevation-accent: var(--ds-shadow-accent);
   --ds-elevation-field: var(--ds-shadow-field);
+  --ds-elevation-field-focus: var(--ds-shadow-field-focus);
 
   /* Motion */
   --ds-motion-hover: var(--ds-duration-fast) var(--ds-ease-standard);

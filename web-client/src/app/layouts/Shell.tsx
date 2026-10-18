@@ -21,7 +21,7 @@ type ShellProps = {
 export function Shell({ label, nav, mobileHeader, mobileTabBar, sidebarFooter }: ShellProps) {
   return (
     <div className="min-h-dvh lg:flex">
-      <aside className="ds-surface ds-surface--chrome hidden rounded-none border-y-0 border-l-0 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-64 lg:shrink-0 lg:flex-col lg:gap-8 lg:p-5">
+      <aside className="ds-surface ds-surface--chrome hidden rounded-none border-y-0 border-l-0 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-64 lg:shrink-0 lg:flex-col lg:gap-6 lg:p-4">
         <Brand label={label} />
         {nav}
         {sidebarFooter && <div className="mt-auto grid grid-cols-1 gap-3">{sidebarFooter}</div>}

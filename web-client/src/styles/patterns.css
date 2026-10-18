@@ -58,10 +58,10 @@
   justify-content: center;
   gap: var(--ds-space-2);
   min-height: var(--ds-control-h-md);
-  padding: var(--ds-space-3) var(--ds-space-5);
-  border: 0;
+  padding: var(--ds-space-2) var(--ds-space-4);
+  border: 1px solid transparent;
   border-radius: var(--ds-radius-button);
-  font-size: var(--ds-text-base);
+  font-size: var(--ds-text-md);
   font-weight: var(--ds-weight-button);
   letter-spacing: var(--ds-tracking-normal);
     /* Long labels wrap instead of pushing the layout wider than the screen (N5.1). */
@@ -70,8 +70,15 @@
   cursor: pointer;
   transition:
     transform var(--ds-motion-hover),
-    filter var(--ds-motion-hover),
+    border-color var(--ds-motion-hover),
     background-color var(--ds-motion-hover);
+}
+
+/* 44px touch targets below md, a slimmer control where a pointer is likely. */
+@media (min-width: 48rem) {
+  .ds-btn {
+    min-height: var(--ds-control-h-compact);
+  }
 }
 
 .ds-btn:active:not(:disabled) {
@@ -86,26 +93,24 @@
 }
 
 .ds-btn--primary {
-  background: var(--ds-gradient-accent);
+  background: var(--ds-color-accent);
   color: var(--ds-color-accent-on);
   box-shadow: var(--ds-elevation-accent);
 }
 
 .ds-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  background: var(--ds-color-accent-hover);
 }
 
 .ds-btn--glass {
-  background: var(--ds-color-surface-chrome);
-  backdrop-filter: blur(var(--ds-blur-soft));
-  -webkit-backdrop-filter: blur(var(--ds-blur-soft));
-  border: 1px solid var(--ds-color-border-glass);
+  background: var(--ds-color-surface-selected);
+  border-color: var(--ds-color-border);
   color: var(--ds-color-text);
   box-shadow: var(--ds-elevation-button);
 }
 
 .ds-btn--glass:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.82);
+  border-color: var(--ds-color-border-strong);
 }
 
 .ds-btn--text {
@@ -141,10 +146,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--ds-space-1);
-  padding: var(--ds-space-1) var(--ds-space-3);
+  padding: var(--ds-space-0-5) var(--ds-space-2);
   border-radius: var(--ds-radius-chip);
   font-size: var(--ds-text-xs);
-  font-weight: var(--ds-weight-button);
+  font-weight: var(--ds-weight-medium);
   line-height: var(--ds-leading-snug);
   white-space: nowrap;
 }
@@ -169,7 +174,7 @@
 /* Labels */
 .ds-label {
   font-size: var(--ds-text-2xs);
-  font-weight: var(--ds-weight-bold);
+  font-weight: var(--ds-weight-semibold);
   letter-spacing: var(--ds-tracking-label);
   text-transform: uppercase;
   color: var(--ds-color-text-subtle);
@@ -178,10 +183,10 @@
 
 .ds-field-label {
   display: block;
-  margin: 0 0 var(--ds-space-2) var(--ds-space-1);
-  font-size: var(--ds-text-xs);
-  font-weight: var(--ds-weight-button);
-  color: var(--ds-color-text-muted);
+  margin: 0 0 var(--ds-space-2);
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-color-text);
 }
 
 /* Fields */
@@ -189,9 +194,9 @@
   width: 100%;
   min-height: var(--ds-control-h-md);
   padding: var(--ds-space-3) var(--ds-space-4);
-  border: 1px solid var(--ds-color-border-glass);
+  border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-field);
-  background: rgb(255 255 255 / 0.55);
+  background: var(--ds-color-surface-selected);
   box-shadow: var(--ds-elevation-field);
   color: var(--ds-color-text);
   font: inherit;
@@ -199,6 +204,13 @@
   transition:
     border-color var(--ds-motion-hover),
     background-color var(--ds-motion-hover);
+}
+
+/* The ring of a focused field is its border and a soft halo, replacing the global outline. */
+.ds-field:focus-visible {
+  outline: none;
+  border-color: var(--ds-color-accent);
+  box-shadow: var(--ds-elevation-field-focus);
 }
 
 .ds-field::placeholder {
@@ -214,7 +226,7 @@
   margin-top: var(--ds-space-2);
   color: var(--ds-color-danger);
   font-size: var(--ds-text-sm);
-  font-weight: var(--ds-weight-button);
+  font-weight: var(--ds-weight-medium);
 }
 
 /* Segmented control */
@@ -246,7 +258,7 @@
   white-space: nowrap;
 }
 
-/* 44px targets below md (house rule), the compact pill of the prototype from md up. */
+/* 44px targets below md (house rule), the compact pill from md up. */
 @media (min-width: 48rem) {
   .ds-segmented > * {
     min-height: auto;
@@ -265,7 +277,7 @@
 .ds-num {
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--ds-tracking-num);
-  font-weight: var(--ds-weight-bold);
+  font-weight: var(--ds-weight-semibold);
 }
 
 .ds-stat-value {
@@ -349,17 +361,17 @@
 
 .ds-notice--info {
   background: var(--ds-color-info-surface);
-  border-color: var(--ds-color-info-mark);
+  border-color: transparent;
 }
 
 .ds-notice--success {
   background: var(--ds-color-success-surface);
-  border-color: var(--ds-color-success-mark);
+  border-color: transparent;
 }
 
 .ds-notice--danger {
   background: var(--ds-color-danger-surface);
-  border-color: var(--ds-color-danger-mark);
+  border-color: transparent;
 }
 
 /* Select: the native arrow differs per browser, so it is hidden and SelectField draws its own. */
@@ -380,9 +392,10 @@
   align-items: center;
   gap: var(--ds-space-3);
   min-height: var(--ds-control-h-md);
-  padding: var(--ds-space-2) var(--ds-space-4);
+  padding: var(--ds-space-2) var(--ds-space-3);
   border-radius: var(--ds-radius-button);
   color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-md);
   font-weight: var(--ds-weight-medium);
   transition:
     background-color var(--ds-motion-hover),
@@ -390,13 +403,19 @@
 }
 
 .ds-nav-item:hover {
+  background: var(--ds-color-surface-hover);
   color: var(--ds-color-text);
 }
 
 .ds-nav-item[aria-current='page'] {
-  background: var(--ds-color-surface-selected);
-  color: var(--ds-color-accent);
-  box-shadow: var(--ds-elevation-selected);
+  background: var(--ds-color-accent-subtle);
+  color: var(--ds-color-accent-on-tint);
+}
+
+@media (min-width: 48rem) {
+  .ds-nav-item {
+    min-height: var(--ds-control-h-compact);
+  }
 }
 
 
@@ -426,11 +445,10 @@
   border-radius: var(--ds-radius-chip);
   color: var(--ds-color-text-muted);
   font-size: var(--ds-text-xs);
-  font-weight: var(--ds-weight-semibold);
+  font-weight: var(--ds-weight-medium);
 }
 
 .ds-tabbar-item[aria-current='page'] {
-  background: var(--ds-color-surface-selected);
-  color: var(--ds-color-accent);
-  box-shadow: var(--ds-elevation-selected);
+  background: var(--ds-color-accent-subtle);
+  color: var(--ds-color-accent-on-tint);
 }

@@ -7,9 +7,9 @@ type BrandProps = {
 export function Brand({ label }: BrandProps) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span aria-hidden="true" className="size-9 shrink-0 rounded-tile bg-accent-gradient" />
+      <span aria-hidden="true" className="size-8 shrink-0 rounded-tile bg-accent-gradient" />
       <div className="min-w-0">
-        <p className="text-lg font-bold">Relay</p>
+        <p className="font-semibold">Relay</p>
         <p className="ds-label">{label}</p>
       </div>
     </div>

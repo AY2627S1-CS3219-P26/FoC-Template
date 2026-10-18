@@ -468,7 +468,7 @@ Read `DESIGN.md` before writing any UI, and open `design-system.html` in a brows
 3. **No arbitrary values.** `bg-[#ff5a3c]` and `p-[13px]` defeat the point.
 4. **Missing token?** Add it to `tokens.semantic.css`, referencing a primitive, and mention it in the pull request. Never inline the value instead.
 5. **Components never reference a primitive.** `--ds-coral-600` is not for components, `--ds-color-accent` is.
-6. **Buttons are 18px rounded rectangles and fields are 16px, not pills.** Pills are only for chips, badges, segmented controls, tabs and nav bars.
+6. **Buttons and fields are 12px rounded rectangles, not pills.** Pills are only for chips, badges, segmented controls, tabs and nav bars. `.ds-btn--primary` is the one main action of a view, `.ds-btn--glass` the white secondary button.
 7. **Write full class names.** Tailwind only finds classes it can read in the source, so `'ds-badge--' + tone` never works. Map values to complete class strings instead, like `Notice.tsx` does.
 
 Available pattern classes, so you do not reinvent them:
@@ -507,7 +507,7 @@ House rules on top of N5:
 ## Layout
 
 - The shells come from `src/app/layouts/`. From `lg` (1024px) there is a sidebar; below it the student app has a floating tab bar and the admin console a menu at the top. Your page only renders its content inside `Page`.
-- `Page` has a sticky header and centres the content at `max-w-layout` with `px-4 md:px-8`. Do not add another outer container.
+- `Page` puts the title (and optional subtitle and actions) at the top of the content and centres everything at `max-w-layout` with `px-4 md:px-8`. Do not add another outer container or a second title.
 - Use `grid grid-cols-1 gap-4` for stacks and add columns from `md:` or `lg:`.
 
 ## TypeScript and React

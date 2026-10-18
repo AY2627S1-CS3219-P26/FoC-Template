@@ -9,6 +9,17 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* A control that gets keyboard focus is scrolled clear of the floating tab bar instead of
+     ending up under it (WCAG 2.4.11). */
+  scroll-padding-top: var(--ds-focus-scroll-top);
+  scroll-padding-bottom: var(--ds-focus-scroll-bottom);
+}
+
+/* From lg there is a sidebar instead of the tab bar. */
+@media (min-width: 64rem) {
+  html {
+    scroll-padding-bottom: 0;
+  }
 }
 
 body {
@@ -23,6 +34,9 @@ body {
   font-weight: var(--ds-weight-regular);
   color: var(--ds-color-text);
   text-wrap: pretty;
+
+  /* Words that do not fit, like long e-mail addresses or ids, break instead of widening the page (N5.1). */
+  overflow-wrap: break-word;
 
   background-color: var(--ds-color-backdrop);
   background-image: var(--ds-gradient-backdrop);
@@ -43,17 +57,17 @@ h5,
 h6 {
   margin: 0;
   color: var(--ds-color-text);
-  font-weight: var(--ds-weight-bold);
-  line-height: var(--ds-leading-none);
-  letter-spacing: var(--ds-tracking-tighter);
+  font-weight: var(--ds-weight-semibold);
+  line-height: var(--ds-leading-tight);
+  letter-spacing: var(--ds-tracking-tight);
   text-wrap: balance;
 }
 
 h1 {
-  font-size: var(--ds-text-3xl);
+  font-size: var(--ds-text-2xl);
 }
 h2 {
-  font-size: var(--ds-text-xl);
+  font-size: var(--ds-text-lg);
 }
 h3 {
   font-size: var(--ds-text-lg);
@@ -67,10 +81,10 @@ h6 {
 
 @media (min-width: 48rem) {
   h1 {
-    font-size: var(--ds-text-4xl);
+    font-size: var(--ds-text-3xl);
   }
   h2 {
-    font-size: var(--ds-text-2xl);
+    font-size: var(--ds-text-xl);
   }
 }
 
@@ -136,6 +150,11 @@ canvas {
 :focus-visible {
   outline: var(--ds-focus-ring-width) solid var(--ds-color-focus-ring);
   outline-offset: var(--ds-focus-ring-offset);
+}
+
+/* Containers that only get focus from code, like <main> after the skip link, need no ring. */
+[tabindex='-1']:focus-visible {
+  outline: none;
 }
 
 /* Tables */

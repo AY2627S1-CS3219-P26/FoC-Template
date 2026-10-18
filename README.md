@@ -26,11 +26,14 @@ Requires only Docker. From the repository root:
 
 | Component | URL |
 | --- | --- |
+| web-client (the app in the browser) | http://localhost:8080 |
 | user-service | http://localhost:3001 |
 | supplier-service | http://localhost:3002 |
 | Mailpit (local email inbox) | http://localhost:8025 |
 
 No `.env` is needed for local use; every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me` unless `ADMIN_PASSWORD` is set. To override values, copy `.env.example` to `.env`.
+
+The browser reaches the services only through the web client, which forwards `/api/<service>/...` to them. How to develop the client with live reload is in [`web-client/README.md`](web-client/README.md).
 
 `docker compose down -v` stops everything and deletes the local data.
 

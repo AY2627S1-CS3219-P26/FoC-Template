@@ -58,18 +58,27 @@
   justify-content: center;
   gap: var(--ds-space-2);
   min-height: var(--ds-control-h-md);
-  padding: var(--ds-space-3) var(--ds-space-5);
-  border: 0;
+  padding: var(--ds-space-2) var(--ds-space-4);
+  border: 1px solid transparent;
   border-radius: var(--ds-radius-button);
-  font-size: var(--ds-text-base);
+  font-size: var(--ds-text-md);
   font-weight: var(--ds-weight-button);
   letter-spacing: var(--ds-tracking-normal);
-  white-space: nowrap;
+    /* Long labels wrap instead of pushing the layout wider than the screen (N5.1). */
+  max-width: 100%;
+  text-align: center;
   cursor: pointer;
   transition:
     transform var(--ds-motion-hover),
-    filter var(--ds-motion-hover),
+    border-color var(--ds-motion-hover),
     background-color var(--ds-motion-hover);
+}
+
+/* 44px touch targets below md, a slimmer control where a pointer is likely. */
+@media (min-width: 48rem) {
+  .ds-btn {
+    min-height: var(--ds-control-h-compact);
+  }
 }
 
 .ds-btn:active:not(:disabled) {
@@ -84,35 +93,42 @@
 }
 
 .ds-btn--primary {
-  background: var(--ds-gradient-accent);
+  background: var(--ds-color-accent);
   color: var(--ds-color-accent-on);
   box-shadow: var(--ds-elevation-accent);
 }
 
 .ds-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  background: var(--ds-color-accent-hover);
 }
 
 .ds-btn--glass {
-  background: var(--ds-color-surface-chrome);
-  backdrop-filter: blur(var(--ds-blur-soft));
-  -webkit-backdrop-filter: blur(var(--ds-blur-soft));
-  border: 1px solid var(--ds-color-border-glass);
+  background: var(--ds-color-surface-selected);
+  border-color: var(--ds-color-border);
   color: var(--ds-color-text);
   box-shadow: var(--ds-elevation-button);
 }
 
 .ds-btn--glass:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.82);
+  border-color: var(--ds-color-border-strong);
 }
 
 .ds-btn--text {
-  min-height: auto;
+  min-width: var(--ds-tap-target-min);
   padding: var(--ds-space-2) var(--ds-space-1);
   background: none;
   color: var(--ds-color-accent);
   font-size: var(--ds-text-sm);
   box-shadow: none;
+}
+
+/* Below md every target stays 44px tall (house rule); from md the text button sits flush
+   with the text around it. */
+@media (min-width: 48rem) {
+  .ds-btn--text {
+    min-width: auto;
+    min-height: auto;
+  }
 }
 
 .ds-btn--text:hover:not(:disabled) {
@@ -130,10 +146,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--ds-space-1);
-  padding: var(--ds-space-1) var(--ds-space-3);
+  padding: var(--ds-space-0-5) var(--ds-space-2);
   border-radius: var(--ds-radius-chip);
   font-size: var(--ds-text-xs);
-  font-weight: var(--ds-weight-button);
+  font-weight: var(--ds-weight-medium);
   line-height: var(--ds-leading-snug);
   white-space: nowrap;
 }
@@ -158,7 +174,7 @@
 /* Labels */
 .ds-label {
   font-size: var(--ds-text-2xs);
-  font-weight: var(--ds-weight-bold);
+  font-weight: var(--ds-weight-semibold);
   letter-spacing: var(--ds-tracking-label);
   text-transform: uppercase;
   color: var(--ds-color-text-subtle);
@@ -167,10 +183,10 @@
 
 .ds-field-label {
   display: block;
-  margin: 0 0 var(--ds-space-2) var(--ds-space-1);
-  font-size: var(--ds-text-xs);
-  font-weight: var(--ds-weight-button);
-  color: var(--ds-color-text-muted);
+  margin: 0 0 var(--ds-space-2);
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-color-text);
 }
 
 /* Fields */
@@ -178,9 +194,9 @@
   width: 100%;
   min-height: var(--ds-control-h-md);
   padding: var(--ds-space-3) var(--ds-space-4);
-  border: 1px solid var(--ds-color-border-glass);
+  border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-field);
-  background: rgb(255 255 255 / 0.55);
+  background: var(--ds-color-surface-selected);
   box-shadow: var(--ds-elevation-field);
   color: var(--ds-color-text);
   font: inherit;
@@ -188,6 +204,13 @@
   transition:
     border-color var(--ds-motion-hover),
     background-color var(--ds-motion-hover);
+}
+
+/* The ring of a focused field is its border and a soft halo, replacing the global outline. */
+.ds-field:focus-visible {
+  outline: none;
+  border-color: var(--ds-color-accent);
+  box-shadow: var(--ds-elevation-field-focus);
 }
 
 .ds-field::placeholder {
@@ -203,13 +226,16 @@
   margin-top: var(--ds-space-2);
   color: var(--ds-color-danger);
   font-size: var(--ds-text-sm);
-  font-weight: var(--ds-weight-button);
+  font-weight: var(--ds-weight-medium);
 }
 
 /* Segmented control */
 .ds-segmented {
   display: inline-flex;
   align-items: center;
+  /* Too many options for a small phone scroll inside the control, not the page (N5.1). */
+  max-width: 100%;
+  overflow-x: auto;
   padding: 3px;
   border: 1px solid var(--ds-color-border-glass-soft);
   border-radius: var(--ds-radius-chip);
@@ -217,6 +243,10 @@
 }
 
 .ds-segmented > * {
+  /* Options keep their width and the control scrolls, instead of squeezing labels together. */
+  flex-shrink: 0;
+  min-width: var(--ds-tap-target-min);
+  min-height: var(--ds-tap-target-min);
   padding: var(--ds-space-2) var(--ds-space-3);
   border: 0;
   border-radius: var(--ds-radius-chip);
@@ -226,6 +256,13 @@
   color: var(--ds-color-text-muted);
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* 44px targets below md (house rule), the compact pill from md up. */
+@media (min-width: 48rem) {
+  .ds-segmented > * {
+    min-height: auto;
+  }
 }
 
 .ds-segmented > [aria-selected='true'],
@@ -240,7 +277,7 @@
 .ds-num {
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--ds-tracking-num);
-  font-weight: var(--ds-weight-bold);
+  font-weight: var(--ds-weight-semibold);
 }
 
 .ds-stat-value {
@@ -302,4 +339,116 @@
   height: 9px;
   border-radius: var(--ds-radius-chip);
   background: var(--ds-chart-series-1);
+}
+
+/* Loading placeholder bar (N5.2). LoadingState adds animate-pulse; reduced motion stops it. */
+.ds-skeleton {
+  display: block;
+  height: var(--ds-space-4);
+  border-radius: var(--ds-radius-tile);
+  background: var(--ds-color-track);
+}
+
+/* Notice: a tinted box for information, confirmations and refused actions (N5.4). */
+.ds-notice {
+  display: grid;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-4);
+  border: 1px solid;
+  border-radius: var(--ds-radius-inset);
+  color: var(--ds-color-text);
+}
+
+.ds-notice--info {
+  background: var(--ds-color-info-surface);
+  border-color: transparent;
+}
+
+.ds-notice--success {
+  background: var(--ds-color-success-surface);
+  border-color: transparent;
+}
+
+.ds-notice--danger {
+  background: var(--ds-color-danger-surface);
+  border-color: transparent;
+}
+
+/* Select: the native arrow differs per browser, so it is hidden and SelectField draws its own. */
+.ds-select {
+  appearance: none;
+  padding-right: var(--ds-space-10);
+}
+
+/* A button whose request is running stays fully visible, so it reads as busy, not as unavailable. */
+.ds-btn[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}
+
+/* Sidebar navigation item. NavLink marks the current page with aria-current="page". */
+.ds-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  min-height: var(--ds-control-h-md);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--ds-radius-button);
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-md);
+  font-weight: var(--ds-weight-medium);
+  transition:
+    background-color var(--ds-motion-hover),
+    color var(--ds-motion-hover);
+}
+
+.ds-nav-item:hover {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-text);
+}
+
+.ds-nav-item[aria-current='page'] {
+  background: var(--ds-color-accent-subtle);
+  color: var(--ds-color-accent-on-tint);
+}
+
+@media (min-width: 48rem) {
+  .ds-nav-item {
+    min-height: var(--ds-control-h-compact);
+  }
+}
+
+
+/* Mobile tab bar: a floating pill at the bottom of the screen, below lg. */
+.ds-tabbar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-1);
+  border: 1px solid var(--ds-color-border-glass);
+  border-radius: var(--ds-radius-chip);
+  background: var(--ds-color-surface-chrome);
+  backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  -webkit-backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  box-shadow: var(--ds-elevation-panel);
+}
+
+.ds-tabbar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-1);
+  min-height: var(--ds-tap-target-min);
+  padding: var(--ds-space-2) var(--ds-space-1);
+  border-radius: var(--ds-radius-chip);
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-xs);
+  font-weight: var(--ds-weight-medium);
+}
+
+.ds-tabbar-item[aria-current='page'] {
+  background: var(--ds-color-accent-subtle);
+  color: var(--ds-color-accent-on-tint);
 }

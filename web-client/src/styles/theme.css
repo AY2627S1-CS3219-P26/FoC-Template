@@ -109,6 +109,9 @@
   --blur-glass: var(--ds-blur-glass);
   --blur-chrome: var(--ds-blur-chrome);
   --blur-soft: var(--ds-blur-soft);
+
+  /* Layout: max-w-layout caps the content width on very wide screens */
+  --container-layout: var(--ds-layout-max);
 }
 
 /* Literal values, not var() references: media queries cannot resolve custom

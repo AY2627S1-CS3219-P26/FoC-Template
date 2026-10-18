@@ -16,6 +16,14 @@ server {
     return 200 "ok\n";
   }
 
+  # Settings the app reads from the environment of this container, so one image fits every place
+  # it runs. DEV_MAILBOX_URL is the local test inbox (Mailpit); it stays empty where real emails go out.
+  location = /api/config {
+    default_type application/json;
+    add_header Cache-Control "no-store";
+    return 200 '{"devMailboxUrl":"${DEV_MAILBOX_URL}"}';
+  }
+
   # Each service routes its own paths in its own file (from step 6 on).
   include /etc/nginx/conf.d/routes/*.conf;
 

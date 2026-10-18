@@ -32,7 +32,7 @@ The login page is still a placeholder. Log in from the browser console on :5173 
 await fetch('/api/user/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: '<username or email>', password: '<password>' }) }); location.reload()
 ```
 
-The first administrator is described in the root `README.md`. For an account without the administrator role, register it through the gateway (`POST /api/user/auth/register`), take the six-digit code from Mailpit on http://localhost:8025 and send it to `POST /api/user/auth/verify`. The Postman collection in `postman/` does the same with `userServiceUrl` set to `http://localhost:8080/api/user`.
+The first administrator is described in the root `README.md`. No real emails are sent locally: they all land in Mailpit, and the verify page links there while `DEV_MAILBOX_URL` is set (compose sets it to http://localhost:8025; set it to empty wherever real emails go out). For an account without the administrator role, register it through the gateway (`POST /api/user/auth/register`), take the six-digit code from Mailpit on http://localhost:8025 and send it to `POST /api/user/auth/verify`. The Postman collection in `postman/` does the same with `userServiceUrl` set to `http://localhost:8080/api/user`.
 
 Log out with `await fetch('/api/user/auth/logout', { method: 'POST' })` or the "Log out" entry in the app.
 
@@ -58,6 +58,7 @@ Then stop the container of your service (`docker compose stop supplier-service`)
 | Path | Goes to |
 | --- | --- |
 | `/healthz` | 200, used by the compose healthcheck |
+| `/api/config` | settings for the app from this container's environment, for now `DEV_MAILBOX_URL` |
 | `/api/user/(auth\|users)/...` | `USER_SERVICE_URL`, without the `/api/user` prefix |
 | `/api/supplier/suppliers/...` | `SUPPLIER_SERVICE_URL`, without the `/api/supplier` prefix |
 | any other `/api/...` | 404 as JSON. `/internal/*` and `/health` of the services stay unreachable. |

@@ -6,7 +6,7 @@ Instructions for coding agents working in this repository. Read the AGENTS.md in
 
 One folder per service at the top level: `user-service`, `supplier-service`, `order-service`, `credit-service`. A nice-to-have feature that warrants its own service becomes another folder at the same level. Core implementation stays inside these folders.
 
-`web-client` is the browser client. It owns no domain rules.
+`web-client` is the browser client. It owns no domain rules. Its container (host port 8080) is also the gateway for the browser: it forwards `/api/<service>/...` to the services, so a service needs no CORS and the browser never sees an internal address.
 
 Work in the folder you were asked to work in. Do not change another service to make your own change fit. If you need something from another service, say so instead of reaching across the boundary.
 

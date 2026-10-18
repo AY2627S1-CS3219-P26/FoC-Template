@@ -22,3 +22,17 @@ export function useLogin() {
     },
   })
 }
+
+export type RegisterInput = {
+  fullName: string
+  email: string
+  username: string
+  password: string
+}
+
+// Creates the account in PendingVerification and sends the code. Nobody is logged in afterwards.
+export function useRegister() {
+  return useMutation({
+    mutationFn: (input: RegisterInput) => request<PublicUser>('user', '/auth/register', { method: 'POST', body: input }),
+  })
+}

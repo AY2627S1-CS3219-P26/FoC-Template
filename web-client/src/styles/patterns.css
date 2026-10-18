@@ -109,12 +109,21 @@
 }
 
 .ds-btn--text {
-  min-height: auto;
+  min-width: var(--ds-tap-target-min);
   padding: var(--ds-space-2) var(--ds-space-1);
   background: none;
   color: var(--ds-color-accent);
   font-size: var(--ds-text-sm);
   box-shadow: none;
+}
+
+/* Below md every target stays 44px tall (house rule); from md the text button sits flush
+   with the text around it. */
+@media (min-width: 48rem) {
+  .ds-btn--text {
+    min-width: auto;
+    min-height: auto;
+  }
 }
 
 .ds-btn--text:hover:not(:disabled) {
@@ -222,6 +231,10 @@
 }
 
 .ds-segmented > * {
+  /* Options keep their width and the control scrolls, instead of squeezing labels together. */
+  flex-shrink: 0;
+  min-width: var(--ds-tap-target-min);
+  min-height: var(--ds-tap-target-min);
   padding: var(--ds-space-2) var(--ds-space-3);
   border: 0;
   border-radius: var(--ds-radius-chip);
@@ -231,6 +244,13 @@
   color: var(--ds-color-text-muted);
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* 44px targets below md (house rule), the compact pill of the prototype from md up. */
+@media (min-width: 48rem) {
+  .ds-segmented > * {
+    min-height: auto;
+  }
 }
 
 .ds-segmented > [aria-selected='true'],

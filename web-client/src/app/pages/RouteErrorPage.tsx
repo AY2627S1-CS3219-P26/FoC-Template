@@ -4,7 +4,8 @@ export function RouteErrorPage() {
   const error = useRouteError()
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-12">
+    <main id="main" className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-12">
+      <title>Something went wrong · Relay</title>
       <div className="ds-surface p-6">
         <p className="ds-label">Unexpected error</p>
         <h1 className="mt-2">Something went wrong</h1>
@@ -17,7 +18,7 @@ export function RouteErrorPage() {
             {describe(error)}
           </pre>
         )}
-        <div className="mt-6 grid gap-3">
+        <div className="mt-6 grid grid-cols-1 gap-3">
           <button
             type="button"
             className="ds-btn ds-btn--primary w-full"

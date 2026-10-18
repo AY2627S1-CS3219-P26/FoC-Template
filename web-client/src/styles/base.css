@@ -9,6 +9,17 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* A control that gets keyboard focus is scrolled clear of the sticky page header and the
+     floating tab bar instead of ending up under them (WCAG 2.4.11). */
+  scroll-padding-top: var(--ds-focus-scroll-top);
+  scroll-padding-bottom: var(--ds-focus-scroll-bottom);
+}
+
+/* From lg there is a sidebar instead of the tab bar. */
+@media (min-width: 64rem) {
+  html {
+    scroll-padding-bottom: 0;
+  }
 }
 
 body {

@@ -78,6 +78,10 @@
   --ds-color-focus-ring: var(--ds-coral-600);
   --ds-focus-ring-width: 2px;
   --ds-focus-ring-offset: 3px;
+  /* Room kept free when focus scrolls into view: the sticky page header above, the
+     floating tab bar below. */
+  --ds-focus-scroll-top: calc(var(--ds-space-24) + var(--ds-space-8));
+  --ds-focus-scroll-bottom: calc(var(--ds-space-24) + var(--ds-space-4));
 
   /* Shape */
   --ds-radius-card: var(--ds-radius-xl);

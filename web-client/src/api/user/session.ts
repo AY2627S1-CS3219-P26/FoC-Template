@@ -32,3 +32,10 @@ export function useLogout() {
     onSuccess: () => window.location.replace('/login'),
   })
 }
+
+// For pages below RequireSession, where a logged-in account is guaranteed.
+export function useCurrentUser(): PublicUser {
+  const user = useSession().data
+  if (!user) throw new Error('useCurrentUser needs a logged-in account: use it below RequireSession.')
+  return user
+}

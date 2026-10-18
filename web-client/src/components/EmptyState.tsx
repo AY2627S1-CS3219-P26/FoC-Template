@@ -10,7 +10,7 @@ type EmptyStateProps = {
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
-    <div className="ds-surface grid grid-cols-1 justify-items-start gap-3 p-5">
+    <div className="ds-surface grid grid-cols-1 gap-3 p-5">
       <p className="text-lg font-semibold">{title}</p>
       {description && <p className="text-muted">{description}</p>}
       <div className="flex flex-wrap gap-3">{action}</div>

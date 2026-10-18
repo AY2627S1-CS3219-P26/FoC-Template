@@ -9,11 +9,11 @@ export function ErrorState({ error, onRetry }: ErrorStateProps) {
   const { title, message, retryable } = describe(error)
 
   return (
-    <div role="alert" className="ds-surface grid grid-cols-1 justify-items-start gap-3 p-5">
+    <div role="alert" className="ds-surface grid grid-cols-1 gap-3 p-5">
       <p className="text-lg font-semibold text-danger">{title}</p>
       <p className="text-muted">{message}</p>
       {onRetry && retryable && (
-        <button type="button" className="ds-btn ds-btn--glass" onClick={onRetry}>
+        <button type="button" className="ds-btn ds-btn--glass justify-self-start" onClick={onRetry}>
           Try again
         </button>
       )}

@@ -9,14 +9,14 @@ type LogoutButtonProps = {
 
 const lookClasses: Record<LogoutButtonProps['look'], string> = {
   nav: 'ds-nav-item w-full',
-  button: 'ds-btn ds-btn--glass',
+  button: 'ds-btn ds-btn--glass justify-self-start',
 }
 
 export function LogoutButton({ look }: LogoutButtonProps) {
   const logout = useLogout()
 
   return (
-    <div className="grid grid-cols-1 justify-items-start gap-2">
+    <div className="grid grid-cols-1 gap-2">
       <button
         type="button"
         className={lookClasses[look]}

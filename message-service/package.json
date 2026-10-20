@@ -1,0 +1,9 @@
+{
+    "name": "message-service",
+    "version": "0.0.1",
+    "description": "message service shall control the full lifecycle of message between clints",
+    "type": "module",
+    "dependencies": {
+        "express": "^5.3.0"
+    }
+}

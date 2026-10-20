@@ -1,22 +1,26 @@
 import mongoose from "mongoose";
 import { createApp } from "./app.ts";
 import { config } from "./config.ts";
-import { connectWithRetry } from "./db.ts";
 import { logger } from "./lib/logger.ts";
-import { ensureAdministrator } from "./bootstrap.ts";
+import SocketServer from "./webSocket.ts";
 
 try {
-    await connectWithRetry();
-    await ensureAdministrator();
-} catch(err) {
+    //await connectToDBWithRetry();
+    //await ensureAdministrator();
+} catch (err) {
     logger.fatal({ err }, "could not start, exiting");
     process.exit(1);
 }
 
 
 const server = createApp().listen(config.PORT, () => {
-    logger.info({ port: config.PORT }, "user-service listening");
-})
+    logger.info(
+        { port: config.PORT },
+        "message-service listening"
+    );
+});
+
+const socketServer = new SocketServer(server);
 
 async function shutdown(signal: string) {
     logger.info({ signal }, "shutting down");

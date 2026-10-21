@@ -38,6 +38,7 @@ jobs:
               - '*/.dockerignore'
               - 'user-service/**'
               - 'supplier-service/**'
+              - 'data/csv/**'
               - 'web-client/nginx/**'
 
   user-service:

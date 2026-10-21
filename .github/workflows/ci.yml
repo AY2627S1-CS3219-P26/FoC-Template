@@ -37,6 +37,7 @@ jobs:
               - '*/Dockerfile'
               - '*/.dockerignore'
               - 'user-service/**'
+              - 'supplier-service/**'
               - 'web-client/nginx/**'
 
   user-service:

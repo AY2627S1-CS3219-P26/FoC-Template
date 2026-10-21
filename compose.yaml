@@ -7,6 +7,7 @@ services:
       PORT: 3000
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MONGO_URL: mongodb://user-db:27017/user-service
+      BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
       OTP_SECRET: ${OTP_SECRET:-dev-only-otp-secret-do-not-use-in-production}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -24,6 +25,7 @@ services:
     networks:
       - edge
       - backend
+    # Not tied to the broker: while it is down the service keeps serving and announcements wait.
     depends_on:
       user-db:
         condition: service_healthy
@@ -58,6 +60,30 @@ services:
       - "127.0.0.1:1025:1025"
     networks:
       - backend
+    restart: unless-stopped
+
+  broker:
+    image: rabbitmq:4.3-management-alpine
+    # RabbitMQ keeps its data under a node name taken from the hostname. A fixed hostname keeps
+    # queued messages when the container is recreated.
+    hostname: broker
+    environment:
+      RABBITMQ_DEFAULT_USER: ${BROKER_USER:-relay}
+      RABBITMQ_DEFAULT_PASS: ${BROKER_PASSWORD:-change-me}
+    # AMQP for services run outside compose, and the management UI. Both on this machine only.
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    networks:
+      - backend
+    volumes:
+      - broker-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
   supplier-service:
@@ -132,6 +158,7 @@ services:
 volumes:
   user-db-data:
   supplier-db-data:
+  broker-data:
 
 # edge connects the web client to the services, backend connects the services to their databases
 # and infrastructure. The web client is only on edge, so the gateway has no route to any database.

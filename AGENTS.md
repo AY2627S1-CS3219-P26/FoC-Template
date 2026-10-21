@@ -24,6 +24,14 @@ The user-service is the only authority on who is logged in and what they may do.
 - Fail closed: if the user-service does not answer with `authorized`, refuse.
 - Check the role before looking anything up, so a refusal does not reveal whether an object exists.
 
+## Events
+
+Services tell each other about changes through RabbitMQ, without waiting for an answer. Conventions, the envelope and the catalog of events are in `docs/events.md`, the reasons in `docs/decisions/0003-message-broker.md`.
+
+- Publish through an outbox: the event is written together with the change it reports and repeated until the broker confirms it.
+- Consume idempotently: every event can arrive more than once. Acknowledge only after your transaction committed.
+- Add every new event to the catalog in `docs/events.md` in the same pull request.
+
 ## Config and secrets
 
 Every environment variable a service reads must appear in `.env.example` with a safe placeholder, so teammates know what to set. Real values go in `.env`, which is git-ignored. Never commit a real secret.

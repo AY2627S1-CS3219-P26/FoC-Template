@@ -178,6 +178,13 @@ describe("first administrator (F1.5.6)", () => {
         await request(app).post("/auth/login").send({ identifier: "admin", password: "admin-password" }).expect(200);
     });
 
+    it("is announced to the Credit Service like any other Active account (F1.1.7)", async () => {
+        await ensureAdministrator();
+
+        const admin = await UserModel.findOne({ roles: "administrator" }).select("+announcement");
+        expect(admin?.announcement?.pending).toBe(true);
+    });
+
     it("is not created when an administrator already exists", async () => {
         await createUser({ username: "boss", roles: [...ADMIN_ROLES] });
         await ensureAdministrator();

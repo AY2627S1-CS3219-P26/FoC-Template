@@ -20,6 +20,18 @@ const otpSchema = new Schema(
     { _id: false },
 );
 
+// F1.1.7: the announcement to the Credit Service. It is written in the same update that makes the
+// account Active and stays pending until the broker has confirmed it (an outbox inside the document).
+const announcementSchema = new Schema(
+    {
+        eventId: { type: String, required: true },
+        occurredAt: { type: Date, required: true },
+        pending: { type: Boolean, required: true },
+        sentAt: { type: Date },
+    },
+    { _id: false },
+);
+
 const userSchema = new Schema(
     {
         _id: { type: String, default: () => randomUUID() },
@@ -29,7 +41,8 @@ const userSchema = new Schema(
         passwordHash: { type: String, required: true, select: false },
         roles: { type: [{ type: String, enum: ROLES }], default: ["member"] },
         state: { type: String, enum: ACCOUNT_STATES, default: "PendingVerification" },
-        otp: { type: otpSchema, select: false }
+        otp: { type: otpSchema, select: false },
+        announcement: { type: announcementSchema, select: false },
     },
     {
         timestamps: { createdAt: true, updatedAt: true },
@@ -40,6 +53,11 @@ const userSchema = new Schema(
 userSchema.index({ email: 1}, { unique: true })
 userSchema.index({ username: 1 }, { unique: true, collation: USERNAME_COLLATION });
 userSchema.index({ createdAt: 1}, {expireAfterSeconds: 24 * 60 * 60, partialFilterExpression: { state: "PendingVerification"}});
+// Holds only the accounts still waiting for their announcement, so the relay's query stays cheap.
+userSchema.index(
+    { "announcement.pending": 1, "announcement.occurredAt": 1 },
+    { partialFilterExpression: { "announcement.pending": true } },
+);
 
 export type User = InferSchemaType<typeof userSchema>;
 export const UserModel = model("User", userSchema);

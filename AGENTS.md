@@ -14,6 +14,8 @@ Work in the folder you were asked to work in. Do not change another service to m
 
 Host ports in `compose.yaml`: user-service 3001, supplier-service 3002, order-service 3003, credit-service 3004. Inside the compose network services reach each other by service name, for example `http://user-service:3000`.
 
+`compose.yaml` has two networks. Every service joins `edge`, where the web client reaches it, and `backend`, where its database lives. Databases and infrastructure such as Mailpit join only `backend`, so the web client cannot reach them. Publish host ports on `127.0.0.1` only (`"127.0.0.1:3003:3000"`); 8080 for the web client is the one port open to the network.
+
 ## Authentication and authorization
 
 The user-service is the only authority on who is logged in and what they may do. Every other service asks it for each protected request, through `POST /internal/authorize` with the session token and the role the operation needs. The contract, the role rules and an example are in `user-service/README.md`, section "Authorizing requests in another service".

@@ -5,6 +5,7 @@ import { codeMatches, createOtp, OTP_RESEND_COOLDOWN_MS } from "../lib/otp.ts";
 import { fieldErrorsOf, validationError } from "../lib/validation.ts";
 import { toPublicUser, UserModel, type PublicUser } from "../models/user.model.ts";
 import { ResendBody, VerifyBody } from "../schemas/auth.schemas.ts";
+import { newAnnouncement } from "./announcement.service.ts";
 
 export async function verifyAccount(input: unknown): Promise<PublicUser> {
     const parsed = VerifyBody.safeParse(input);
@@ -33,7 +34,8 @@ export async function verifyAccount(input: unknown): Promise<PublicUser> {
 
     const activated = await UserModel.findOneAndUpdate(
         { _id: user._id, state: "PendingVerification", "otp.codeHash": user.otp.codeHash },
-        { $set: {state: "Active"}, $unset: { otp: 1 } },
+        // The announcement goes into the same atomic update, so an Active account is never left without one (F1.1.7).
+        { $set: { state: "Active", announcement: newAnnouncement(now) }, $unset: { otp: 1 } },
         { returnDocument: "after" },
     );
     if (!activated) {

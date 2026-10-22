@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 
 import { authorize } from './middleware.ts/auth.ts';
 import connectDB from './config/db.ts';
+import { startAccountConsumer } from './consumer.ts';
 import accountRoute from './routes/accountRoute.ts';
 import reservationRoute from './routes/reservationRoute.ts';
 import transactionRoute from './routes/transactionRoute.ts';
@@ -11,6 +12,7 @@ import transactionRoute from './routes/transactionRoute.ts';
 dotenv.config();
 
 connectDB();
+void startAccountConsumer();
 
 const app: Express = express();
 const port: number = 3002;

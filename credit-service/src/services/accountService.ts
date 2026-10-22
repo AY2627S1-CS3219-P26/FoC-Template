@@ -7,7 +7,12 @@ export async function createAccount(userId: string): Promise<void> {
     const existing = await findAccountByUserId(userId);
     if (existing) return;
 
-    await insertAccount({ userId, available: INITIAL_CREDITS, reserved: 0 });
+    try {
+        await insertAccount({ userId, available: INITIAL_CREDITS, reserved: 0 });
+    } catch (err) {
+        if ((err as { code?: number }).code === 11000) return; // a concurrent announcement won the race; the unique userId index keeps it idempotent
+        throw err;
+    }
     await insertTransaction({ userId, type: 'allocation', amount: INITIAL_CREDITS, createdAt: new Date() });
 }
 

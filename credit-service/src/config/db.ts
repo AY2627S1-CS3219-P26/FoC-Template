@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { MongoClient } from 'mongodb';
+import { MongoClient, type ClientSession } from 'mongodb';
 
 dotenv.config();
 
@@ -26,6 +26,19 @@ export async function connectDB() {
 
 export async function closeDB() {
     await client.close();
+}
+
+// Runs fn inside one multi-document transaction so the balance move, the reservation and the
+// ledger entry commit all-or-nothing (N4.1.2). Needs credit-db to be a replica set.
+export async function withTxn<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
+    const session = client.startSession();
+    try {
+        let result: T;
+        await session.withTransaction(async () => { result = await fn(session); });
+        return result! as T;
+    } finally {
+        await session.endSession();
+    }
 }
 
 export { client };

@@ -1,17 +1,21 @@
 import { client } from "../../../config/db.ts";
+import type { ClientSession } from "mongodb";
 import type { Reservation } from "../../../types/credit.ts";
 
 const database = client.db('credit-service');
 const collection = database.collection('reservations');
 
-export async function insertReservation(reservation: Reservation) {
-    return collection.insertOne(reservation);
+export async function insertReservation(reservation: Reservation, session?: ClientSession) {
+    return collection.insertOne(reservation, { session });
 }
 
-export async function findReservationByErrandRef(errandRef: string) {
+export async function findActiveReservation(errandRef: string) {
     return collection.findOne({ errandRef, status: 'active' });
 }
 
-export async function updateReservationStatus(errandRef: string, status: Reservation['status']) {
-    return collection.updateOne({ errandRef }, { $set: { status } });
+// Move an active reservation to a terminal state, guarded so only one concurrent caller wins
+// (modifiedCount is 1 for the winner, 0 for a repeat). This is what makes transfer/release idempotent.
+export async function setReservationStatusIfActive(errandRef: string, status: Reservation['status'], session?: ClientSession) {
+    const r = await collection.updateOne({ errandRef, status: 'active' }, { $set: { status } }, { session });
+    return r.modifiedCount === 1;
 }

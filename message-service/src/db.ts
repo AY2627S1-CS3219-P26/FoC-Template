@@ -5,6 +5,7 @@ import { logger } from "./lib/logger.ts";
 const MAX_ATTEMPTS = 10;
 
 export async function connectToDBWithRetry(): Promise<void> {
+
     for (let attempt = 1; ; attempt++) {
         try {
             await mongoose.connect(config.MONGO_URL, { serverSelectionTimeoutMS: 5000 });

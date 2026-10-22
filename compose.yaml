@@ -30,7 +30,7 @@ services:
       user-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -46,12 +46,49 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
     restart: unless-stopped
+
+  message-service:
+    build: ./message-service
+    environment:
+      PORT: 3008
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MONGO_URL: mongodb://message-db:27017/message-service #uses the container port
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nus.edu.sg}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+    ports:
+      - "3008:3008"
+    depends_on:
+      message-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3008/health" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  message-db:
+    image: mongo:8 #Pulls mongo image 8 
+    volumes:
+      - message-db-data:/data/db # source/desination stored on my machine/stored inside container
+    ports:
+      - "127.0.0.1:27018:27017" #only on specific interfaces: local port on my machine to docker port
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped #makes the container restart automaticly 
 
   mailpit:
     image: axllent/mailpit:v1.31.6
@@ -127,7 +164,7 @@ services:
       # Gives the tests a database of their own, so they never touch real data.
       - ./supplier-service/db/create-test-database.sql:/docker-entrypoint-initdb.d/create-test-database.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -201,16 +238,17 @@ services:
     # No depends_on on purpose: nginx looks the services up per request, so the web client
     # starts and stays up while a service is down or being replaced (N6.1.2).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz" ]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 5s
     restart: unless-stopped
 
-
 volumes:
+  #Place for docker to store data
   user-db-data:
+  message-db-data:
   supplier-db-data:
   credit-db-data:
   broker-data:

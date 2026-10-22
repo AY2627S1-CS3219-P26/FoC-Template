@@ -3,10 +3,10 @@ import { createApp } from "./app.ts";
 import { config } from "./config.ts";
 import { logger } from "./lib/logger.ts";
 import SocketServer from "./webSocket.ts";
+import { connectToDBWithRetry } from "./db.ts";
 
 try {
     //await connectToDBWithRetry();
-    //await ensureAdministrator();
 } catch (err) {
     logger.fatal({ err }, "could not start, exiting");
     process.exit(1);

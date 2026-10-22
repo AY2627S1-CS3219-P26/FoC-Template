@@ -7,6 +7,7 @@ export const messagesRouter = Router();
 messagesRouter.get("/last-message/:userId", getLastMessageByUserId)
 messagesRouter.get("/:senderId/:userId", getConversationByIds)
 messagesRouter.get("unread/:userId", getUnreadMessagesByUserId)
+messagesRouter.get("test", getUnreadMessagesByUserId)
 
 messagesRouter.post("/send", send)
 

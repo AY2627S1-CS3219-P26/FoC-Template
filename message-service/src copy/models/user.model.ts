@@ -37,9 +37,9 @@ const userSchema = new Schema(
     }
 )
 
-userSchema.index({ email: 1}, { unique: true })
+userSchema.index({ email: 1 }, { unique: true })
 userSchema.index({ username: 1 }, { unique: true, collation: USERNAME_COLLATION });
-userSchema.index({ createdAt: 1}, {expireAfterSeconds: 24 * 60 * 60, partialFilterExpression: { state: "PendingVerification"}});
+userSchema.index({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60, partialFilterExpression: { state: "PendingVerification" } });
 
 export type User = InferSchemaType<typeof userSchema>;
 export const UserModel = model("User", userSchema);

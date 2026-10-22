@@ -1,11 +1,10 @@
 import express from "express";
 import helmet from "helmet";
-import { healthRouter } from "./routes/health.routes.ts";
-import { errorHandler, notFound } from "./middleware/errorHandler.ts";
-import { authRouter } from "./routes/auth.routes.ts";
-import { usersRouter } from "./routes/users.routes.ts";
+
 import cookieParser from "cookie-parser";
-import { internalRouter } from "./routes/internal.routes.ts";
+import { healthRouter } from "./routes/health.routes.ts";
+import messagesRouter from "./routes/messages.routes.ts";
+import ragRouter from "./routes/rag.routes.ts";
 
 export function createApp() {
     const app = express();
@@ -15,11 +14,8 @@ export function createApp() {
     app.use(cookieParser());
 
     app.use(healthRouter);
-    app.use("/auth", authRouter);
-    app.use("/users", usersRouter);
-    app.use("/internal", internalRouter);
+    app.use("/messages", messagesRouter);
+    app.use("/rag", ragRouter);
 
-    app.use(notFound);
-    app.use(errorHandler);
     return app;
 }

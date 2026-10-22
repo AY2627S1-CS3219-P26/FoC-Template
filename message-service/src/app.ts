@@ -13,7 +13,6 @@ export function createApp() {
     app.use(express.json({ limit: "10kb" }));
     app.use(cookieParser());
 
-    app.use("", (req: Request, res: Response) => res.status(200))
 
     app.use(healthRouter);
     app.use("/messages", messagesRouter);

@@ -84,7 +84,9 @@ jobs:
     name: compose
     needs: changes
     if: needs.changes.outputs.compose == 'true'
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now ships kernel 6.19+, which mongo:8 refuses to boot on
+    # (MongoDB SERVER-121912), so every mongo service is unhealthy and the stack never comes up.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
       - name: Start the system the way N6.1.1 promises

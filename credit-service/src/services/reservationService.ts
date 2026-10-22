@@ -6,7 +6,7 @@ export async function reserveCredits(userId: string, errandRef: string, amount: 
     if (amount <= 0 || !Number.isInteger(amount)) throw new Error('Amount must be a positive whole number');
 
     const existing = await findReservationByErrandRef(errandRef);
-    if (existing) return; // ponytail: idempotent — repeated reservation request is a no-op
+    if (existing) return;
 
     const account = await findAccountByUserId(userId);
     if (!account) throw new Error('Account not found');
@@ -37,7 +37,7 @@ export async function transferCredits(errandRef: string, courierId: string): Pro
 
 export async function releaseCredits(errandRef: string): Promise<void> {
     const reservation = await findReservationByErrandRef(errandRef);
-    if (!reservation) return; // ponytail: idempotent — already released is a no-op
+    if (!reservation) return;
 
     const account = await findAccountByUserId(reservation.userId);
     if (!account) throw new Error('Account not found');

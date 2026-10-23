@@ -1,13 +1,18 @@
-import { Request, Response } from "express";
-import { OrderService } from "../services/order.service.ts";
+import type { Request, Response } from "express";
+import { createOrderService } from "../services/order.service.ts";
 import { CreateOrderSchema } from "../schemas/order.schema.ts";
+import { OrderModel } from "../models/order.model.ts";
+import { createServiceClients, ServiceError } from "../services/clients.ts";
+import { config } from "../config.ts";
+
+const OrderService = createOrderService(OrderModel, createServiceClients(config.SUPPLIER_SERVICE_URL, config.CREDIT_SERVICE_URL));
 
 export const OrderController = {
     // POST /orders
     async createOrder(req: Request, res: Response): Promise<void> {
         try {
             // Extract logged-in user ID (populated by authentication middleware)
-            const requesterId = (req as any).user?.id || req.headers["x-user-id"];
+            const requesterId = res.locals.accountId;
             if (!requesterId) {
                 res.status(401).json({ error: "Unauthorized: Missing user identity" });
                 return;
@@ -20,10 +25,18 @@ export const OrderController = {
                 return;
             }
 
-            const order = await OrderService.createOrder(requesterId as string, validation.data);
+            const order = await OrderService.createOrder(requesterId, validation.data, req.headers.cookie!);
             res.status(201).json({ message: "Errand request created successfully", data: order });
         } catch (error: any) {
-            res.status(500).json({ error: error.message || "Failed to create order" });
+            if (error instanceof ServiceError) {
+                res.status(error.status).json({ error: error.message });
+                return;
+            }
+            if (error.message === "NEEDED_BY_TIME_IN_PAST") {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.status(500).json({ error: "Failed to create order" });
         }
     },
 
@@ -61,7 +74,7 @@ export const OrderController = {
     // POST /orders/:id/accept
     async acceptOrder(req: Request, res: Response): Promise<void> {
         try {
-            const courierId = (req as any).user?.id || req.headers["x-user-id"];
+            const courierId = res.locals.accountId;
             if (!courierId) {
                 res.status(401).json({ error: "Unauthorized: Missing courier identity" });
                 return;
@@ -97,7 +110,7 @@ export const OrderController = {
     // PATCH /orders/:id/status
     async updateStatus(req: Request, res: Response): Promise<void> {
         try {
-            const userId = (req as any).user?.id || req.headers["x-user-id"];
+            const userId = res.locals.accountId;
             if (!userId) {
                 res.status(401).json({ error: "Unauthorized: Missing user identity" });
                 return;
@@ -114,11 +127,19 @@ export const OrderController = {
             const updatedOrder = await OrderService.updateOrderStatus(orderId, userId as string, status);
             res.status(200).json({ message: "Order status updated successfully", data: updatedOrder });
         } catch (error: any) {
-            if (error.message === "UNAUTHORIZED_STATUS_UPDATE") {
+            if (error.message.startsWith("UNAUTHORIZED_")) {
                 res.status(403).json({ error: "You are not authorized to update this order" });
                 return;
             }
-            res.status(500).json({ error: error.message || "Failed to update order status" });
+            if (error.message === "ORDER_NOT_FOUND") {
+                res.status(404).json({ error: "Order not found" });
+                return;
+            }
+            if (["INVALID_STATE_TRANSITION", "STATUS_UPDATE_FAILED"].includes(error.message)) {
+                res.status(409).json({ error: error.message });
+                return;
+            }
+            res.status(500).json({ error: "Failed to update order status" });
         }
     }
 };

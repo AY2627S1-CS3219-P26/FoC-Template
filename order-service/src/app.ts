@@ -1,4 +1,4 @@
-import express, { Express } from "express";
+import express, { type Express } from "express";
 import orderRoutes from "./routes/order.route.ts";
 import { logger } from "./lib/logger.ts";
 

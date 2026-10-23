@@ -1,59 +1,30 @@
-import { Request, Response, NextFunction } from "express";
-import { config } from "../config.ts";
-import { logger } from "../lib/logger.ts";
+import type { Request, Response, NextFunction } from "express";
 
-export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-        const sessionToken = req.headers.authorization || req.headers["x-session-token"];
-        if (!sessionToken) {
-            res.status(401).json({ error: "Unauthorized: Missing session credential" });
+export function createRequireAuth(userServiceUrl: string, request: typeof fetch = fetch) {
+    return async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const token = req.headers.cookie?.split(";")
+            .map((part) => part.trim()).find((part) => part.startsWith("relay_session="))
+            ?.slice("relay_session=".length);
+        if (!token) {
+            res.status(401).json({ error: "A session is required" });
             return;
         }
-
-        // If running locally, stub out specific test tokens so you don't need the User Service
-        if (config.NODE_ENV === "development") {
-            if (sessionToken === "session-token-requester-123") {
-                (req as any).user = {
-                    id: "user-requester-001", // Fake Requester ID
-                    roles: ["member"]
-                };
-                return next();
+        try {
+            const response = await request(new URL("/internal/authorize", userServiceUrl), {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ token, requiredRole: "member" }),
+                signal: AbortSignal.timeout(2000),
+            });
+            const body = response.ok ? await response.json() as { decision?: string; accountId?: string } : null;
+            if (body?.decision === "authorized" && typeof body.accountId === "string" && body.accountId !== "") {
+                res.locals.accountId = body.accountId;
+                next();
+                return;
             }
-            if (sessionToken === "session-token-courier-456") {
-                (req as any).user = {
-                    id: "user-courier-002", // Fake Courier ID (different from requester!)
-                    roles: ["member"]
-                };
-                return next();
-            }
+        } catch {
+            // A failed authorization request is a refusal, as in the other services.
         }
-
-        // Call User Service authorization endpoint (Fail closed)
-        const response = await fetch(`${config.USER_SERVICE_URL}/internal/authorize`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": sessionToken as string
-            },
-            body: JSON.stringify({ path: req.baseUrl + req.path, method: req.method })
-        });
-
-        if (!response.ok) {
-            res.status(403).json({ error: "Access denied by User Service" });
-            return;
-        }
-
-        const data = await response.json() as { userId: string; roles: string[] };
-
-        // Attach authenticated user context to request
-        (req as any).user = {
-            id: data.userId,
-            roles: data.roles
-        };
-
-        next();
-    } catch (error) {
-        logger.error({ error }, "Authorization check failed");
-        res.status(500).json({ error: "Authorization service unavailable" });
-    }
+        res.status(403).json({ error: "Access denied by User Service" });
+    };
 }

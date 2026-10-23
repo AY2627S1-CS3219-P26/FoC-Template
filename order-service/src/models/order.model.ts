@@ -2,6 +2,7 @@ import { pool } from "../db.ts";
 import type { QueryResult } from "pg";
 
 export type OrderStatus =
+    | "Pending"
     | "Open"
     | "Accepted"
     | "PickedUp"
@@ -40,7 +41,7 @@ export const OrderModel = {
                 requester_id, supplier_id, delivery_location,
                 needed_by_time, item_lines, credit_reward, status
             )
-            VALUES ($1, $2, $3, $4, $5::text[], $6, 'Open')
+            VALUES ($1, $2, $3, $4, $5::text[], $6, 'Pending')
             RETURNING *;
         `;
         const values = [
@@ -76,14 +77,22 @@ export const OrderModel = {
         return result.rows[0] || null;
     },
 
-    async updateStatus(orderId: number, status: OrderStatus): Promise<Order | null> {
+    async updateStatus(orderId: number, status: OrderStatus, expectedStatus: OrderStatus): Promise<Order | null> {
         const query = `
-            UPDATE orders
-            SET status = $1, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2
-            RETURNING *;
+            WITH updated AS (
+                UPDATE orders
+                SET status = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2 AND status = $3
+                RETURNING *
+            ), queued AS (
+                INSERT INTO order_outbox (type, data)
+                SELECT 'order.errand.' || lower(status),
+                    jsonb_build_object('errandRef', id::text, 'courierId', courier_id)
+                FROM updated WHERE status IN ('Completed', 'Cancelled', 'Expired')
+            )
+            SELECT * FROM updated;
         `;
-        const result: QueryResult<Order> = await pool.query(query, [status, orderId]);
+        const result: QueryResult<Order> = await pool.query(query, [status, orderId, expectedStatus]);
         return result.rows[0] || null;
     }
 };

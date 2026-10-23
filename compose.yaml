@@ -94,7 +94,24 @@ services:
       retries: 10
     restart: unless-stopped
 
-  web-client:
+order-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${ORDER_DB_USER:-order_service}
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-change-me}
+      POSTGRES_DB: ${ORDER_DB_NAME:-orders}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - order-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+web-client:
     build: ./web-client
     environment:
       USER_SERVICE_URL: http://user-service:3000

@@ -96,29 +96,45 @@ export const OrderController = {
 
     // PATCH /orders/:id/status
     async updateStatus(req: Request, res: Response): Promise<void> {
-        try {
-            const userId = (req as any).user?.id || req.headers["x-user-id"];
-            if (!userId) {
-                res.status(401).json({ error: "Unauthorized: Missing user identity" });
-                return;
-            }
-            const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-            const orderId = parseInt(rawId ?? "", 10);
-            const { status } = req.body;
-
-            if (isNaN(orderId) || !status) {
-                res.status(400).json({ error: "Order ID and status are required" });
-                return;
-            }
-
-            const updatedOrder = await OrderService.updateOrderStatus(orderId, userId as string, status);
-            res.status(200).json({ message: "Order status updated successfully", data: updatedOrder });
-        } catch (error: any) {
-            if (error.message === "UNAUTHORIZED_STATUS_UPDATE") {
-                res.status(403).json({ error: "You are not authorized to update this order" });
-                return;
-            }
-            res.status(500).json({ error: error.message || "Failed to update order status" });
+    try {
+        const userId = (req as any).user?.id || req.headers["x-user-id"];
+        if (!userId) {
+            res.status(401).json({ error: "Unauthorized: Missing user identity" });
+            return;
         }
+
+        const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        const orderId = parseInt(rawId ?? "", 10);
+        const { status } = req.body;
+
+        if (isNaN(orderId) || !status) {
+            res.status(400).json({ error: "Order ID and status are required" });
+            return;
+        }
+
+        const order = await OrderService.getOrderById(orderId);
+        if (!order) {
+            res.status(404).json({ error: "Order not found" });
+            return;
+        }
+        
+        if (order.status === status) {
+            res.status(200).json({ 
+                message: `Order is already marked as ${status}`, 
+                order 
+            });
+            return;
+        }
+
+        const updatedOrder = await OrderService.updateOrderStatus(orderId, userId as string, status);
+
+        res.status(200).json({ message: "Order status updated successfully", data: updatedOrder });
+    } catch (error: any) {
+        if (error.message === "UNAUTHORIZED_STATUS_UPDATE") {
+            res.status(403).json({ error: "You are not authorized to update this order" });
+            return;
+        }
+        res.status(500).json({ error: error.message || "Failed to update order status" });
     }
+}
 };

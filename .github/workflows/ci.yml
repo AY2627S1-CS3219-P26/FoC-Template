@@ -37,6 +37,8 @@ jobs:
               - '*/Dockerfile'
               - '*/.dockerignore'
               - 'user-service/**'
+              - 'supplier-service/**'
+              - 'data/csv/**'
               - 'web-client/nginx/**'
 
   user-service:
@@ -82,7 +84,9 @@ jobs:
     name: compose
     needs: changes
     if: needs.changes.outputs.compose == 'true'
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now ships kernel 6.19+, which mongo:8 refuses to boot on
+    # (MongoDB SERVER-121912), so every mongo service is unhealthy and the stack never comes up.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
       - name: Start the system the way N6.1.1 promises
@@ -112,14 +116,30 @@ jobs:
         run: docker compose down --volumes
 
   publish:
-    name: publish images
-    needs: [user-service, compose]
+    name: publish ${{ matrix.service }}
+    needs: [user-service, web-client, compose]
     # Runs after a merge into main, also when the jobs above were skipped because nothing changed.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      # One image failing to build does not hold back the others.
+      fail-fast: false
+      matrix:
+        # order-service and credit-service get an entry here once their Dockerfile is filled in.
+        include:
+          - service: user-service
+            context: user-service
+            dockerfile: user-service/Dockerfile
+          # Built from the repository root, because its seed file lives in data/csv.
+          - service: supplier-service
+            context: .
+            dockerfile: supplier-service/Dockerfile
+          - service: web-client
+            context: web-client
+            dockerfile: web-client/Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -131,13 +151,14 @@ jobs:
       - uses: docker/metadata-action@v6
         id: meta
         with:
-          images: ghcr.io/ay2627s1-cs3219-p26/user-service
+          images: ghcr.io/ay2627s1-cs3219-p26/${{ matrix.service }}
           tags: |
             type=sha
             type=raw,value=latest
       - uses: docker/build-push-action@v7
         with:
-          context: user-service
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -56,7 +56,7 @@ export const OrderService = {
 
         // Enforce F3.3.1 state transition rules
         const current = order.status;
-        const isValidTransition = 
+        const isValidTransition =
             (current === "Open" && ["Accepted", "Cancelled", "Expired"].includes(newStatus)) ||
             (current === "Accepted" && ["PickedUp", "Cancelled"].includes(newStatus)) ||
             (current === "PickedUp" && newStatus === "Delivered") ||

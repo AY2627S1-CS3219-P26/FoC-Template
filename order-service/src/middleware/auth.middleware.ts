@@ -44,7 +44,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         }
 
         const data = await response.json() as { userId: string; roles: string[] };
-        
+
         // Attach authenticated user context to request
         (req as any).user = {
             id: data.userId,

@@ -1,7 +1,7 @@
 import { pool } from "../db.ts";
 import type { QueryResult } from "pg";
 
-export type OrderStatus = 
+export type OrderStatus =
     | "Open"
     | "Accepted"
     | "PickedUp"
@@ -37,7 +37,7 @@ export const OrderModel = {
     async create(data: CreateOrderData): Promise<Order> {
         const query = `
             INSERT INTO orders (
-                requester_id, supplier_id, delivery_location, 
+                requester_id, supplier_id, delivery_location,
                 needed_by_time, item_lines, credit_reward, status
             )
             VALUES ($1, $2, $3, $4, $5::text[], $6, 'Open')
@@ -67,7 +67,7 @@ export const OrderModel = {
 
     async acceptOrder(orderId: number, courierId: string): Promise<Order | null> {
         const query = `
-            UPDATE orders 
+            UPDATE orders
             SET courier_id = $1, status = 'Accepted', updated_at = CURRENT_TIMESTAMP
             WHERE id = $2 AND status = 'Open' AND requester_id != $1
             RETURNING *;
@@ -78,7 +78,7 @@ export const OrderModel = {
 
     async updateStatus(orderId: number, status: OrderStatus): Promise<Order | null> {
         const query = `
-            UPDATE orders 
+            UPDATE orders
             SET status = $1, updated_at = CURRENT_TIMESTAMP
             WHERE id = $2
             RETURNING *;

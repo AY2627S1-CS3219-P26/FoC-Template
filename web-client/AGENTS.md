@@ -542,7 +542,7 @@ For order and credit, once the service has an API:
    ```
 
    List only the top-level paths the browser needs. Never `internal` or `health`.
-2. Add the variable to the `web-client` service in `../compose.yaml`, for example `ORDER_SERVICE_URL: http://order-service:3000`, and to `../.env.example`. A route file without its variable stops nginx from starting, on purpose.
+2. Add the variable to the `web-client` service in `../compose.yaml`, for example `ORDER_SERVICE_URL: http://order-service:3000`, and to `../.env.example`. A route file without its variable stops nginx from starting, on purpose. The service itself has to be on the `edge` network in `../compose.yaml`, otherwise nginx cannot find it and answers 503.
 3. `docker compose up --build -d web-client`, then check that `curl -i http://localhost:8080/api/order/orders` reaches your service and `curl -i http://localhost:8080/api/order/internal/x` answers 404.
 4. Commit these shared files on their own and ask the platform owner for review.
 

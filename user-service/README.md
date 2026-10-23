@@ -15,6 +15,7 @@ From the repository root, `docker compose up --build` starts the service on http
 | `PORT` | HTTP port inside the container (default 3000) |
 | `LOG_LEVEL` | pino log level (default `info`) |
 | `MONGO_URL` | MongoDB connection string |
+| `BROKER_URL` | RabbitMQ connection string, for announcing accounts |
 | `OTP_SECRET` | Key for hashing verification codes, at least 32 characters |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Outgoing email |
 | `COOKIE_SECURE` | Send the session cookie over HTTPS only (default true, false in compose for local HTTP) |
@@ -38,6 +39,12 @@ All errors have the shape `{ "error": { "code": "...", "message": "...", "detail
 | PUT, DELETE | `/users/:id/roles/administrator` | administrator | F1.5.5 |
 | POST | `/internal/authorize` | other services | F1.5.3 |
 | GET | `/health` | public | |
+
+## Announcing accounts
+
+Every account that becomes Active, by verifying its email or as the first administrator, is announced to the Credit Service as the event `user.account.activated` (F1.1.7). The announcement is written into the account document in the same update that activates it. A relay publishes pending announcements every second and marks one sent only after RabbitMQ has stored it in a queue, so a repetition always carries the same `eventId`. While the broker is down or the credit-service has not declared its queue yet, announcements wait and the service keeps working. `GET /health` shows whether the broker is connected.
+
+The event and the rules for consuming it are in [`docs/events.md`](../docs/events.md).
 
 ## Sessions
 

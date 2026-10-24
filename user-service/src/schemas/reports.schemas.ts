@@ -8,6 +8,12 @@ export const ReportBody = z.object({
     reason: Reason
 });
 
+// F1.6.7: Actioned also suspends the reported account, with the justification as its reason
+export const DecisionBody = z.object({
+    outcome: z.enum(["Dismissed", "Actioned"], "must be Dismissed or Actioned"),
+    justification: Reason
+});
+
 export const ListReportsQuery = PageQuery.extend({
     state: z.enum(REPORT_STATES, "must be Open, Dismissed or Actioned").optional(),
     reportedId: z.string().trim().optional()

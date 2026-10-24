@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { file, getOne, list } from "../controllers/reports.controller.ts";
+import { decide, file, getOne, list } from "../controllers/reports.controller.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireRole } from "../middleware/requireRole.ts";
 
@@ -13,3 +13,4 @@ reportsRouter.post("/", file);
 const adminOnly = requireRole("administrator");
 reportsRouter.get("/", adminOnly, list);
 reportsRouter.get("/:id", adminOnly, getOne);
+reportsRouter.post("/:id/decision", adminOnly, decide);

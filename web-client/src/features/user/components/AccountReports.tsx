@@ -14,7 +14,8 @@ const shown = 5
 // The newest reports that name this account. The full list with filters is on /admin/reports.
 export function AccountReports({ accountId }: AccountReportsProps) {
   const reports = useReports({ page: 1, pageSize: shown, reportedId: accountId })
-  const allReports = `/admin/reports?reportedId=${accountId}`
+  // state=all, since this section lists every state and the report list starts on Open
+  const allReports = `/admin/reports?state=all&reportedId=${accountId}`
 
   return (
     <section aria-labelledby="account-reports" className="grid grid-cols-1 gap-4">

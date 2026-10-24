@@ -131,7 +131,7 @@ Copy and adapt these. They were run against the real supplier-service. For the s
 | a mutation that updates the session or other cached data | `api/user/auth.ts` (`useLogin`), `api/user/account.ts` (`useUpdateProfile`) |
 | a server reason with extra details, like attempts left | `pages/VerifyPage.tsx` |
 | a paged list with the page in the URL, table from `md`, cards below | `pages/AdminStudentsPage.tsx` |
-| status values shown as badges | `pages/AdminStudentsPage.tsx` (`stateBadges`) |
+| status values shown as badges | `components/AccountStateBadge.tsx` |
 
 ### Template 1: API module
 

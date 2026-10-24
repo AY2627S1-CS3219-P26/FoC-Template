@@ -1,4 +1,5 @@
 import type { FeatureRoutes } from '@/lib/routing'
+import { AdminReportDetailPage } from './pages/AdminReportDetailPage'
 import { AdminReportsPage } from './pages/AdminReportsPage'
 import { AdminStudentDetailPage } from './pages/AdminStudentDetailPage'
 import { AdminStudentsPage } from './pages/AdminStudentsPage'
@@ -24,5 +25,6 @@ export const userRoutes: FeatureRoutes = {
     { path: 'students', Component: AdminStudentsPage },
     { path: 'students/:id', Component: AdminStudentDetailPage },
     { path: 'reports', Component: AdminReportsPage },
+    { path: 'reports/:id', Component: AdminReportDetailPage },
   ],
 }

@@ -6,6 +6,7 @@ import { QueryView } from '@/components/QueryView'
 import { AccountBalance } from '../components/AccountBalance'
 import { AccountDetails } from '../components/AccountDetails'
 import { AccountReports } from '../components/AccountReports'
+import { AccountStateForm } from '../components/AccountStateForm'
 import { StateHistory } from '../components/StateHistory'
 
 export function AdminStudentDetailPage() {
@@ -31,6 +32,7 @@ export function AdminStudentDetailPage() {
               <AccountReports accountId={account.id} />
             </div>
             <div className="grid grid-cols-1 gap-4">
+              <AccountStateForm account={account} />
               <AccountBalance accountId={account.id} />
             </div>
           </div>

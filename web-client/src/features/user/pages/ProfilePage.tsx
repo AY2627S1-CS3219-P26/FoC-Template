@@ -13,7 +13,8 @@ export function ProfilePage() {
   const location = useLocation()
   const navigate = useNavigate()
   // The edit pages come back here with what they saved. Kept in state, so it outlives the cleanup below.
-  const [notice] = useState(() => (location.state as { notice?: string } | null)?.notice)
+  const [arrival] = useState(() => location.state as { notice?: string; detail?: string } | null)
+  const notice = arrival?.notice
 
   // The browser keeps router state across a reload and back, so it is cleared once read.
   // Otherwise "Profile saved" would show again on every reload.
@@ -23,7 +24,11 @@ export function ProfilePage() {
 
   return (
     <Page title="Profile">
-      {notice && <Notice tone="success" role="status" title={notice} />}
+      {notice && (
+        <Notice tone="success" role="status" title={notice}>
+          {arrival?.detail}
+        </Notice>
+      )}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <ProfileSummary user={user} />
         <nav aria-label="Account settings" className="ds-surface p-2">

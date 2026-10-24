@@ -15,14 +15,22 @@ function notFound(): AppError {
 export async function listUsers(query: unknown) {
     const parsed = ListUsersQuery.safeParse(query);
     if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
-    const { page, pageSize } = parsed.data;
+    const { page, pageSize, q, state } = parsed.data;
+
+    // Escaped, so the search is plain text: "a.b" does not find "axb". No index helps a substring
+    // search, which is fine for the accounts of one campus.
+    const search = q ? new RegExp(RegExp.escape(q), "i") : undefined;
+    const filter = {
+        ...(state ? { state } : {}),
+        ...(search ? { $or: [{ _id: q }, { fullName: search }, { username: search }, { email: search }] } : {}),
+    };
 
     const [users, total] = await Promise.all([
-        UserModel.find()
+        UserModel.find(filter)
             .sort({ createdAt: 1 })
             .skip((page -1 ) * pageSize)
             .limit(pageSize),
-        UserModel.countDocuments()
+        UserModel.countDocuments(filter)
     ]);
     return { items: users.map(toPublicUser), page, pageSize, total };
 }

@@ -37,6 +37,7 @@ All errors have the shape `{ "error": { "code": "...", "message": "...", "detail
 | GET | `/users`, `/users/:id` | administrator | F1.4.1, F1.6.2 (`/users/:id` adds `stateChanges`, newest first) |
 | PATCH, DELETE | `/users/:id` | administrator | F1.4.2, F1.4.4 |
 | PUT, DELETE | `/users/:id/roles/administrator` | administrator | F1.5.5 |
+| PUT | `/users/:id/state` | administrator | F1.6.2 |
 | POST | `/internal/authorize` | other services | F1.5.3 |
 | GET | `/health` | public | |
 

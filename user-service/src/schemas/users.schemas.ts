@@ -18,9 +18,12 @@ export const PasswordChangeBody = z.object({
     newPassword: Password
 })
 
-export const ListUsersQuery = z.object({
+export const PageQuery = z.object({
     page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20)
+});
+
+export const ListUsersQuery = PageQuery.extend({
     // F5.5.1: part of a full name, username or email address, or an exact account id
     q: z.string().trim().max(100, "must be at most 100 characters").optional(),
     state: z.enum(ACCOUNT_STATES, "must be PendingVerification, Active or Suspended").optional()

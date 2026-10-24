@@ -30,6 +30,11 @@ const reportSchema = new Schema(
 
 // F1.6.4: one report per reporter and errand, which the database keeps even for parallel requests
 reportSchema.index({ reporterId: 1, errandId: 1 }, { unique: true });
+// The administrators' list (F5.5.4): newest first, by state or by reported account. _id keeps
+// reports filed in the same millisecond in a fixed order across pages.
+reportSchema.index({ filedAt: -1, _id: 1 });
+reportSchema.index({ state: 1, filedAt: -1, _id: 1 });
+reportSchema.index({ reportedId: 1, filedAt: -1, _id: 1 });
 
 export type Report = InferSchemaType<typeof reportSchema>;
 export const ReportModel = model("Report", reportSchema);

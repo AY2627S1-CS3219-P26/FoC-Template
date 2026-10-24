@@ -6,6 +6,7 @@ import { AdminStudentsPage } from './pages/AdminStudentsPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { EditProfilePage } from './pages/EditProfilePage'
 import { LoginPage } from './pages/LoginPage'
+import { NewReportPage } from './pages/NewReportPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SignupPage } from './pages/SignupPage'
 import { VerifyPage } from './pages/VerifyPage'
@@ -20,6 +21,7 @@ export const userRoutes: FeatureRoutes = {
     { path: 'profile', Component: ProfilePage },
     { path: 'profile/edit', Component: EditProfilePage },
     { path: 'profile/password', Component: ChangePasswordPage },
+    { path: 'reports/new', Component: NewReportPage },
   ],
   admin: [
     { path: 'students', Component: AdminStudentsPage },

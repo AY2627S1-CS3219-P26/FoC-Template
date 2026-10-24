@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ReportModel, type ReportState } from "../src/models/report.model.ts";
+import { SessionModel } from "../src/models/session.model.ts";
+import { UserModel, type AccountState } from "../src/models/user.model.ts";
 import { useTestDatabase } from "./helpers/db.ts";
 import { app, createUser, loginAs } from "./helpers/users.ts";
 
@@ -209,5 +211,121 @@ describe("reports for administrators (F1.6.5, F5.5.4)", () => {
         const missing = await member.get(`/reports/${randomUUID()}`).expect(403);
 
         expect(existing.body).toEqual(missing.body);
+    });
+});
+
+describe("deciding a report (F1.6.6, F1.6.7)", () => {
+    const JUSTIFICATION = "Chat log confirms the errand was never delivered";
+
+    // Alice reports bob through the API; the admin is logged in and ready to decide.
+    async function openReport({ reportedState = "Active", reported = "bob" }: { reportedState?: AccountState; reported?: "bob" | "admin" } = {}) {
+        const adminId = await createUser({ username: "admin", roles: ["member", "administrator"] });
+        await createUser({ username: "alice" });
+        const bob = await createUser({ username: "bob" });
+        const admin = await loginAs("admin");
+        const alice = await loginAs("alice");
+        const bobAgent = await loginAs("bob");
+        const reportedId = reported === "admin" ? adminId : bob;
+        const filed = await alice.post("/reports").send({ reportedId, errandId: "42", reason: REASON }).expect(201);
+        if (reportedState !== "Active") await UserModel.updateOne({ _id: bob }, { $set: { state: reportedState } });
+        return { admin, adminId, bob, bobAgent, reportId: filed.body.id as string };
+    }
+
+    it("dismisses an Open report and records who decided, why and when", async () => {
+        const { admin, adminId, bob, reportId } = await openReport();
+        const before = Date.now();
+
+        const response = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Dismissed", justification: JUSTIFICATION }).expect(200);
+
+        expect(response.body).toMatchObject({
+            id: reportId,
+            state: "Dismissed",
+            reported: { id: bob, state: "Active" },
+            decision: { by: { id: adminId, username: "admin" }, justification: JUSTIFICATION },
+        });
+        expect(Date.parse(response.body.decision.decidedAt)).toBeGreaterThanOrEqual(before);
+        expect(await UserModel.findById(bob)).toMatchObject({ state: "Active" });
+    });
+
+    it("actions a report by suspending the reported account with the justification as reason", async () => {
+        const { admin, adminId, bob, bobAgent, reportId } = await openReport();
+
+        const response = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Actioned", justification: JUSTIFICATION }).expect(200);
+
+        expect(response.body).toMatchObject({ state: "Actioned", reported: { id: bob, state: "Suspended" } });
+        const account = await admin.get(`/users/${bob}`).expect(200);
+        expect(account.body.stateChanges).toMatchObject([
+            { from: "Active", to: "Suspended", reason: JUSTIFICATION, actor: { id: adminId } },
+        ]);
+        // F1.6.8 applies here as well
+        expect(await SessionModel.countDocuments({ accountId: bob })).toBe(0);
+        await bobAgent.get("/users/me").expect(401);
+    });
+
+    it("actions a report on an account that is already suspended and leaves the account as it is", async () => {
+        const { admin, bob, reportId } = await openReport({ reportedState: "Suspended" });
+
+        const response = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Actioned", justification: JUSTIFICATION }).expect(200);
+
+        expect(response.body.state).toBe("Actioned");
+        const account = await admin.get(`/users/${bob}`).expect(200);
+        expect(account.body).toMatchObject({ state: "Suspended", stateChanges: [] });
+    });
+
+    it("refuses a justification outside 20 to 500 characters or an unknown outcome and keeps the report Open", async () => {
+        const { admin, reportId } = await openReport();
+
+        const tooShort = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Dismissed", justification: "Not enough proof" }).expect(400);
+        const unknown = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Ignored", justification: JUSTIFICATION }).expect(400);
+
+        expect(tooShort.body.error.details.fields.justification).toEqual(["must be between 20 and 500 characters"]);
+        expect(unknown.body.error.details.fields.outcome).toEqual(["must be Dismissed or Actioned"]);
+        expect(await ReportModel.findById(reportId)).toMatchObject({ state: "Open" });
+    });
+
+    it("changes a report only once, and names an unknown one", async () => {
+        const { admin, reportId } = await openReport();
+
+        await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Dismissed", justification: JUSTIFICATION }).expect(200);
+        const again = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Actioned", justification: JUSTIFICATION }).expect(409);
+        const unknown = await admin.post(`/reports/${randomUUID()}/decision`).send({ outcome: "Dismissed", justification: JUSTIFICATION }).expect(404);
+
+        expect(again.body.error.code).toBe("REPORT_ALREADY_DECIDED");
+        expect(unknown.body.error.code).toBe("REPORT_NOT_FOUND");
+        expect(await ReportModel.findById(reportId)).toMatchObject({ state: "Dismissed" });
+    });
+
+    it("lets exactly one of two parallel decisions apply", async () => {
+        const { admin, bob, reportId } = await openReport();
+
+        const results = await Promise.all([
+            admin.post(`/reports/${reportId}/decision`).send({ outcome: "Dismissed", justification: JUSTIFICATION }),
+            admin.post(`/reports/${reportId}/decision`).send({ outcome: "Actioned", justification: JUSTIFICATION }),
+        ]);
+
+        expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+        const report = await ReportModel.findById(reportId);
+        const account = await UserModel.findById(bob);
+        expect(account?.state).toBe(report?.state === "Actioned" ? "Suspended" : "Active");
+    });
+
+    it("puts the report back to Open when the suspension is refused", async () => {
+        const { admin, adminId, reportId } = await openReport({ reported: "admin" });
+
+        const refused = await admin.post(`/reports/${reportId}/decision`).send({ outcome: "Actioned", justification: JUSTIFICATION }).expect(409);
+
+        expect(refused.body.error.code).toBe("OWN_ACCOUNT");
+        const report = await ReportModel.findById(reportId);
+        expect(report).toMatchObject({ state: "Open" });
+        expect(report?.decision).toBeUndefined();
+        expect(await UserModel.findById(adminId)).toMatchObject({ state: "Active" });
+    });
+
+    it("is refused to members", async () => {
+        const { bobAgent, reportId } = await openReport();
+
+        await bobAgent.post(`/reports/${reportId}/decision`).send({ outcome: "Dismissed", justification: JUSTIFICATION }).expect(403);
+
+        expect(await ReportModel.findById(reportId)).toMatchObject({ state: "Open" });
     });
 });

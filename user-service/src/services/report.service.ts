@@ -4,8 +4,8 @@ import { logger } from "../lib/logger.ts";
 import { fieldErrorsOf, validationError } from "../lib/validation.ts";
 import { ReportModel, toFiledReport, type Report } from "../models/report.model.ts";
 import { UserModel, type AccountSummary } from "../models/user.model.ts";
-import { ListReportsQuery, ReportBody } from "../schemas/reports.schemas.ts";
-import { accountSummaries } from "./user.service.ts";
+import { DecisionBody, ListReportsQuery, ReportBody } from "../schemas/reports.schemas.ts";
+import { accountSummaries, applyStateChange } from "./user.service.ts";
 
 function notFound(): AppError {
     return new AppError(404, "REPORT_NOT_FOUND", "No report with this id");
@@ -62,6 +62,46 @@ export async function listReports(query: unknown) {
 export async function getReport(reportId: string): Promise<AdminReport> {
     const report = await ReportModel.findById(reportId);
     if (!report) throw notFound();
+    return toAdminReport(report, await accountSummaries(accountIdsOf(report)));
+}
+
+// F1.6.6 and F1.6.7. There are no transactions on this database, so the report is decided first
+// and put back to Open when the suspension is refused.
+export async function decideReport(reportId: string, actorId: string, input: unknown): Promise<AdminReport> {
+    const parsed = DecisionBody.safeParse(input);
+    if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
+    const { outcome, justification } = parsed.data;
+
+    const decision = { byId: actorId, justification, decidedAt: new Date() };
+    // Only an Open report matches, so of two parallel decisions exactly one applies
+    const report = await ReportModel.findOneAndUpdate(
+        { _id: reportId, state: "Open" },
+        { $set: { state: outcome, decision } },
+        { returnDocument: "after" },
+    );
+    if (!report) {
+        if (!(await ReportModel.exists({ _id: reportId }))) throw notFound();
+        throw new AppError(409, "REPORT_ALREADY_DECIDED", "This report has already been decided");
+    }
+
+    if (outcome === "Actioned") {
+        try {
+            await applyStateChange(report.reportedId, actorId, "Suspended", justification);
+        } catch (err) {
+            // An account that is no longer Active, or no longer exists, stays as it is and the
+            // report is still Actioned. Any other refusal (own account, last administrator) undoes it.
+            const keepsDecision = err instanceof AppError && (err.code === "INVALID_STATE_CHANGE" || err.code === "USER_NOT_FOUND");
+            if (!keepsDecision) {
+                await ReportModel.updateOne(
+                    { _id: reportId, state: outcome, "decision.byId": actorId, "decision.decidedAt": decision.decidedAt },
+                    { $set: { state: "Open" }, $unset: { decision: 1 } },
+                );
+                throw err;
+            }
+        }
+    }
+
+    logger.info({ reportId, actorId, outcome }, "report decided");
     return toAdminReport(report, await accountSummaries(accountIdsOf(report)));
 }
 

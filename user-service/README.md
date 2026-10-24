@@ -40,6 +40,7 @@ All errors have the shape `{ "error": { "code": "...", "message": "...", "detail
 | PUT | `/users/:id/state` | administrator | F1.6.2 |
 | POST | `/reports` | session | F1.6.3, F1.6.4 |
 | GET | `/reports`, `/reports/:id` | administrator | F1.6.5, F5.5.4 (`/reports?state=&reportedId=`, newest first) |
+| POST | `/reports/:id/decision` | administrator | F1.6.6, F1.6.7 |
 | POST | `/internal/authorize` | other services | F1.5.3 |
 | GET | `/health` | public | |
 

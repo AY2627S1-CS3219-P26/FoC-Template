@@ -189,6 +189,10 @@ export async function applyStateChange(accountId: string, actorId: string, to: C
         }
     }
 
+    // F1.6.8. resolveSession already refuses a Suspended account; deleting the sessions also keeps
+    // them from working again once the account is reinstated.
+    if (to === "Suspended") await endAllSessions(accountId);
+
     logger.info({ accountId, actorId, state: to }, "account state changed");
     return toAdminUser(user);
 }

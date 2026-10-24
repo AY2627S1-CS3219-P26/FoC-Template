@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import request from "supertest";
 import { describe, expect, it } from "vitest";
+import { SessionModel } from "../src/models/session.model.ts";
 import { UserModel } from "../src/models/user.model.ts";
 import { useTestDatabase } from "./helpers/db.ts";
-import { createUser, loginAs } from "./helpers/users.ts";
+import { app, createUser, loginAs, PASSWORD, sessionTokenOf } from "./helpers/users.ts";
 
 useTestDatabase();
 
@@ -175,5 +177,41 @@ describe("suspending and reinstating (F1.6.2)", () => {
         for (const user of await UserModel.find().select("+stateChanges")) {
             expect(user.stateChanges.at(-1)?.to ?? "Active").toBe(user.state);
         }
+    });
+});
+
+describe("sessions of a suspended account (F1.6.8)", () => {
+    const REASON = "Harassed a courier in the errand chat";
+
+    it("all end when the account is suspended, and no new one starts", async () => {
+        const adminId = await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const carol = await createUser({ username: "carol" });
+        const admin = await loginAs("admin");
+        const phone = await loginAs("carol");
+        const login = await request(app).post("/auth/login").send({ identifier: "carol", password: PASSWORD }).expect(200);
+
+        await admin.put(`/users/${carol}/state`).send({ state: "Suspended", reason: REASON }).expect(200);
+
+        expect(await SessionModel.countDocuments({ accountId: carol })).toBe(0);
+        expect(await SessionModel.countDocuments({ accountId: adminId })).toBe(1);
+        await phone.get("/users/me").expect(401);
+        const decision = await request(app).post("/internal/authorize").send({ token: sessionTokenOf(login) }).expect(200);
+        expect(decision.body).toEqual({ decision: "denied" });
+        const refused = await request(app).post("/auth/login").send({ identifier: "carol", password: PASSWORD }).expect(403);
+        expect(refused.body.error.code).toBe("ACCOUNT_SUSPENDED");
+    });
+
+    it("stay ended after a reinstatement, while a new login works", async () => {
+        await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const carol = await createUser({ username: "carol" });
+        const admin = await loginAs("admin");
+        const phone = await loginAs("carol");
+
+        await admin.put(`/users/${carol}/state`).send({ state: "Suspended", reason: REASON }).expect(200);
+        await admin.put(`/users/${carol}/state`).send({ state: "Active", reason: "Apologised to the courier, first warning" }).expect(200);
+
+        await phone.get("/users/me").expect(401);
+        const laptop = await loginAs("carol");
+        await laptop.get("/users/me").expect(200);
     });
 });

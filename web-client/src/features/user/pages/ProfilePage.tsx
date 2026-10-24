@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { KeyRound, UserPen } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router'
 import { useCurrentUser } from '@/api/user/session'
@@ -15,19 +15,25 @@ export function ProfilePage() {
   // The edit pages come back here with what they saved. Kept in state, so it outlives the cleanup below.
   const [arrival] = useState(() => location.state as { notice?: string; detail?: string } | null)
   const notice = arrival?.notice
+  const noticeRef = useRef<HTMLDivElement>(null)
 
-  // The browser keeps router state across a reload and back, so it is cleared once read.
-  // Otherwise "Profile saved" would show again on every reload.
   useEffect(() => {
-    if (notice) navigate(location.pathname, { replace: true, state: null })
+    if (!notice) return
+    // The button that saved is gone, so keyboard users continue from the notice, not the top of the page.
+    noticeRef.current?.focus()
+    // The browser keeps router state across a reload and back, so it is cleared once read.
+    // Otherwise "Profile saved" would show again on every reload.
+    navigate(location.pathname, { replace: true, state: null })
   }, [notice, navigate, location.pathname])
 
   return (
     <Page title="Profile">
       {notice && (
-        <Notice tone="success" role="status" title={notice}>
-          {arrival?.detail}
-        </Notice>
+        <div ref={noticeRef} tabIndex={-1}>
+          <Notice tone="success" role="status" title={notice}>
+            {arrival?.detail}
+          </Notice>
+        </div>
       )}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <ProfileSummary user={user} />

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { useChangeAccountState } from '@/api/user/admin'
 import type { AdminUser } from '@/api/user/types'
@@ -18,7 +18,6 @@ export function AccountStateForm({ account }: AccountStateFormProps) {
   const [reason, setReason] = useState('')
   const change = useChangeAccountState(account.id)
   const fieldErrors = fieldErrorsOf(change.error)
-  const headingRef = useRef<HTMLHeadingElement>(null)
 
   if (account.state === 'PendingVerification') {
     return (
@@ -33,22 +32,12 @@ export function AccountStateForm({ account }: AccountStateFormProps) {
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    change.mutate(
-      { state: suspending ? 'Suspended' : 'Active', reason },
-      {
-        onSuccess: () => setReason(''),
-        // The button was disabled while the request ran, which drops keyboard focus to the top of
-        // the page. The heading keeps it here, and the next Tab reaches the reason field.
-        onSettled: () => headingRef.current?.focus(),
-      },
-    )
+    change.mutate({ state: suspending ? 'Suspended' : 'Active', reason }, { onSuccess: () => setReason('') })
   }
 
   return (
     <form noValidate onSubmit={handleSubmit} aria-labelledby="account-state" className="ds-surface grid grid-cols-1 gap-4 p-5">
-      <h2 id="account-state" ref={headingRef} tabIndex={-1}>
-        {suspending ? 'Suspend account' : 'Reinstate account'}
-      </h2>
+      <h2 id="account-state">{suspending ? 'Suspend account' : 'Reinstate account'}</h2>
       <p className="text-muted">
         {suspending
           ? 'Every session of this account ends at once. The reason is recorded with your name.'

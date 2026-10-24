@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { useGrantAdministrator, useRevokeAdministrator } from '@/api/user/admin'
 import type { AdminUser } from '@/api/user/types'
 import { FormError } from '@/components/FormError'
@@ -12,24 +11,22 @@ type AdministratorRoleProps = {
 export function AdministratorRole({ account }: AdministratorRoleProps) {
   const grant = useGrantAdministrator(account.id)
   const revoke = useRevokeAdministrator(account.id)
-  const headingRef = useRef<HTMLHeadingElement>(null)
   const isAdministrator = account.roles.includes('administrator')
   const action = isAdministrator ? revoke : grant
   const previous = isAdministrator ? grant : revoke
   const pending = grant.isPending || revoke.isPending
 
   function handleClick() {
+    // aria-disabled keeps keyboard focus on the button, so a running request is ignored here (as in SubmitButton).
+    if (pending) return
     // Only the latest change shows its outcome, so the one before it is cleared first.
     previous.reset()
-    // The button is disabled while the request runs, which drops keyboard focus to the top of the page.
-    action.mutate(undefined, { onSettled: () => headingRef.current?.focus() })
+    action.mutate()
   }
 
   return (
     <section aria-labelledby="administrator-role" className="ds-surface grid grid-cols-1 gap-4 p-5">
-      <h2 id="administrator-role" ref={headingRef} tabIndex={-1}>
-        Administrator role
-      </h2>
+      <h2 id="administrator-role">Administrator role</h2>
       <p className="text-muted">
         {isAdministrator
           ? 'This account can open the admin console and decide reports.'
@@ -41,7 +38,7 @@ export function AdministratorRole({ account }: AdministratorRoleProps) {
       <button
         type="button"
         className="ds-btn ds-btn--glass"
-        disabled={pending}
+        aria-disabled={pending || undefined}
         aria-busy={pending || undefined}
         onClick={handleClick}
       >

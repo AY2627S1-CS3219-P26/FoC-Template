@@ -23,7 +23,6 @@ export function NewReportPage() {
   const [reason, setReason] = useState('')
   const create = useCreateReport()
   const fieldErrors = fieldErrorsOf(create.error)
-  const errorRef = useRef<HTMLDivElement>(null)
   const sentRef = useRef<HTMLHeadingElement>(null)
 
   // The form, and the button that had focus, are gone once the report is sent.
@@ -33,8 +32,7 @@ export function NewReportPage() {
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    // The button was disabled while the request ran, which drops keyboard focus to the top of the page.
-    create.mutate({ reportedId, errandId, reason }, { onError: () => errorRef.current?.focus() })
+    create.mutate({ reportedId, errandId, reason })
   }
 
   if (!errandId || !reportedId) {
@@ -69,9 +67,7 @@ export function NewReportPage() {
         ) : (
           <form noValidate onSubmit={handleSubmit} className="ds-surface grid grid-cols-1 gap-4 p-5">
             <p className="text-muted">Tell the administrators what went wrong. They read every report and decide what happens.</p>
-            <div ref={errorRef} tabIndex={-1}>
-              <FormError error={create.error} fields={['reason', 'errandId', 'reportedId']} />
-            </div>
+            <FormError error={create.error} fields={['reason', 'errandId', 'reportedId']} />
             {/* Not editable: both come from the errand. Refusals about them show here, not as field names. */}
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="min-w-0">

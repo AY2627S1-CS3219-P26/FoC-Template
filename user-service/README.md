@@ -56,6 +56,52 @@ Logging in sets the cookie `relay_session` (HttpOnly, SameSite=Lax). The token i
 
 Sessions are server-side on purpose, not JWTs: a session can be ended at once, and role changes apply on the next request.
 
+## Account states and reports
+
+An account is `PendingVerification`, `Active` or `Suspended` (F1.6.1). Only an administrator moves an Active account to Suspended or back, with `PUT /users/:id/state` and a reason of 20 to 500 characters (F1.6.2):
+
+```json
+{ "state": "Suspended", "reason": "Did not deliver three accepted errands" }
+```
+
+Each change is recorded with the administrator, the reason and the time. `GET /users/:id` returns them as `stateChanges`, newest first. Suspending an account ends all its sessions at once (F1.6.8), so after a reinstatement it has to log in again.
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `VALIDATION_FAILED` | The reason is not 20 to 500 characters, or the state is neither `Active` nor `Suspended`. |
+| 409 | `INVALID_STATE_CHANGE` | The account is not in the state the change starts from, for example still `PendingVerification`. |
+| 409 | `OWN_ACCOUNT` | An administrator tries to change their own account. |
+| 409 | `LAST_ADMINISTRATOR` | No Active administrator would be left. |
+
+Any logged-in account can report another one with `POST /reports` (F1.6.3):
+
+```json
+{ "reportedId": "<account id>", "errandId": "42", "reason": "Took the food and never delivered it" }
+```
+
+The answer is `201` with the report in state `Open`. A refusal names the field (F1.6.4): `reason` when it is not 20 to 500 characters, `reportedId` when it is the reporter's own account or does not exist, and `errandId` when the same reporter already reported this errand. A unique index on reporter and errand enforces the last rule even for parallel requests. Not checked yet: that the two accounts really were requester and courier of the errand, which needs a lookup in the order-service (REL-210).
+
+Administrators list reports with `GET /reports?state=&reportedId=&page=&pageSize=`, newest first, and read one with `GET /reports/:id` (F1.6.5, F5.5.4). Accounts appear as `{ id, fullName, username, state }`, or as `null` once deleted:
+
+```json
+{
+  "id": "<uuid>",
+  "reporter": { "id": "<uuid>", "fullName": "Alice Tan", "username": "alice", "state": "Active" },
+  "reported": { "id": "<uuid>", "fullName": "Bob Lim", "username": "bob", "state": "Suspended" },
+  "errandId": "42",
+  "reason": "Took the food and never delivered it",
+  "state": "Actioned",
+  "filedAt": "2026-10-24T03:12:45.000Z",
+  "decision": { "by": { "id": "<uuid>", "fullName": "admin", "username": "admin", "state": "Active" }, "justification": "Chat log confirms the errand was never delivered", "decidedAt": "2026-10-24T05:30:00.000Z" }
+}
+```
+
+`POST /reports/:id/decision` with `{ "outcome": "Dismissed" | "Actioned", "justification": "..." }` decides an Open report, again with 20 to 500 characters (F1.6.6, F1.6.7). `Actioned` also suspends the reported account as above, with the justification as reason. An account that is already Suspended stays as it is. A decided report answers `409 REPORT_ALREADY_DECIDED`, and a refused suspension (`OWN_ACCOUNT`, `LAST_ADMINISTRATOR`) leaves the report Open.
+
+The database of this service is a single MongoDB without a replica set, so there are no transactions across documents. Every change is a conditional update on the state it starts from (`state: "Open"`, `state: "Active"`), so of two parallel requests exactly one applies. When a later step is refused, the first one is undone, the same way as when the administrator role is revoked.
+
+`GET /users?q=&state=` searches part of a full name, username or email address, or an exact account id (F5.5.1). The search is plain text, not a pattern, and uses no index, which is fine for the accounts of one campus.
+
 ## Authorizing requests in another service
 
 Every other service checks access by asking this service.

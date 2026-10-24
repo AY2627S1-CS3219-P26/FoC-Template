@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useUsers } from '@/api/user/admin'
-import type { AccountState, Role } from '@/api/user/types'
+import type { AccountState } from '@/api/user/types'
 import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { Pagination } from '@/components/Pagination'
@@ -10,6 +10,8 @@ import { QueryView } from '@/components/QueryView'
 import { SelectField } from '@/components/SelectField'
 import { TextField } from '@/components/TextField'
 import { formatDateTime } from '@/lib/format'
+import { AccountStateBadge } from '../components/AccountStateBadge'
+import { RoleBadges } from '../components/RoleBadges'
 
 const pageSize = 20
 
@@ -19,17 +21,6 @@ const stateOptions = [
   { value: 'Suspended', label: 'Suspended' },
   { value: 'PendingVerification', label: 'Pending verification' },
 ]
-
-const roleBadges: Record<Role, { label: string; className: string }> = {
-  member: { label: 'Member', className: 'ds-badge ds-badge--neutral' },
-  administrator: { label: 'Administrator', className: 'ds-badge ds-badge--info' },
-}
-
-const stateBadges: Record<AccountState, { label: string; className: string }> = {
-  Active: { label: 'Active', className: 'ds-badge ds-badge--success' },
-  PendingVerification: { label: 'Pending verification', className: 'ds-badge ds-badge--info' },
-  Suspended: { label: 'Suspended', className: 'ds-badge ds-badge--danger' },
-}
 
 export function AdminStudentsPage() {
   // Search, state and page live in the URL, so reload, back and a shared link keep them.
@@ -133,22 +124,18 @@ export function AdminStudentsPage() {
                   {result.items.map((user) => (
                     <tr key={user.id}>
                       <td>
-                        <p className="font-medium">{user.fullName}</p>
+                        <Link to={`/admin/students/${user.id}`} className="block">
+                          {user.fullName}
+                        </Link>
                         <p className="font-mono text-xs text-muted">{user.id}</p>
                       </td>
                       <td>{user.username}</td>
                       <td>{user.email}</td>
                       <td>
-                        <div className="flex flex-wrap gap-1">
-                          {user.roles.map((role) => (
-                            <span key={role} className={roleBadges[role].className}>
-                              {roleBadges[role].label}
-                            </span>
-                          ))}
-                        </div>
+                        <RoleBadges roles={user.roles} />
                       </td>
                       <td>
-                        <span className={stateBadges[user.state].className}>{stateBadges[user.state].label}</span>
+                        <AccountStateBadge state={user.state} />
                       </td>
                       <td className="nums-tabular">{formatDateTime(user.createdAt)}</td>
                     </tr>
@@ -161,19 +148,15 @@ export function AdminStudentsPage() {
               {result.items.map((user) => (
                 <li key={user.id} className="grid grid-cols-1 gap-2 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="min-w-0 font-medium wrap-anywhere">{user.fullName}</p>
-                    <span className={stateBadges[user.state].className}>{stateBadges[user.state].label}</span>
+                    <Link to={`/admin/students/${user.id}`} className="min-w-0 wrap-anywhere">
+                      {user.fullName}
+                    </Link>
+                    <AccountStateBadge state={user.state} />
                   </div>
                   <p className="text-sm text-muted wrap-anywhere">
                     {user.username} · {user.email}
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                    {user.roles.map((role) => (
-                      <span key={role} className={roleBadges[role].className}>
-                        {roleBadges[role].label}
-                      </span>
-                    ))}
-                  </div>
+                  <RoleBadges roles={user.roles} />
                   <p className="text-sm text-muted">Joined {formatDateTime(user.createdAt)}</p>
                   <p className="font-mono text-xs text-subtle wrap-anywhere">{user.id}</p>
                 </li>

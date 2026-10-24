@@ -461,6 +461,7 @@ All in `src/components/`. `npm run dev` and http://localhost:5173/_dev/ui shows 
 | `Notice` | an info, success or danger message box |
 | `FormError` | a refused request, without repeating field messages |
 | `TextField`, `SelectField` | labelled inputs with hint and server errors |
+| `TextAreaField` | longer text such as a reason, with an optional character count that refuses nothing |
 | `SubmitButton` | the primary button of a form, with a pending label |
 | `Pagination` | page buttons for a `Paginated` list |
 | `PlaceholderPage` | the "not built yet" page. Delete its use when your page is real. |

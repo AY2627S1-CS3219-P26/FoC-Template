@@ -7,6 +7,7 @@ import { Pagination } from '@/components/Pagination'
 import { QueryView } from '@/components/QueryView'
 import { formatDateTime } from '@/lib/format'
 import { AccountLink } from '../components/AccountLink'
+import { ReportLink } from '../components/ReportLink'
 import { ReportStateBadge } from '../components/ReportStateBadge'
 
 const pageSize = 20
@@ -137,6 +138,9 @@ export function AdminReportsPage() {
                     <th scope="col">Errand</th>
                     <th scope="col">Reason</th>
                     <th scope="col">State</th>
+                    <th scope="col">
+                      <span className="sr-only">Report</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -153,6 +157,9 @@ export function AdminReportsPage() {
                       <td className="wrap-anywhere">{report.reason}</td>
                       <td>
                         <ReportStateBadge state={report.state} />
+                      </td>
+                      <td>
+                        <ReportLink report={report} />
                       </td>
                     </tr>
                   ))}
@@ -175,6 +182,7 @@ export function AdminReportsPage() {
                     <AccountLink account={report.reporter} backLabel="Reports" />
                   </p>
                   <p className="wrap-anywhere">{report.reason}</p>
+                  <ReportLink report={report} />
                 </li>
               ))}
             </ul>

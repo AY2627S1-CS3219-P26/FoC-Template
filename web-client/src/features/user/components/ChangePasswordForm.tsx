@@ -1,30 +1,30 @@
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { useChangePassword } from '@/api/user/account'
 import { FormError } from '@/components/FormError'
-import { Notice } from '@/components/Notice'
 import { SubmitButton } from '@/components/SubmitButton'
 import { TextField } from '@/components/TextField'
 import { fieldErrorsOf } from '@/lib/http'
 
-const empty = { currentPassword: '', newPassword: '' }
-
 export function ChangePasswordForm() {
-  const [values, setValues] = useState(empty)
+  // A refused change keeps what was typed (N5.4); on success the page is left anyway.
+  const [values, setValues] = useState({ currentPassword: '', newPassword: '' })
   const change = useChangePassword()
+  const navigate = useNavigate()
   const fieldErrors = fieldErrorsOf(change.error)
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    // The fields are cleared only on success; a refused change keeps what was typed (N5.4).
-    change.mutate(values, { onSuccess: () => setValues(empty) })
+    change.mutate(values, {
+      onSuccess: () =>
+        navigate('/profile', { state: { notice: 'Password changed', detail: 'Every other device is logged out.' } }),
+    })
   }
 
   return (
     <form noValidate onSubmit={handleSubmit} className="ds-surface grid grid-cols-1 content-start gap-4 p-5">
-      <h2>Change password</h2>
       <p className="text-muted">You stay logged in here. Every other device is logged out.</p>
-      {change.isSuccess && <Notice tone="success" role="status" title="Password changed" />}
       <FormError error={change.error} fields={['currentPassword', 'newPassword']} />
       <TextField
         label="Current password"
@@ -44,9 +44,14 @@ export function ChangePasswordForm() {
         onChange={(newPassword) => setValues({ ...values, newPassword })}
         errors={fieldErrors.newPassword}
       />
-      <SubmitButton pending={change.isPending} pendingLabel="Changing…">
-        Change password
-      </SubmitButton>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SubmitButton pending={change.isPending} pendingLabel="Changing…">
+          Change password
+        </SubmitButton>
+        <Link to="/profile" className="ds-btn ds-btn--glass">
+          Cancel
+        </Link>
+      </div>
     </form>
   )
 }

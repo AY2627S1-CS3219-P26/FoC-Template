@@ -10,6 +10,7 @@ import { Notice } from '@/components/Notice'
 import { QueryView } from '@/components/QueryView'
 import { TextField } from '@/components/TextField'
 import { SelectField } from '@/components/SelectField'
+import { TextAreaField } from '@/components/TextAreaField'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { SubmitEvent } from 'react'
 import { SubmitButton } from '@/components/SubmitButton'
@@ -131,6 +132,8 @@ export function DevUiPage() {
         <TextFieldDemo />
 
         <SelectFieldDemo />
+
+        <TextAreaFieldDemo />
 
         <FormDemo />
       </Page>
@@ -403,6 +406,33 @@ function SelectFieldDemo() {
         onChange={() => {}}
         options={[{ value: '', label: 'Pick a type' }]}
         errors={['is required']}
+      />
+    </section>
+  )
+}
+
+function TextAreaFieldDemo() {
+  const [reason, setReason] = useState('')
+
+  return (
+    <section className="ds-surface grid grid-cols-1 gap-4 p-5">
+      <h2>Text area field</h2>
+      <TextAreaField
+        label="Reason"
+        name="reason"
+        value={reason}
+        onChange={setReason}
+        hint="Between 20 and 500 characters"
+        characterLimit={500}
+      />
+      <TextAreaField
+        label="Justification"
+        name="justification"
+        value="Too short"
+        onChange={() => {}}
+        rows={2}
+        characterLimit={500}
+        errors={['must be between 20 and 500 characters']}
       />
     </section>
   )

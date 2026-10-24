@@ -23,6 +23,15 @@ export const ListUsersQuery = z.object({
     pageSize: z.coerce.number().int().min(1).max(100).default(20)
 });
 
+// F1.6.2 and F1.6.7: suspending, reinstating and deciding a report all need a reason of this length
+const REASON_LENGTH = "must be between 20 and 500 characters";
+export const Reason = z.string().trim().min(20, REASON_LENGTH).max(500, REASON_LENGTH);
+
+export const StateChangeBody = z.object({
+    state: z.enum(["Active", "Suspended"], "must be Active or Suspended"),
+    reason: Reason
+});
+
 export const AuthorizeBody = z.object({
     token: z.string().min(1),
     requiredRole: z.enum(ROLES).default("member")

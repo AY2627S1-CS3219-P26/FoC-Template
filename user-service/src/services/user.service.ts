@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import mongoose from "mongoose";
 import { AppError } from "../errors.ts";
 import { logger } from "../lib/logger.ts";
 import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { fieldErrorsOf, validationError } from "../lib/validation.ts";
 import { toAccountSummary, toPublicUser, UserModel, USERNAME_COLLATION, type AccountSummary, type PublicUser, type User } from "../models/user.model.ts";
-import { ListUsersQuery, PasswordChangeBody, ProfileUpdateBody } from "../schemas/users.schemas.ts";
+import { ListUsersQuery, PasswordChangeBody, ProfileUpdateBody, StateChangeBody } from "../schemas/users.schemas.ts";
 import { endAllSessions } from "./session.service.ts";
 
 function notFound(): AppError {
@@ -140,4 +141,54 @@ export async function revokeAdministrator(accountId: string, actorId: string): P
 
     logger.info({ accountId, actorId }, "administrator role revoked");
     return toPublicUser(user);
+}
+
+type ChangeableState = "Active" | "Suspended";
+
+const STATE_CHANGES = {
+    Suspended: { from: "Active", refusal: "Only an Active account can be suspended" },
+    Active: { from: "Suspended", refusal: "Only a Suspended account can be reinstated" },
+} as const;
+
+export async function changeAccountState(accountId: string, actorId: string, input: unknown): Promise<AdminUser> {
+    const parsed = StateChangeBody.safeParse(input);
+    if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
+    const { state, reason } = parsed.data;
+    return applyStateChange(accountId, actorId, state, reason);
+}
+
+// F1.6.2. Also used by the report decision of F1.6.7, which brings its own validated reason.
+export async function applyStateChange(accountId: string, actorId: string, to: ChangeableState, reason: string): Promise<AdminUser> {
+    // An administrator who suspends their own account is logged out and may leave nobody to undo it
+    if (accountId === actorId) {
+        throw new AppError(409, "OWN_ACCOUNT", "You cannot change the state of your own account");
+    }
+
+    const { from, refusal } = STATE_CHANGES[to];
+    const change = { changeId: randomUUID(), from, to, reason, actorId, at: new Date() };
+    // The expected state is part of the filter, so of two parallel changes only one applies and is recorded
+    const user = await UserModel.findOneAndUpdate(
+        { _id: accountId, state: from },
+        { $set: { state: to }, $push: { stateChanges: change } },
+        { returnDocument: "after" },
+    ).select("+stateChanges");
+    if (!user) {
+        if (!(await UserModel.exists({ _id: accountId }))) throw notFound();
+        throw new AppError(409, "INVALID_STATE_CHANGE", refusal);
+    }
+
+    // Same as revokeAdministrator: suspend first, undo when no Active administrator is left
+    if (to === "Suspended" && user.roles.includes("administrator")) {
+        const remaining = await UserModel.countDocuments({ roles: "administrator", state: "Active" });
+        if (remaining === 0) {
+            await UserModel.updateOne(
+                { _id: accountId, "stateChanges.changeId": change.changeId },
+                { $set: { state: from }, $pull: { stateChanges: { changeId: change.changeId } } },
+            );
+            throw new AppError(409, "LAST_ADMINISTRATOR", "At least one administrator is needed");
+        }
+    }
+
+    logger.info({ accountId, actorId, state: to }, "account state changed");
+    return toAdminUser(user);
 }

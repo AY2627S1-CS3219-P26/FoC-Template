@@ -69,3 +69,111 @@ describe("state history (F1.6.2)", () => {
         expect(list.body.items[0]).not.toHaveProperty("stateChanges");
     });
 });
+
+describe("suspending and reinstating (F1.6.2)", () => {
+    const REASON = "Did not deliver three accepted errands";
+
+    it("suspends an Active account and records actor, reason and time", async () => {
+        const adminId = await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const carol = await createUser({ username: "carol" });
+        const admin = await loginAs("admin");
+        const before = Date.now();
+
+        const response = await admin.put(`/users/${carol}/state`).send({ state: "Suspended", reason: `  ${REASON}  ` }).expect(200);
+
+        expect(response.body).toMatchObject({
+            id: carol,
+            state: "Suspended",
+            stateChanges: [{ from: "Active", to: "Suspended", reason: REASON, actor: { id: adminId, username: "admin" } }],
+        });
+        expect(Date.parse(response.body.stateChanges[0].at)).toBeGreaterThanOrEqual(before);
+        expect(await UserModel.findById(carol)).toMatchObject({ state: "Suspended" });
+    });
+
+    it("reinstates a Suspended account and keeps the earlier change", async () => {
+        await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const carol = await createUser({ username: "carol" });
+        const admin = await loginAs("admin");
+
+        await admin.put(`/users/${carol}/state`).send({ state: "Suspended", reason: REASON }).expect(200);
+        const response = await admin
+            .put(`/users/${carol}/state`)
+            .send({ state: "Active", reason: "Explained the missed errands, first warning" })
+            .expect(200);
+
+        expect(response.body.state).toBe("Active");
+        expect(response.body.stateChanges).toMatchObject([
+            { from: "Suspended", to: "Active" },
+            { from: "Active", to: "Suspended" },
+        ]);
+        await loginAs("carol");
+    });
+
+    it("refuses a reason outside 20 to 500 characters or an unknown state and changes nothing", async () => {
+        await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const carol = await createUser({ username: "carol" });
+        const admin = await loginAs("admin");
+
+        // 19 characters once the spaces are trimmed
+        const tooShort = await admin.put(`/users/${carol}/state`).send({ state: "Suspended", reason: "   too short to count   " }).expect(400);
+        const tooLong = await admin.put(`/users/${carol}/state`).send({ state: "Suspended", reason: "x".repeat(501) }).expect(400);
+        const badState = await admin.put(`/users/${carol}/state`).send({ state: "Deleted", reason: REASON }).expect(400);
+
+        expect(tooShort.body.error.details.fields.reason).toEqual(["must be between 20 and 500 characters"]);
+        expect(tooLong.body.error.details.fields.reason).toEqual(["must be between 20 and 500 characters"]);
+        expect(badState.body.error.details.fields.state).toEqual(["must be Active or Suspended"]);
+        const stored = await UserModel.findById(carol).select("+stateChanges");
+        expect(stored).toMatchObject({ state: "Active", stateChanges: [] });
+    });
+
+    it("refuses a change that does not fit the current state", async () => {
+        await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const pending = await createUser({ username: "pat", state: "PendingVerification" });
+        const active = await createUser({ username: "carol" });
+        const suspended = await createUser({ username: "sam", state: "Suspended" });
+        const admin = await loginAs("admin");
+
+        const unverified = await admin.put(`/users/${pending}/state`).send({ state: "Suspended", reason: REASON }).expect(409);
+        await admin.put(`/users/${pending}/state`).send({ state: "Active", reason: REASON }).expect(409);
+        const again = await admin.put(`/users/${suspended}/state`).send({ state: "Suspended", reason: REASON }).expect(409);
+        const notSuspended = await admin.put(`/users/${active}/state`).send({ state: "Active", reason: REASON }).expect(409);
+
+        expect(unverified.body.error).toMatchObject({ code: "INVALID_STATE_CHANGE", message: "Only an Active account can be suspended" });
+        expect(again.body.error.code).toBe("INVALID_STATE_CHANGE");
+        expect(notSuspended.body.error.message).toBe("Only a Suspended account can be reinstated");
+        expect(await UserModel.findById(pending)).toMatchObject({ state: "PendingVerification" });
+    });
+
+    it("refuses members, unknown accounts and the administrator's own account", async () => {
+        const adminId = await createUser({ username: "admin", roles: [...ADMIN_ROLES] });
+        const carol = await createUser({ username: "carol" });
+        const admin = await loginAs("admin");
+        const member = await loginAs("carol");
+
+        await member.put(`/users/${adminId}/state`).send({ state: "Suspended", reason: REASON }).expect(403);
+        const unknown = await admin.put(`/users/${randomUUID()}/state`).send({ state: "Suspended", reason: REASON }).expect(404);
+        const own = await admin.put(`/users/${adminId}/state`).send({ state: "Suspended", reason: REASON }).expect(409);
+
+        expect(unknown.body.error.code).toBe("USER_NOT_FOUND");
+        expect(own.body.error.code).toBe("OWN_ACCOUNT");
+        expect(await UserModel.findById(carol)).toMatchObject({ state: "Active" });
+    });
+
+    it("keeps an Active administrator when two suspend each other at the same moment", async () => {
+        const first = await createUser({ username: "first", roles: [...ADMIN_ROLES] });
+        const second = await createUser({ username: "second", roles: [...ADMIN_ROLES] });
+        const firstAgent = await loginAs("first");
+        const secondAgent = await loginAs("second");
+
+        await Promise.all([
+            firstAgent.put(`/users/${second}/state`).send({ state: "Suspended", reason: REASON }),
+            secondAgent.put(`/users/${first}/state`).send({ state: "Suspended", reason: REASON }),
+        ]);
+
+        expect(await UserModel.countDocuments({ roles: "administrator", state: "Active" })).toBeGreaterThanOrEqual(1);
+        // An undone suspension leaves no entry behind, so the history always ends in the current state
+        for (const user of await UserModel.find().select("+stateChanges")) {
+            expect(user.stateChanges.at(-1)?.to ?? "Active").toBe(user.state);
+        }
+    });
+});

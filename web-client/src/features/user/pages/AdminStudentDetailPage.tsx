@@ -7,6 +7,7 @@ import { AccountBalance } from '../components/AccountBalance'
 import { AccountDetails } from '../components/AccountDetails'
 import { AccountReports } from '../components/AccountReports'
 import { AccountStateForm } from '../components/AccountStateForm'
+import { AdministratorRole } from '../components/AdministratorRole'
 import { StateHistory } from '../components/StateHistory'
 
 export function AdminStudentDetailPage() {
@@ -33,6 +34,7 @@ export function AdminStudentDetailPage() {
             </div>
             <div className="grid grid-cols-1 gap-4">
               <AccountStateForm account={account} />
+              <AdministratorRole account={account} />
               <AccountBalance accountId={account.id} />
             </div>
           </div>

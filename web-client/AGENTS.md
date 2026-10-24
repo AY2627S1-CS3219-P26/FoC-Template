@@ -132,6 +132,9 @@ Copy and adapt these. They were run against the real supplier-service. For the s
 | a server reason with extra details, like attempts left | `pages/VerifyPage.tsx` |
 | a paged list with the page in the URL, table from `md`, cards below | `pages/AdminStudentsPage.tsx` |
 | status values shown as badges | `components/AccountStateBadge.tsx` |
+| a form that returns to an overview, which shows a notice once | `components/EditProfileForm.tsx`, `pages/ProfilePage.tsx` |
+| a detail page whose back button returns to the list it was opened from | `pages/AdminStudentDetailPage.tsx`, `components/BackButton.tsx` |
+| an action that needs a reason and shows the service's refusal | `components/AccountStateForm.tsx` |
 
 ### Template 1: API module
 
@@ -392,7 +395,7 @@ export function EditSupplierForm({ supplier }: EditSupplierFormProps) {
 - Never `<form action={...}>`. React resets uncontrolled fields after an action, so a refused request would wipe what the user typed.
 - The event type is `SubmitEvent<HTMLFormElement>` from `react`. `FormEvent` is deprecated.
 - `fieldErrorsOf(mutation.error)` gives the messages per field. Pass them to `TextField` or `SelectField` as `errors`. `FormError` shows everything else, so give it the list of fields the form already shows.
-- `SubmitButton` is disabled while the request runs, so a second click cannot send it twice.
+- `SubmitButton` refuses a second click or Enter while the request runs, so it cannot send twice. It uses `aria-disabled`, not `disabled`, so keyboard focus stays on it when the service refuses the form.
 - No client-side validation. `type`, `autoComplete` and `inputMode` are hints for the keyboard, not checks.
 - A mutation outside a form (log out, delete, grant a role) shows its error with `FormError` next to its button, like `src/features/user/components/LogoutButton.tsx`.
 - A button in every row of a list is a small component in `components/` with its own mutation hook, so each row shows its own pending state and its own error.

@@ -124,7 +124,7 @@ export function AdminStudentsPage() {
                   {result.items.map((user) => (
                     <tr key={user.id}>
                       <td>
-                        <Link to={`/admin/students/${user.id}`} className="block">
+                        <Link to={`/admin/students/${user.id}`} state={{ backLabel: 'Students' }} className="block">
                           {user.fullName}
                         </Link>
                         <p className="font-mono text-xs text-muted">{user.id}</p>
@@ -148,7 +148,7 @@ export function AdminStudentsPage() {
               {result.items.map((user) => (
                 <li key={user.id} className="grid grid-cols-1 gap-2 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Link to={`/admin/students/${user.id}`} className="min-w-0 wrap-anywhere">
+                    <Link to={`/admin/students/${user.id}`} state={{ backLabel: 'Students' }} className="min-w-0 wrap-anywhere">
                       {user.fullName}
                     </Link>
                     <AccountStateBadge state={user.state} />

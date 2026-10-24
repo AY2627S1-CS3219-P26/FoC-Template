@@ -27,8 +27,9 @@ export function ReportDecision({ report }: ReportDecisionProps) {
   }, [decide.isSuccess])
 
   function handleDecide(outcome: ReportOutcome) {
-    // A refused decision keeps the form; the heading keeps keyboard focus near it.
-    decide.mutate({ outcome, justification }, { onError: () => headingRef.current?.focus() })
+    // aria-disabled keeps keyboard focus on the button, so a running request is ignored here (as in SubmitButton).
+    if (decide.isPending) return
+    decide.mutate({ outcome, justification })
   }
 
   if (report.decision) {
@@ -53,9 +54,7 @@ export function ReportDecision({ report }: ReportDecisionProps) {
 
   return (
     <section aria-labelledby="report-decision" className="ds-surface grid grid-cols-1 gap-4 p-5">
-      <h2 id="report-decision" ref={headingRef} tabIndex={-1}>
-        Decide
-      </h2>
+      <h2 id="report-decision">Decide</h2>
       <p className="text-muted">
         {alreadySuspended
           ? 'The reported account is already suspended. Actioning the report keeps it that way.'
@@ -75,7 +74,7 @@ export function ReportDecision({ report }: ReportDecisionProps) {
         <button
           type="button"
           className="ds-btn ds-btn--glass"
-          disabled={decide.isPending}
+          aria-disabled={decide.isPending || undefined}
           aria-busy={pendingOutcome === 'Dismissed' || undefined}
           onClick={() => handleDecide('Dismissed')}
         >
@@ -84,7 +83,7 @@ export function ReportDecision({ report }: ReportDecisionProps) {
         <button
           type="button"
           className="ds-btn ds-btn--primary"
-          disabled={decide.isPending}
+          aria-disabled={decide.isPending || undefined}
           aria-busy={pendingOutcome === 'Actioned' || undefined}
           onClick={() => handleDecide('Actioned')}
         >

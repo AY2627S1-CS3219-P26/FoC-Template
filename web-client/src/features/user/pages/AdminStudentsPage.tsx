@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import type { SubmitEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import { useUsers } from '@/api/user/admin'
 import type { AccountState, Role } from '@/api/user/types'
@@ -5,9 +7,18 @@ import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { Pagination } from '@/components/Pagination'
 import { QueryView } from '@/components/QueryView'
+import { SelectField } from '@/components/SelectField'
+import { TextField } from '@/components/TextField'
 import { formatDateTime } from '@/lib/format'
 
 const pageSize = 20
+
+const stateOptions = [
+  { value: '', label: 'All states' },
+  { value: 'Active', label: 'Active' },
+  { value: 'Suspended', label: 'Suspended' },
+  { value: 'PendingVerification', label: 'Pending verification' },
+]
 
 const roleBadges: Record<Role, { label: string; className: string }> = {
   member: { label: 'Member', className: 'ds-badge ds-badge--neutral' },
@@ -21,11 +32,44 @@ const stateBadges: Record<AccountState, { label: string; className: string }> = 
 }
 
 export function AdminStudentsPage() {
-  // The page lives in the URL, so reload and back keep it. What is not a page number shows page 1.
+  // Search, state and page live in the URL, so reload, back and a shared link keep them.
+  // What is not a page number shows page 1; an unknown state is refused by the user-service.
   const [searchParams, setSearchParams] = useSearchParams()
+  const q = searchParams.get('q') ?? ''
+  const state = searchParams.get('state') ?? ''
   const page = Math.max(1, Math.trunc(Number(searchParams.get('page'))) || 1)
-  const users = useUsers({ page, pageSize })
+  const users = useUsers({
+    page,
+    pageSize,
+    q: q || undefined,
+    state: (state || undefined) as AccountState | undefined,
+  })
   const total = users.data?.total
+  const filtered = Boolean(q || state)
+
+  // The box holds what is typed until the search runs. When back, forward or "Clear filters"
+  // change q in the URL, the box follows.
+  const [search, setSearch] = useState(q)
+  const [shownQ, setShownQ] = useState(q)
+  if (shownQ !== q) {
+    setShownQ(q)
+    setSearch(q)
+  }
+
+  // A new filter always starts again at page 1.
+  function setFilter(name: 'q' | 'state', value: string) {
+    setSearchParams((params) => {
+      if (value) params.set(name, value)
+      else params.delete(name)
+      params.delete('page')
+      return params
+    })
+  }
+
+  function handleSearch(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFilter('q', search.trim())
+  }
 
   function setPage(next: number) {
     setSearchParams((params) => {
@@ -36,19 +80,38 @@ export function AdminStudentsPage() {
 
   return (
     <Page title="Students" subtitle={total === undefined ? undefined : `${total} ${total === 1 ? 'account' : 'accounts'}`}>
+      <form role="search" noValidate onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">
+        {/* No hint below the field: it would push the field above the select and button next to it. */}
+        <TextField label="Name, username, email or id" name="q" type="search" value={search} onChange={setSearch} />
+        <SelectField label="State" name="state" value={state} onChange={(value) => setFilter('state', value)} options={stateOptions} />
+        <button type="submit" className="ds-btn ds-btn--glass">
+          Search
+        </button>
+      </form>
       <QueryView
         query={users}
         loadingLabel="Loading accounts"
         isEmpty={(result) => result.items.length === 0}
         empty={
-          <EmptyState
-            title={total ? `There is no page ${page}` : 'No accounts yet'}
-            action={
-              <button type="button" className="ds-btn ds-btn--glass" onClick={() => setSearchParams({})}>
-                Go to page 1
-              </button>
-            }
-          />
+          total ? (
+            <EmptyState
+              title={`There is no page ${page}`}
+              action={
+                <button type="button" className="ds-btn ds-btn--glass" onClick={() => setPage(1)}>
+                  Go to page 1
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={filtered ? 'No accounts match these filters' : 'No accounts yet'}
+              action={
+                <button type="button" className="ds-btn ds-btn--glass" onClick={() => setSearchParams({})}>
+                  {filtered ? 'Clear filters' : 'Go to page 1'}
+                </button>
+              }
+            />
+          )
         }
       >
         {(result) => (

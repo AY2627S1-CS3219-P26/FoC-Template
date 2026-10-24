@@ -1,6 +1,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach } from "vitest";
+import { ReportModel } from "../../src/models/report.model.ts";
 import { SessionModel } from "../../src/models/session.model.ts";
 import { UserModel } from "../../src/models/user.model.ts";
 
@@ -12,11 +13,11 @@ export function useTestDatabase(): void {
         server = await MongoMemoryServer.create();
         await mongoose.connect(server.getUri());
         // Unique and TTL indexes must exist before the first test relies on them.
-        await Promise.all([UserModel.init(), SessionModel.init()]);
+        await Promise.all([UserModel.init(), SessionModel.init(), ReportModel.init()]);
     });
 
     beforeEach(async () => {
-        await Promise.all([UserModel.deleteMany({}), SessionModel.deleteMany({})]);
+        await Promise.all([UserModel.deleteMany({}), SessionModel.deleteMany({}), ReportModel.deleteMany({})]);
     });
 
     afterAll(async () => {

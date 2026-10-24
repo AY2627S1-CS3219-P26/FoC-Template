@@ -32,6 +32,20 @@ const announcementSchema = new Schema(
     { _id: false },
 );
 
+// F1.6.2: every suspension and reinstatement with who did it, why and when. The changeId lets a
+// change that has to be undone remove exactly its own entry.
+const stateChangeSchema = new Schema(
+    {
+        changeId: { type: String, required: true },
+        from: { type: String, enum: ACCOUNT_STATES, required: true },
+        to: { type: String, enum: ACCOUNT_STATES, required: true },
+        reason: { type: String, required: true },
+        actorId: { type: String, required: true },
+        at: { type: Date, required: true },
+    },
+    { _id: false },
+);
+
 const userSchema = new Schema(
     {
         _id: { type: String, default: () => randomUUID() },
@@ -43,6 +57,8 @@ const userSchema = new Schema(
         state: { type: String, enum: ACCOUNT_STATES, default: "PendingVerification" },
         otp: { type: otpSchema, select: false },
         announcement: { type: announcementSchema, select: false },
+        // Not selected by default, so resolving a session on every request does not load the history.
+        stateChanges: { type: [stateChangeSchema], select: false },
     },
     {
         timestamps: { createdAt: true, updatedAt: true },
@@ -75,3 +91,15 @@ export function toPublicUser(user: User) {
 }
 
 export type PublicUser = ReturnType<typeof toPublicUser>;
+
+// How one account appears inside another object, e.g. as the administrator behind a state change.
+export function toAccountSummary(user: User) {
+    return {
+        id: user._id,
+        fullName: user.fullName,
+        username: user.username,
+        state: user.state,
+    }
+}
+
+export type AccountSummary = ReturnType<typeof toAccountSummary>;

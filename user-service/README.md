@@ -34,7 +34,7 @@ All errors have the shape `{ "error": { "code": "...", "message": "...", "detail
 | POST | `/auth/logout` | session | |
 | GET, PATCH | `/users/me` | session | F1.4.3 |
 | PUT | `/users/me/password` | session | F1.4.3 |
-| GET | `/users`, `/users/:id` | administrator | F1.4.1 |
+| GET | `/users`, `/users/:id` | administrator | F1.4.1, F1.6.2 (`/users/:id` adds `stateChanges`, newest first) |
 | PATCH, DELETE | `/users/:id` | administrator | F1.4.2, F1.4.4 |
 | PUT, DELETE | `/users/:id/roles/administrator` | administrator | F1.5.5 |
 | POST | `/internal/authorize` | other services | F1.5.3 |

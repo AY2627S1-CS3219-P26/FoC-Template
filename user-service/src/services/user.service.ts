@@ -3,7 +3,7 @@ import { AppError } from "../errors.ts";
 import { logger } from "../lib/logger.ts";
 import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { fieldErrorsOf, validationError } from "../lib/validation.ts";
-import { toPublicUser, UserModel, USERNAME_COLLATION, type PublicUser } from "../models/user.model.ts";
+import { toAccountSummary, toPublicUser, UserModel, USERNAME_COLLATION, type AccountSummary, type PublicUser, type User } from "../models/user.model.ts";
 import { ListUsersQuery, PasswordChangeBody, ProfileUpdateBody } from "../schemas/users.schemas.ts";
 import { endAllSessions } from "./session.service.ts";
 
@@ -26,11 +26,38 @@ export async function listUsers(query: unknown) {
     return { items: users.map(toPublicUser), page, pageSize, total };
 }
 
-export async function getUser(accountId: string): Promise<PublicUser> {
-    const user = await UserModel.findById(accountId);
+export async function getUser(accountId: string): Promise<AdminUser> {
+    const user = await UserModel.findById(accountId).select("+stateChanges");
     if (!user) throw notFound();
-    return toPublicUser(user);
+    return toAdminUser(user);
 }
+
+// Looks up several accounts in one query. An id without an account (deleted since) is missing from the map.
+export async function accountSummaries(ids: string[]): Promise<Map<string, AccountSummary>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const users = await UserModel.find({ _id: { $in: unique } });
+    return new Map(users.map((user) => [user._id, toAccountSummary(user)]));
+}
+
+// An account as administrators see it: the public fields plus the state history of F1.6.2, newest first.
+async function toAdminUser(user: User) {
+    const changes = [...user.stateChanges].reverse();
+    const actors = await accountSummaries(changes.map((change) => change.actorId));
+    return {
+        ...toPublicUser(user),
+        stateChanges: changes.map((change) => ({
+            id: change.changeId,
+            from: change.from,
+            to: change.to,
+            reason: change.reason,
+            actor: actors.get(change.actorId) ?? null,
+            at: change.at,
+        })),
+    };
+}
+
+export type AdminUser = Awaited<ReturnType<typeof toAdminUser>>;
 
 export async function updateProfile(accountId: string, input: unknown): Promise<PublicUser> {
     const parsed = ProfileUpdateBody.safeParse(input);

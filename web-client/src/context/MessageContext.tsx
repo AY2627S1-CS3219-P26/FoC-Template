@@ -1,5 +1,5 @@
 import { useCurrentUser } from '@/api/user/session';
-import React, {
+import {
     createContext,
     useContext,
     useEffect,
@@ -50,25 +50,25 @@ export function MessageProvider({ children }: { children: ReactNode }) {
         const onReceiveMessage = (msg: Message) => {
             setMessages((prev) => [...prev, msg]);
 
-            if (String(msg.senderId) !== String(userId)) {
-                // increase unread count for msg.senderId here
-            }
+            // if (String(msg.senderId) !== String(userId)) {
+            //     // increase unread count for msg.senderId here
+            // }
         };
 
-        const onMessagesRead = ({ readerId }: { readerId: string | number }) => {
-            // reset unread count for readerId here
-        };
+        //const onMessagesRead = ({ readerId }: { readerId: string | number }) => {
+        //    // reset unread count for readerId here
+        //};
 
         newSocket.on('connect', onConnect);
         newSocket.on('disconnect', onDisconnect);
         newSocket.on('receiveMessage', onReceiveMessage);
-        newSocket.on('messagesRead', onMessagesRead);
+        //newSocket.on('messagesRead', onMessagesRead);
 
         return () => {
             newSocket.off('connect', onConnect);
             newSocket.off('disconnect', onDisconnect);
             newSocket.off('receiveMessage', onReceiveMessage);
-            newSocket.off('messagesRead', onMessagesRead);
+            //newSocket.off('messagesRead', onMessagesRead);
             newSocket.close();
             setSocket(null);
             setIsConnected(false);

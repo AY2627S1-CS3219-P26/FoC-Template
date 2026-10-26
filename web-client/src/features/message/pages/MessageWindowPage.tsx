@@ -1,41 +1,48 @@
 import { useMessage } from "@/context/MessageContext";
 import { useState } from "react";
 
-export function MessageWindowPage({ user, selectedContact }: any) {
+export function MessageWindowPage() {
+    const user = { id: 321 }
+    const selectedContact = { _id: 123 }
+
     const [newMessage, setNewMessage] = useState('');
+    const { messages, socket, isConnected } = useMessage();
 
-    const { socket } = useMessage();
-
-    const handleSendMessage = async (content: String = newMessage, type = 'text') => {
-
+    const handleSendMessage = (content: string = newMessage, type = 'text') => {
         if (!content.trim() || !socket) return;
 
-        // Word limit check
         if (type === 'text' && content.trim().split(/\s+/).filter(Boolean).length > 12000) {
             alert('Message limit exceeded! Maximum allowed is 12,000 words.');
             return;
         }
 
-        const tempId = Date.now().toString() + Math.random().toString();
-        const messageData = {
-            _tempId: tempId,
+        socket.emit('sendMessage', {
+            _tempId: Date.now().toString() + Math.random().toString(),
             senderId: user.id,
             receiverId: selectedContact._id,
-            content: content,
+            content,
             type,
-            createdAt: new Date()
-        };
-        socket.emit('sendMessage', messageData);
+            createdAt: new Date(),
+        });
+        console.log("New message:", newMessage);
         setNewMessage('');
     };
 
-    return <div className="grid 4-gap">
+    console.log("Message window:",);
+    return (
+        <div className="grid gap-4">
+            <pre>{JSON.stringify(messages, null, 2)}</pre>
 
-        <p>
-            {newMessage}
-        </p>
-        <button onClick={() => handleSendMessage()}>
-            Send message
-        </button>
-    </div>
+            <input
+                className="ds-field"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message"
+            />
+
+            <button className="ds-btn ds-btn--primary" disabled={!isConnected} onClick={() => handleSendMessage()}>
+                Send message
+            </button>
+        </div>
+    );
 }

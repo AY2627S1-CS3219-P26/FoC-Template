@@ -25,6 +25,7 @@ const socketServer = new SocketServer(server);
 async function shutdown(signal: string) {
     logger.info({ signal }, "shutting down");
     await new Promise((resolve) => server.close(resolve));
+    //await socketServer.close();
     await mongoose.disconnect();
     process.exit(0);
 }

@@ -1,7 +1,7 @@
 // The one way the web client talks to the services. Every request goes through the
 // gateway as /api/<service>/<path>, so no host, port or URL of a service appears in code.
 
-export type ServiceName = 'user' | 'supplier' | 'order' | 'credit'
+export type ServiceName = 'user' | 'supplier' | 'order' | 'credit' | "message"
 
 export type Paginated<T> = {
   items: T[]

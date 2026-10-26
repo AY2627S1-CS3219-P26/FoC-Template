@@ -30,34 +30,37 @@ export function MessagePage() {
 
 
 
-        const newSocket = io('http://localhost:3008'); //TODO: move to env
-        //setSocket(newSocket);
+        const socket = io('http://localhost:3008'); //TODO: move to env
+        //setSocket(socket);
 
-        newSocket.on('connect', () => {
-            newSocket.emit('join', String(user.id));
+        socket.on('connect', () => {
+            console.log(socket.connected);
+            socket.emit('join', String(user.id));
         });
 
-        // newSocket.on('onlineUsers', (users) => {
-        //     setOnlineUsers(users.map(id => String(id)));
-        // });
-
-        newSocket.on('disconnect', () => {
+        socket.on('disconnect', () => {
             console.log('Socket disconnected, clearing states');
         });
 
+        // socket.on('onlineUsers', (users) => {
+        //     setOnlineUsers(users.map(id => String(id)));
+        // });
 
-        newSocket.on('receiveMessage', (msg) => {
+
+
+
+        socket.on('receiveMessage', (msg) => {
             // Only increase unread if NOT current chat
             if (msg.senderId !== user.id) {
 
             }
         });
-        newSocket.on('messagesRead', ({ readerId }) => {
+        socket.on('messagesRead', ({ readerId }) => {
 
         });
 
         return () => {
-            newSocket.close();
+            socket.close();
         };
     }, [user]);
 

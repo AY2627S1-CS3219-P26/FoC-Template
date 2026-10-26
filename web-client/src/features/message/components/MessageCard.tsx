@@ -9,7 +9,7 @@ export function MessageCard({ name, message }: MessageCardProps) {
     const navigate = useNavigate()
 
     function onMessage() {
-        navigate('/profile');
+        navigate('/message/user');
     }
 
     return (

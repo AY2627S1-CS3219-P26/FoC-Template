@@ -1,33 +1,28 @@
-import { useBalance } from '@/api/credit/wallet'
-import { useCurrentUser } from '@/api/user/session'
-import { QueryView } from '@/components/QueryView'
+import { useNavigate } from "react-router";
 
-// F4.1.4: available large, reserved and total below. Self-contained so both the app
-// sidebar and the wallet page can drop it in. Only used below RequireSession.
-export function BalanceCard() {
-    const user = useCurrentUser()
-    const balance = useBalance(user.id)
+interface MessageCardProps {
+    name: string;
+    message: string;
+}
+
+export function MessageCard({ name, message }: MessageCardProps) {
+    const navigate = useNavigate()
+
+    function onMessage() {
+        navigate('/profile');
+    }
 
     return (
-        <QueryView query={balance} loadingLabel="Loading balance">
-            {(b) => (
-                <div className="ds-surface grid grid-cols-1 gap-4 p-6">
-                    <div className="grid gap-1">
-                        <p className="ds-label">Available</p>
-                        <p className="nums-tabular text-4xl font-semibold">{b.available}</p>
-                    </div>
-                    <dl className="grid grid-cols-2 gap-3">
-                        <div className="ds-surface ds-surface--sunken grid gap-1 p-3">
-                            <dt className="ds-label">Reserved</dt>
-                            <dd className="nums-tabular text-lg font-medium">{b.reserved}</dd>
-                        </div>
-                        <div className="ds-surface ds-surface--sunken grid gap-1 p-3">
-                            <dt className="ds-label">Total</dt>
-                            <dd className="nums-tabular text-lg font-medium">{b.total}</dd>
-                        </div>
-                    </dl>
-                </div>
-            )}
-        </QueryView>
+
+        <div className="ds-surface grid grid-cols-1 gap-4 p-6 bg-blue-500 transition duration-200 ease-in-out hover:bg-blue-700 hover:scale-105" onClick={onMessage}>
+
+            <div className="grid gap-1">
+                <p className="ds-label">Sender Information</p>
+                <p className="nums-tabular text-3xl font-semibold">{name}</p>
+                <p className="nums-tabular text-2xl">{message}</p>
+            </div>
+
+        </div>
+
     )
 }

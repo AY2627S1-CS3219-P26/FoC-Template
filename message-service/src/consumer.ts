@@ -1,0 +1,55 @@
+import { connect, type ConsumeMessage } from "amqplib";
+import { messageUser } from "./services/message.service.ts";
+
+const BROKER_URL = process.env.BROKER_URL ?? "amqp://relay:change-me@localhost:5672";
+const EXCHANGE = "relay.events";
+const DEAD_EXCHANGE = "relay.dead";
+const QUEUE = "message-service.messages";
+const EVENT_TYPE = "user.account.activated";
+const RETRY_MS = 5000;
+
+
+export async function startMessageConsumer(): Promise<void> {
+    try {
+        const connection = await connect(BROKER_URL);
+        connection.on("error", () => { });
+        connection.on("close", () => setTimeout(() => void startMessageConsumer(), RETRY_MS));
+
+        const channel = await connection.createChannel();
+        await channel.assertExchange(EXCHANGE, "topic", { durable: true });
+        await channel.assertExchange(DEAD_EXCHANGE, "topic", { durable: true });
+        await channel.assertQueue(QUEUE, { durable: true, deadLetterExchange: DEAD_EXCHANGE, deadLetterRoutingKey: QUEUE });
+        await channel.assertQueue(`${QUEUE}.dead`, { durable: true });
+        await channel.bindQueue(`${QUEUE}.dead`, DEAD_EXCHANGE, QUEUE);
+        await channel.bindQueue(QUEUE, EXCHANGE, EVENT_TYPE);
+        await channel.prefetch(10);
+
+        await channel.consume(QUEUE, async (message: ConsumeMessage | null) => {
+            if (!message) return;
+            let accountId: string;
+            let eventId: string;
+            try {
+                const event = JSON.parse(message.content.toString());
+                accountId = event.data.accountId;
+                eventId = event.eventId;
+                if (typeof accountId !== "string" || typeof eventId !== "string") throw new Error("missing ids");
+            } catch {
+                channel.nack(message, false, false); // malformed: dead-letter to credit-service.accounts.dead
+                return;
+            }
+            try {
+                await messageUser(accountId);
+                console.log(`sending user ${accountId} welcome message (event ${eventId})`);
+                channel.ack(message);
+            } catch (err) {
+                console.error(`event ${eventId} failed, will retry:`, err);
+                setTimeout(() => channel.nack(message, false, true), RETRY_MS); // temporary: requeue
+            }
+        });
+
+        console.log(`consuming ${EVENT_TYPE} on ${QUEUE}`);
+    } catch (err) {
+        console.error("broker connect failed, will retry:", err);
+        setTimeout(() => void startMessageConsumer(), RETRY_MS);
+    }
+}

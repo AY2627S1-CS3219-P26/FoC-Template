@@ -39,11 +39,11 @@ class SocketServer {
 
             socket.on('sendMessage', async (data, callback) => {
                 const newMessage = new Message(data);
-                await newMessage.save();
+                //await newMessage.save();
 
                 // Emit to receiver's room (targeted)
                 this.io.to(data.receiverId).emit('receiveMessage', newMessage);
-
+                logger.info("Message received by server and send to receiver" + JSON.stringify(newMessage));
                 // Ack back to sender
                 if (typeof callback === 'function') {
                     callback(newMessage);

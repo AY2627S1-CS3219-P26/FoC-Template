@@ -1,4 +1,5 @@
 import { useCurrentUser } from '@/api/user/session';
+import type { Message } from '@/types/message';
 import {
     createContext,
     useContext,
@@ -9,10 +10,6 @@ import {
 } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
-interface Message {
-    senderId: string | number;
-    // add your other fields (id, text, createdAt, ...)
-}
 
 interface MessageContextValue {
     messages: Message[];

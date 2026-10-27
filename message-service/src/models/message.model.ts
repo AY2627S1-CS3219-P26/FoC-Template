@@ -1,5 +1,5 @@
 import { Schema, model } from "mongoose";
-import { lowercase, minLength } from "zod";
+
 
 export const STATUS = ["read", "unread"];
 

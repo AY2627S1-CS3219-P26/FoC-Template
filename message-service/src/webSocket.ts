@@ -1,5 +1,5 @@
 
-import type { userInfo } from "os";
+
 import { Server, Socket } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { logger } from "./lib/logger.ts";

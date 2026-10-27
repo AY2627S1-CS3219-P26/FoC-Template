@@ -5,6 +5,7 @@
     "description": "message service shall control the full lifecycle of message between clints",
     "type": "module",
     "dependencies": {
+        "amqplib": "^2.2.0",
         "argon2": "^0.45.1",
         "cookie-parser": "^1.4.7",
         "express": "^5.2.1",
@@ -12,6 +13,7 @@
         "mongoose": "^9.10.2",
         "nodemailer": "^10.0.10",
         "pino": "^10.4.0",
+        "process": "^0.11.10",
         "socket.io": "^4.8.4",
         "socket.io-client": "^4.8.4",
         "zod": "^4.6.5"

@@ -16,7 +16,7 @@ const RETRY_MS = 5000;
 export async function startAccountConsumer(): Promise<void> {
     try {
         const connection = await connect(BROKER_URL);
-        connection.on("error", () => {});
+        connection.on("error", () => { });
         connection.on("close", () => setTimeout(() => void startAccountConsumer(), RETRY_MS));
 
         const channel = await connection.createChannel();

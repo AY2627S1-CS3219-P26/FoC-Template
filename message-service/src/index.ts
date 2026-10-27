@@ -4,9 +4,11 @@ import { config } from "./config.ts";
 import { logger } from "./lib/logger.ts";
 import SocketServer from "./webSocket.ts";
 import { connectToDBWithRetry } from "./db.ts";
+import { startMessageConsumer } from "./consumer.ts";
 
 try {
     //await connectToDBWithRetry();
+    void startMessageConsumer();
 } catch (err) {
     logger.fatal({ err }, "could not start, exiting");
     process.exit(1);
@@ -20,7 +22,7 @@ const server = createApp().listen(config.PORT, () => {
     );
 });
 
-const socketServer = new SocketServer(server);
+export const socketServer = new SocketServer(server);
 
 async function shutdown(signal: string) {
     logger.info({ signal }, "shutting down");

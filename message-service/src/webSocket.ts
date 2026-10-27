@@ -91,6 +91,10 @@ class SocketServer {
             });
         });
     }
+
+    public sendToUser(userId: string, event: string, payload: unknown): void {
+        this.io.to(userId).emit(event, payload);
+    }
 }
 
 export default SocketServer;

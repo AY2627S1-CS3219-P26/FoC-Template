@@ -1,8 +1,5 @@
 import { socketServer } from "../index.ts"
 
-
-
-
 export async function messageUser(userId: string) {
 
     const message = {

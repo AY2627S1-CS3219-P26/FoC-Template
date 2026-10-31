@@ -2,13 +2,13 @@ import { useMessage } from "@/context/MessageContext";
 import type { Message } from "@/types/message";
 import { useEffect, useRef, useState } from "react";
 import { MessageField } from "../components/MessageField";
+import { useParams } from "react-router";
+import { useCurrentUser } from "@/api/user/session";
 
 export function MessageWindowPage() {
-    const user = { id: "217fbdf5-a630-4093-bfc4-4e2c5fa210ad" }
-    const selectedContact = {
-        _id: "217fbdf5-a630-4093-bfc4-4e2c5fa210ad",
-        name: "William"
-    }
+    const { id } = useParams();
+    const user = useCurrentUser();
+
 
     const [newMessage, setNewMessage] = useState('');
     const { messages, socket, isConnected } = useMessage();
@@ -24,7 +24,7 @@ export function MessageWindowPage() {
         const message: Message = {
             //_tempId: Date.now().toString() + Math.random().toString(),
             senderId: user.id,
-            receiverId: selectedContact._id,
+            receiverId: id ?? "",
             content,
             status: "unread",
             timestamp: new Date(),
@@ -45,7 +45,7 @@ export function MessageWindowPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-2 p-4 pb-24">
             <div className="sticky top-2 z-10 mb-2 rounded-2xl bg-[var(--ds-coral-300)] px-5 py-3 shadow-md">
-                <p className="ds-title font-bold">{selectedContact.name}</p>
+                <p className="ds-title font-bold">{id}</p>
             </div>
 
 

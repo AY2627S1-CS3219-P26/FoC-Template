@@ -1,15 +1,16 @@
 import { useNavigate } from "react-router";
 
 interface MessageCardProps {
+    conversationId: string;
     name: string;
     message: string;
 }
 
-export function MessageCard({ name, message }: MessageCardProps) {
+export function MessageCard({ conversationId, name, message }: MessageCardProps) {
     const navigate = useNavigate()
 
     function onMessage() {
-        navigate('/message/user');
+        navigate(`/message/${conversationId}`);
     }
 
     return (

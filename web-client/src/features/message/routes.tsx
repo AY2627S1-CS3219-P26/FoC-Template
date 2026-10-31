@@ -6,6 +6,6 @@ export const messageRoutes: FeatureRoutes = {
 
     app: [
         { path: 'message', Component: MessagePage },
-        { path: 'message/user', Component: MessageWindowPage }
+        { path: 'message/:id', Component: MessageWindowPage }
     ],
 }

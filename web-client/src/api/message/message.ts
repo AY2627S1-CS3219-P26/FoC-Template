@@ -1,16 +1,20 @@
 
 //import { request } from '@/lib/http'
 
+import { useQuery } from "@tanstack/react-query";
+import { request } from '@/lib/http'
 
-export function useMessageConversation() {
-    return "useQuery"
+
+export function useLastMessage(userId: string) {
+    return useQuery({
+        queryKey: ['message', 'lastMessage', userId],
+        queryFn: ({ signal }) => request<any>('message', `/message/last-message/${userId}`, { signal }),
+    })
 }
 
-export function useUserContacts() {
-    return 4;
-    // return useQuery({
-    //     queryKey: ['user', 'messages'],
-    //     queryFn: request<"ContactInfo">("message", "/message", {})
-    //     //placeholderData: keepPreviousData,
-    // })
+export function useConversation(senderId: string, receiverID: string) {
+    return useQuery({
+        queryKey: ['message', 'lastMessage', senderId, receiverID],
+        queryFn: ({ signal }) => request<any>('message', `/message/${senderId}/${receiverID}`, { signal }),
+    })
 }

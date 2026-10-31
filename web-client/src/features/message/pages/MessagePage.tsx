@@ -1,11 +1,8 @@
 
-//import { useCurrentUser } from '@/api/user/session'
 import { Page } from '@/components/Page'
 import { MessageCard } from '../components/MessageCard';
 import { useCurrentUser } from '@/api/user/session';
-import { useOrderByCourierId } from '@/api/order/order';
-import type { Order } from '@/types/order';
-import { useUsers } from '@/api/user/admin';
+import { useOrderByCourierId, useOrderByRequesterId } from '@/api/order/order';
 
 
 
@@ -13,17 +10,17 @@ import { useUsers } from '@/api/user/admin';
 export function MessagePage() {
 
     const user = useCurrentUser();
-    const courierOrders = useOrderByCourierId(user.id).data || [];
-    const requesterOrders = useOrderByCourierId(user.id).data || [];
-    const users = useUsers({ 0, - 1 });
+    const courierOrders = useOrderByCourierId(user.id).data ?? [];
+    const requesterOrders = useOrderByRequesterId(user.id).data ?? [];
+
+    // One conversation per other person, shown by id until the user-service offers members a way to look up names.
+    const conversations = new Map<string, number>();
+    for (const order of courierOrders) conversations.set(order.requester_id, order.id);
+    for (const order of requesterOrders) {
+        if (order.courier_id) conversations.set(order.courier_id, order.id);
+    }
 
 
-const uniqueConversationIds: string[] = [...new Set(...courierOrders.map(order => order.requester_id), ...requesterOrders.map(order => order.courier_id),)]
-const uniqueConversationInfo = uniqueConversationIds.map(id => users.filter(user => user.id == uniqueConversationIds).map(user => { id: user.id, name: user.name, message: user.name }));
-
-
-
-//const transactions = useTransactions(user.id)
 
 return (
 
@@ -44,11 +41,12 @@ return (
 
             <MessageCard conversationId="217fbdf5-a630-4093-bfc4-4e2c5fa210ad" name="User" message='This is a test' />
 
-            {uniqueConversationInfo.map((c) => (
+            {[...conversations].map(([otherId, orderId]) => (
                 <MessageCard
-                    conversationId={c.id}
-                    name={c.name}
-                    message={c.message}
+                    key={otherId}
+                    conversationId={otherId}
+                    name={otherId}
+                    message={`Order #${orderId}`}
                 />
             ))}
 

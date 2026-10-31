@@ -31,7 +31,6 @@ services:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
-      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -48,7 +47,6 @@ services:
       - backend
     healthcheck:
       test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
-      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -66,7 +64,10 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
     ports:
-      - "3008:3008"
+      - "127.0.0.1:3008:3008"
+    networks:
+      - edge
+      - backend
     depends_on:
       message-db:
         condition: service_healthy
@@ -84,43 +85,8 @@ services:
       - message-db-data:/data/db # source/desination stored on my machine/stored inside container
     ports:
       - "127.0.0.1:27018:27017" #only on specific interfaces: local port on my machine to docker port
-    healthcheck:
-      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped #makes the container restart automaticly 
-
-  message-service:
-    build: ./message-service
-    environment:
-      PORT: 3008
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      MONGO_URL: mongodb://message-db:27017/message-service #uses the container port
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nus.edu.sg}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-    ports:
-      - "3008:3008"
-    depends_on:
-      message-db:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:3008/health" ]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-
-  message-db:
-    image: mongo:8 #Pulls mongo image 8 
-    volumes:
-      - message-db-data:/data/db # source/desination stored on my machine/stored inside container
-    ports:
-      - "127.0.0.1:27018:27017" #only on specific interfaces: local port on my machine to docker port
+    networks:
+      - backend
     healthcheck:
       test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
@@ -268,6 +234,8 @@ services:
       USER_SERVICE_URL: http://user-service:3000
       SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
       CREDIT_SERVICE_URL: http://credit-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      MESSAGE_SERVICE_URL: http://message-service:3008
       # Locally every email lands in Mailpit, so the verify page links to it. Set it to empty to hide the hint.
       DEV_MAILBOX_URL: ${DEV_MAILBOX_URL-http://localhost:8025}
     ports:
@@ -278,7 +246,6 @@ services:
     # starts and stays up while a service is down or being replaced (N6.1.2).
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz" ]
-      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -287,9 +254,7 @@ services:
 
 volumes:
   #Place for docker to store data
-  #Place for docker to store data
   user-db-data:
-  message-db-data:
   message-db-data:
   supplier-db-data:
   credit-db-data:

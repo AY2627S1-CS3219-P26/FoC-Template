@@ -4,14 +4,25 @@ import { useEffect, useRef, useState } from "react";
 import { MessageField } from "../components/MessageField";
 import { useParams } from "react-router";
 import { useCurrentUser } from "@/api/user/session";
+import { useConversation } from "@/api/message/message";
 
 export function MessageWindowPage() {
-    const { id } = useParams();
+    const { id = "" } = useParams();
     const user = useCurrentUser();
 
 
     const [newMessage, setNewMessage] = useState('');
-    const { messages, socket, isConnected } = useMessage();
+    const [sent, setSent] = useState<Message[]>([]);
+    const { messages: received, socket, isConnected } = useMessage();
+    const history = useConversation(user.id, id);
+
+    // The message-service endpoint is still a stub that answers a string, so only an array counts as history.
+    const past = Array.isArray(history.data) ? history.data : [];
+    const messages = [...past, ...received, ...sent].filter(
+        (m) =>
+            (m.senderId === user.id && m.receiverId === id) ||
+            (m.senderId === id && m.receiverId === user.id),
+    );
 
     const handleSendMessage = (content: string = newMessage, type = 'text') => {
         if (!content.trim() || !socket) return;
@@ -21,16 +32,18 @@ export function MessageWindowPage() {
             return;
         }
 
-        const message: Message = {
+        // The message-service assigns _id when it accepts the message.
+        const message: Omit<Message, "_id"> = {
             //_tempId: Date.now().toString() + Math.random().toString(),
             senderId: user.id,
-            receiverId: id ?? "",
+            receiverId: id,
             content,
             status: "unread",
             timestamp: new Date(),
         }
 
-        socket.emit('sendMessage', message);
+        // The server only emits to the receiver, so our own copy comes back through the ack.
+        socket.emit('sendMessage', message, (saved: Message) => setSent((prev) => [...prev, saved]));
         setNewMessage('');
     };
 
@@ -54,7 +67,7 @@ export function MessageWindowPage() {
                     key={i}
                     position={m.senderId === user.id ? "right" : "left"}
                     content={m.content}
-                    timestamp={m.timestamp}
+                    timestamp={m.timestamp ?? m.createdAt ?? ""}
                 />
             ))}
             <div ref={bottomRef} />

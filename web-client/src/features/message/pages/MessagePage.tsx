@@ -13,7 +13,7 @@ export function MessagePage() {
     const courierOrders = useOrderByCourierId(user.id).data ?? [];
     const requesterOrders = useOrderByRequesterId(user.id).data ?? [];
 
-    // One conversation per other person, shown by id until the user-service offers members a way to look up names.
+    // One conversation per other person, shown by id until the user-service offer members a way to look up names.
     const conversations = new Map<string, number>();
     for (const order of courierOrders) conversations.set(order.requester_id, order.id);
     for (const order of requesterOrders) {
@@ -22,13 +22,13 @@ export function MessagePage() {
 
 
 
-return (
+    return (
 
-    <Page title="Messages" subtitle="Your active messages">
-        <div className="grid grid-cols-1 gap-6">
+        <Page title="Messages" subtitle="Your active messages">
+            <div className="grid grid-cols-1 gap-6">
 
 
-            {/* <h2 className="ds-label">AI messages</h2>
+                {/* <h2 className="ds-label">AI messages</h2>
             <MessageCard
                 //key={c.id}
                 name="RelayAI"
@@ -37,23 +37,23 @@ return (
 
 
 
-            <h2 className="ds-label">Messages</h2>
+                <h2 className="ds-label">Messages</h2>
 
-            <MessageCard conversationId="217fbdf5-a630-4093-bfc4-4e2c5fa210ad" name="User" message='This is a test' />
+                <MessageCard conversationId="217fbdf5-a630-4093-bfc4-4e2c5fa210ad" name="User" message='This is a test' />
 
-            {[...conversations].map(([otherId, orderId]) => (
-                <MessageCard
-                    key={otherId}
-                    conversationId={otherId}
-                    name={otherId}
-                    message={`Order #${orderId}`}
-                />
-            ))}
-
-
-        </div>
-    </Page>
+                {[...conversations].map(([otherId, orderId]) => (
+                    <MessageCard
+                        key={otherId}
+                        conversationId={otherId}
+                        name={otherId}
+                        message={`Order #${orderId}`}
+                    />
+                ))}
 
 
-)
+            </div>
+        </Page>
+
+
+    )
 }

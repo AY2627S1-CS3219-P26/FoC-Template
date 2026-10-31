@@ -20,3 +20,6 @@ Thumbs.db
 
 # Postman workspace link (per person)
 .postman/
+
+# Python
+__pycache__/

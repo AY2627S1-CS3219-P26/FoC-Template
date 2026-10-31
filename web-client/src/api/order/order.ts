@@ -7,14 +7,16 @@ import type { Order } from '@/types/order'
 
 export function useOrderByCourierId(courierId: string) {
     return useQuery({
-        queryKey: ['credit', 'balance', courierId],
-        queryFn: ({ signal }) => request<Order[]>('order', `/order/courier/${courierId}`, { signal }),
+        queryKey: ['order', 'courier', courierId],
+        queryFn: async ({ signal }) =>
+            (await request<{ data: Order[] }>('order', `/orders/courier/${courierId}`, { signal })).data,
     })
 }
 
 export function useOrderByRequesterId(requesterId: string) {
     return useQuery({
-        queryKey: ['credit', 'balance', requesterId],
-        queryFn: ({ signal }) => request<Order[]>('order', `/order/requester/${requesterId}`, { signal }),
+        queryKey: ['order', 'requester', requesterId],
+        queryFn: async ({ signal }) =>
+            (await request<{ data: Order[] }>('order', `/orders/requester/${requesterId}`, { signal })).data,
     })
 }

@@ -58,6 +58,48 @@ export const OrderController = {
         }
     },
 
+    // GET /courier/:id
+    async getOrderByCourierId(req: Request, res: Response): Promise<void> {
+        try {
+            const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+            const courierId = parseInt(rawId ?? "", 10);
+            if (isNaN(courierId)) {
+                res.status(400).json({ error: "Invalid courier ID" });
+                return;
+            }
+
+            const order = await OrderService.getOrderByCourierId(courierId);
+            res.status(200).json({ data: order });
+        } catch (error: any) {
+            if (error.message === "ORDER_NOT_FOUND") {
+                res.status(404).json({ error: "Order not found" });
+                return;
+            }
+            res.status(500).json({ error: "Failed to fetch order" });
+        }
+    },
+
+    // GET /requester/:id
+    async getOrderByRequesterId(req: Request, res: Response): Promise<void> {
+        try {
+            const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+            const requesterId = parseInt(rawId ?? "", 10);
+            if (isNaN(requesterId)) {
+                res.status(400).json({ error: "Invalid requester ID" });
+                return;
+            }
+
+            const order = await OrderService.getOrderByRequesterId(requesterId);
+            res.status(200).json({ data: order });
+        } catch (error: any) {
+            if (error.message === "ORDER_NOT_FOUND") {
+                res.status(404).json({ error: "Order not found" });
+                return;
+            }
+            res.status(500).json({ error: "Failed to fetch order" });
+        }
+    },
+
     // POST /orders/:id/accept
     async acceptOrder(req: Request, res: Response): Promise<void> {
         try {

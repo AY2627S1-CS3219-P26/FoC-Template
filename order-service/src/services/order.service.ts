@@ -32,6 +32,22 @@ export const OrderService = {
         return order;
     },
 
+    async getOrderByCourierId(courierId: number): Promise<Order[]> {
+        const order = await OrderModel.findByCourierId(courierId);
+        if (!order) {
+            throw new Error("ORDER_NOT_FOUND");
+        }
+        return order;
+    },
+
+    async getOrderByRequesterId(requesterId: number): Promise<Order[]> {
+        const order = await OrderModel.findByRequesterId(requesterId);
+        if (!order) {
+            throw new Error("ORDER_NOT_FOUND");
+        }
+        return order;
+    },
+
     async acceptOrder(orderId: number, courierId: string): Promise<Order> {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error("ORDER_NOT_FOUND");

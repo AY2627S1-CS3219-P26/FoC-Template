@@ -12,6 +12,14 @@ router.get("/open", OrderController.getOpenRequests);
 // GET /orders/:id - Get specific order details
 router.get("/:id", OrderController.getOrderById);
 
+// GET /orders/requester/:id - Get specific order details
+router.get("/requester/:id", OrderController.getOrderByRequesterId);
+
+// GET /orders/courier/:id - Get specific order details
+router.get("/courier/:id", OrderController.getOrderByCourierId);
+
+
+
 // POST /orders/:id/accept - Assign a courier to an open order[cite: 7]
 router.post("/:id/accept", OrderController.acceptOrder);
 

@@ -65,6 +65,16 @@ export const OrderModel = {
         return result.rows[0] || null;
     },
 
+    async findByRequesterId(requesterId: number): Promise<Order[]> {
+        const result: QueryResult<Order> = await pool.query(`SELECT * FROM orders WHERE requester_id = $1;`, [requesterId]);
+        return result.rows;
+    },
+
+    async findByCourierId(courierId: number): Promise<Order[]> {
+        const result: QueryResult<Order> = await pool.query(`SELECT * FROM orders WHERE courier_id = $1;`, [courierId]);
+        return result.rows;
+    },
+
     async acceptOrder(orderId: number, courierId: string): Promise<Order | null> {
         const query = `
             UPDATE orders

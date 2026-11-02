@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from ..services.rag_service import prompt_rag
+from ..services.rag_service import model
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -7,9 +7,9 @@ class PromptRequest(BaseModel):
 
 def post_prompt_rag(request: PromptRequest):
 
-    return prompt_rag(request.prompt, request.conversation)
+    return model.rag_query(request.prompt, request.conversation)
 
 
 def get_prompt_rag(prompt: str):
 
-    return prompt_rag(prompt)
+    return model.rag_query(prompt)

@@ -1,6 +1,22 @@
 name: relay
 
 services:
+
+  rag-service:
+    build: ./rag-service
+    environment:
+      PORT: 3080
+      ANTHROPIC_API_KEY: ${CLAUDE_API_KEY}
+
+    ports:
+      - "3080:3080"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3080/health" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
   user-service:
     build: ./user-service
     environment:
@@ -24,7 +40,7 @@ services:
       user-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -38,7 +54,7 @@ services:
     ports:
       - "127.0.0.1:27017:27017"
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -88,7 +104,7 @@ services:
       # Gives the tests a database of their own, so they never touch real data.
       - ./supplier-service/db/create-test-database.sql:/docker-entrypoint-initdb.d/create-test-database.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -106,13 +122,12 @@ services:
     # No depends_on on purpose: nginx looks the services up per request, so the web client
     # starts and stays up while a service is down or being replaced (N6.1.2).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz" ]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 5s
     restart: unless-stopped
-
 
 volumes:
   user-db-data:

@@ -10,7 +10,17 @@ dependencies = [
     "fastapi[standard]>=0.162.0",
     "numpy>=2.4.6",
     "sentence-transformers>=6.2.0",
+    "torch",
 ]
 
 [tool.fastapi]
 entrypoint = "src.main:app"
+
+# The service only runs on the CPU, and the default Linux torch brings in several GB of GPU libraries.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

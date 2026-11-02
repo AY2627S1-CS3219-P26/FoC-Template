@@ -14,6 +14,10 @@ boostrap_rag_system()
 async def root():
     return {"message": "Welcome to Friend on Campus NUS Rag System"}
 
+@app.get("/health/")
+async def health():
+    return {"status": "ok"}
+
 
 @app.post("/query/")
 async def post_query_raq(request: queryRequest):

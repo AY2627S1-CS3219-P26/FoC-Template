@@ -26,7 +26,8 @@
 #docker build -t rag-service:latest . remember to anme bbay
 FROM python:3.13-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-WORKDIR /app
+#Dockers cd command
+WORKDIR /app 
 ENV NODE_ENV=production
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project

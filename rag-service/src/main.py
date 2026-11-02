@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from .middleware.auth_middleware import verify_auth_header_middleware
 from .services.rag_service import boostrap_rag_system
 from .controller.rag_controller import (
     queryRequest,
@@ -12,6 +13,7 @@ from .controller.rag_controller import (
 # uvicorn src.main:app --reload --host 0.0.0.0 --port 3080
 
 app = FastAPI()
+app.middleware("http")(verify_auth_header_middleware)
 boostrap_rag_system()
 
 @app.get("/")

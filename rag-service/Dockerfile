@@ -22,7 +22,8 @@
 # EXPOSE 3080
 # CMD ["fastapi", "run", "--port", "3080"]
 
-
+#docker run -d -p 3080:3080 relay-rag-service:latest
+#docker build -t rag-service:latest . remember to anme bbay
 FROM python:3.13-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
@@ -35,4 +36,4 @@ RUN uv sync --frozen --no-install-project
 COPY . .
 RUN uv sync --frozen
 EXPOSE 3080
-CMD ["uvicorn", "src.main:app", "--reload", "--host", "0.0.0.0", "--port", "3080"]
+CMD ["uv", "run", "--no-dev", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "3080"]

@@ -1,0 +1,6 @@
+Title: What works in the admin console
+Questions: How do I see all students? How do I manage users as admin? How do I resolve a dispute? How do I add a supplier as admin? How do I see reports or orders as admin?
+
+Students works today. It lists every account, 20 per page, with name, username, NUS email, roles, state (Active, Pending verification or Suspended) and the date joined. It is read only, so you cannot edit, suspend or delete an account from this page yet.
+
+Orders, Reports, Disputes and Suppliers are still being built and currently show a placeholder page, so these tasks cannot be done from the admin console yet.

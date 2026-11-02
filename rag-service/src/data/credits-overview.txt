@@ -1,0 +1,6 @@
+Title: What credits are
+Questions: What are credits? Can I buy credits? Can I withdraw credits? Can I cash out? Are credits real money? How do I get credits? How do I earn credits?
+
+Credits are the currency of the platform and work only inside it. They cannot be bought, withdrawn, or exchanged for money. Every student receives a starting amount of credits when they register. You earn more by completing errands for other students, and you spend them by posting errands. Credits pay the courier for their effort. They do not pay the store for the items.
+
+Note: the wallet is still being built, so the starting amount is not available here yet.

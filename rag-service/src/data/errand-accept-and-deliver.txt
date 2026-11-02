@@ -1,0 +1,8 @@
+Title: How to accept and deliver an errand
+Questions: How do I accept an errand? How do I deliver? How do I earn credits? How do I mark something as picked up? Why can't I accept this errand? Can I accept my own errand?
+
+Open Errands to see errands other students posted. Accepting one makes you its courier. Then collect the items and update the errand to Picked up, and deliver them to the requester. Once delivery is confirmed, the errand is Completed and the credits are transferred to you.
+
+An errand has only one courier. If someone else accepts first, you cannot accept it. You cannot accept your own errand.
+
+Note: the errand pages are still being built, so button names may differ from this description.

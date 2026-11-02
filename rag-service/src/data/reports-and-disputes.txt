@@ -1,0 +1,4 @@
+Title: Reporting a problem or disputing an errand
+Questions: How do I report someone? How do I open a dispute? My courier did not deliver. The requester did not confirm. Who decides disputes? What if something goes wrong with my errand?
+
+Administrators decide reports and resolve disputes. Students do not have a page for submitting a report or opening a dispute yet, so this assistant cannot give steps for it. The Reports and Disputes pages in the admin console are also still being built. Keep the details of the errand so that you can describe what happened.

@@ -1,20 +1,25 @@
-from fastapi import FastAPI
-from .controller.rag_controller import PromptRequest, post_prompt_rag, get_prompt_rag
-
+from fastapi import FastAPI, HTTPException
+from .services.rag_service import boostrap_rag_system
+from .controller.rag_controller import (
+    queryRequest,
+    post_query_rag_controller,
+    get_query_rag_controller,
+)
 
 # uv run fastapi dev
 app = FastAPI()
-
+boostrap_rag_system()
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
-
-@app.post("/prompt/")
-async def post_prompt(request: PromptRequest):
-    return post_prompt_rag(request)
+    return {"message": "Welcome to Friend on Campus NUS Rag System"}
 
 
-@app.get("/prompt/")
-async def get_prompt(prompt: str):
-    return get_prompt_rag(prompt)
+@app.post("/query/")
+async def post_query_raq(request: queryRequest):
+    return await post_query_rag_controller(request)
+
+
+@app.get("/query/")
+async def get_query_rag(query: str):
+    return await get_query_rag_controller(query)

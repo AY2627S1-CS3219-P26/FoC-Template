@@ -1,0 +1,10 @@
+Title: Finding pickup locations
+Questions: What is a supplier? Where can I pick up from? How do I search for a store? Which places are available? What stores are on the platform? Can I add a new store?
+
+A supplier is a store, facility or landmark on campus where errands can be picked up from. Each has a name, a type (Food, Food/Coffee, Shopping or Printing), a campus zone, a building and address, a short description of how to find it, and opening hours. Filtering by Food does not include Food/Coffee, which is a type of its own.
+
+Zones are Central, Computing, Science, Engineering, Medicine, Business and Residences. Search looks at the name, type, building, zone and address.
+
+Only administrators can add or change suppliers. Students cannot add one.
+
+Note: the supplier pages are still being built, so the screens may differ from this description.

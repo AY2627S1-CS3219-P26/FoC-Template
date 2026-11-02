@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from ..services.auth_service import verify_auth_header
 
 # Listing the public paths means a new route is protected unless it is added here.
-PUBLIC_PATHS = {"/", "/health/", "/docs/"}
+PUBLIC_PATHS = {"/", "/health/", "/docs", "/openapi.json"}
 
 
 async def verify_auth_header_middleware(request: Request, call_next):

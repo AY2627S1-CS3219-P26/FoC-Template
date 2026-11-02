@@ -7,6 +7,10 @@ from .controller.rag_controller import (
 )
 
 # uv run fastapi dev
+# conda deactivate
+# source .venv/bin/activate
+# uvicorn src.main:app --reload --host 0.0.0.0 --port 3080
+
 app = FastAPI()
 boostrap_rag_system()
 

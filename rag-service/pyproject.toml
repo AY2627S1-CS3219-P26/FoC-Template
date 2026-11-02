@@ -11,6 +11,7 @@ dependencies = [
     "numpy>=2.4.6",
     "sentence-transformers>=6.2.0",
     "torch",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [tool.fastapi]

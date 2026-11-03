@@ -14,6 +14,8 @@ Work in the folder you were asked to work in. Do not change another service to m
 
 Host ports in `compose.yaml`: user-service 3001, supplier-service 3002, order-service 3003, credit-service 3004. Inside the compose network services reach each other by service name, for example `http://user-service:3000`.
 
+`compose.yaml` has two networks. Every service joins `edge`, where the web client reaches it, and `backend`, where its database lives. Databases and infrastructure such as Mailpit join only `backend`, so the web client cannot reach them. Publish host ports on `127.0.0.1` only (`"127.0.0.1:3003:3000"`); 8080 for the web client is the one port open to the network.
+
 ## Authentication and authorization
 
 The user-service is the only authority on who is logged in and what they may do. Every other service asks it for each protected request, through `POST /internal/authorize` with the session token and the role the operation needs. The contract, the role rules and an example are in `user-service/README.md`, section "Authorizing requests in another service".
@@ -21,6 +23,14 @@ The user-service is the only authority on who is logged in and what they may do.
 - Never decide access from a token or cookie yourself, and never keep your own copy of roles.
 - Fail closed: if the user-service does not answer with `authorized`, refuse.
 - Check the role before looking anything up, so a refusal does not reveal whether an object exists.
+
+## Events
+
+Services tell each other about changes through RabbitMQ, without waiting for an answer. Conventions, the envelope and the catalog of events are in `docs/events.md`, the reasons in `docs/decisions/0003-message-broker.md`.
+
+- Publish through an outbox: the event is written together with the change it reports and repeated until the broker confirms it.
+- Consume idempotently: every event can arrive more than once. Acknowledge only after your transaction committed.
+- Add every new event to the catalog in `docs/events.md` in the same pull request.
 
 ## Config and secrets
 

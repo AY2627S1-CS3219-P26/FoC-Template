@@ -10,3 +10,5 @@ values:
     value: ''
   - key: targetUserId
     value: ''
+  - key: reportId
+    value: ''

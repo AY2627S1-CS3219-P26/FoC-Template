@@ -30,10 +30,11 @@ Requires only Docker. From the repository root:
 | user-service | http://localhost:3001 |
 | supplier-service | http://localhost:3002 |
 | Mailpit (local email inbox) | http://localhost:8025 |
+| RabbitMQ management UI (user `relay`, password `change-me`) | http://localhost:15672 |
 
 No `.env` is needed for local use; every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me` unless `ADMIN_PASSWORD` is set. To override values, copy `.env.example` to `.env`.
 
-The browser reaches the services only through the web client, which forwards `/api/<service>/...` to them. How to develop the client with live reload is in [`web-client/README.md`](web-client/README.md).
+The browser reaches the services only through the web client, which forwards `/api/<service>/...` to them. Services tell each other about changes through RabbitMQ; the conventions and the list of events are in [`docs/events.md`](docs/events.md). How to develop the client with live reload is in [`web-client/README.md`](web-client/README.md).
 
 `docker compose down -v` stops everything and deletes the local data.
 

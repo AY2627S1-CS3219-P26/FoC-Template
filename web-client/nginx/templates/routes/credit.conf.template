@@ -1,0 +1,8 @@
+# Routes for the credit-service. Only the browser-facing reads are reachable here:
+# the balance (F4.1.4) and transaction history (F4.5.3). announce and the reservation
+# mutations are service-to-service only, so they fall through to the JSON 404.
+location ~ ^/api/credit/(account/[^/]+/balance|transactions)(/|$) {
+  set $upstream ${CREDIT_SERVICE_URL};
+  rewrite ^/api/credit(/.*)$ $1 break;
+  proxy_pass $upstream;
+}

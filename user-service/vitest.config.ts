@@ -14,6 +14,8 @@ export default defineConfig({
             LOG_LEVEL: "silent",
             // The app never connects by itself in tests; test/helpers/db.ts does.
             MONGO_URL: "mongodb://unused",
+            // Tests pass a fake publisher instead; nothing connects to a broker.
+            BROKER_URL: "amqp://unused",
             OTP_SECRET: "test-otp-secret-with-at-least-32-characters",
             SMTP_HOST: "localhost",
             SMTP_PORT: "1025",

@@ -6,6 +6,7 @@ import { authRouter } from "./routes/auth.routes.ts";
 import { usersRouter } from "./routes/users.routes.ts";
 import cookieParser from "cookie-parser";
 import { internalRouter } from "./routes/internal.routes.ts";
+import { reportsRouter } from "./routes/reports.routes.ts";
 
 export function createApp() {
     const app = express();
@@ -17,6 +18,7 @@ export function createApp() {
     app.use(healthRouter);
     app.use("/auth", authRouter);
     app.use("/users", usersRouter);
+    app.use("/reports", reportsRouter);
     app.use("/internal", internalRouter);
 
     app.use(notFound);

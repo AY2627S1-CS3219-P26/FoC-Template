@@ -1,6 +1,6 @@
 import type { RequestHandler, Request } from "express";
 import { authOf } from "../middleware/authenticate.ts";
-import { changePassword, deleteUser, getUser, grantAdministrator, listUsers, revokeAdministrator, updateProfile } from "../services/user.service.ts";
+import { changeAccountState, changePassword, deleteUser, getUser, grantAdministrator, listUsers, revokeAdministrator, updateProfile } from "../services/user.service.ts";
 
 function targetId(req: Request): string {
     return String(req.params.id);
@@ -43,4 +43,8 @@ export const grantAdmin: RequestHandler = async (req, res) => {
 
 export const revokeAdmin: RequestHandler = async (req, res) => {
     res.status(200).json(await revokeAdministrator(targetId(req), authOf(req).account.id));
+};
+
+export const changeState: RequestHandler = async (req, res) => {
+    res.status(200).json(await changeAccountState(targetId(req), authOf(req).account.id, req.body));
 };

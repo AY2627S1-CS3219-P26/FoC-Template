@@ -28,9 +28,6 @@ FROM python:3.13-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 #Dockers cd command
 WORKDIR /app 
-ENV NODE_ENV=production
-ENV USER_SERVICE_URL=http://localhost:3001
-
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project

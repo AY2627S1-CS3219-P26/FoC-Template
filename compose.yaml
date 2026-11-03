@@ -2,7 +2,7 @@ name: relay
 
 models:
   sentence-transformer:
-    model: ai/llama3.2:1B-Q8_0
+    model: ghcr.io/huggingface/text-embeddings-inference
 
 services:
 
@@ -54,7 +54,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
 
   user-db:

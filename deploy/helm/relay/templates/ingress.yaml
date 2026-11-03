@@ -1,0 +1,35 @@
+# The only way in from outside: everything goes to the web client's gateway, except /mail/ for
+# Mailpit. The services and databases have no route of their own, as in compose.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: relay
+  labels:
+    {{- include "relay.labels" (dict "root" $ "name" "relay") | nindent 4 }}
+spec:
+  ingressClassName: traefik
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | required "ingress.host is required with ingress.tls" | quote }}]
+      secretName: relay-tls
+  {{- end }}
+  rules:
+    - {{- with .Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: /mail
+            pathType: Prefix
+            backend:
+              service:
+                name: mailpit
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-client
+                port:
+                  name: http

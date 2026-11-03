@@ -124,6 +124,7 @@ services:
     build: ./web-client
     environment:
       USER_SERVICE_URL: http://user-service:3000
+      RAG_SERVICE_URL: http://rag-service:3080
       SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
       # Locally every email lands in Mailpit, so the verify page links to it. Set it to empty to hide the hint.
       DEV_MAILBOX_URL: ${DEV_MAILBOX_URL-http://localhost:8025}

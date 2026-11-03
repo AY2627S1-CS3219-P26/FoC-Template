@@ -7,7 +7,6 @@ from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 
 load_dotenv()
-# # Might implement langchain https://www.datacamp.com/tutorial/building-a-rag-system-with-langchain-and-fastapi?utm_cid=19589720824&utm_aid=157098106775&utm_campaign=230119_1-ps-other~dsa-tofu~all_2-b2c_3-apac_4-prc_5-na_6-na_7-le_8-pdsh-go_9-nb-e_10-na_11-na&utm_loc=9062542-&utm_mtd=-c&utm_kw=&utm_source=google&utm_medium=paid_search&utm_content=ps-other~apac-en~dsa~tofu~tutorial~artificial-intelligence&gad_source=1&gad_campaignid=19589720824&gbraid=0AAAAADQ9WsFOp055eTCmpATtil_ROe2nf&gclid=CjwKCAjwxpvXBhASEiwAue4B4d6ak2zA5rRgKmQM5vPNlnu3S3ZWS8czpzIEnbfyuLpHtBwXZIXy_RoCOTYQAvD_BwE
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 documents = [path.read_text(encoding="utf-8") for path in sorted(DATA_DIR.glob("*.txt"))]
@@ -51,9 +50,9 @@ class rag_system():
         messages.append({"role": "user", "content": prompt})
 
         # Generate response. The fallback lets the API retry on another model if this one refuses.
-        response = self.client.beta.messages.create(
+        response = await self.client.beta.messages.create(
             model="claude-haiku-5-5",
-            max_tokens=16000,
+            max_tokens=1000,
             messages=messages,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
@@ -65,14 +64,6 @@ class rag_system():
         return "".join(block.text for block in response.content if block.type == "text")
 
 rag: rag_system| None = None
-
-# Test Class
-# class rag_system():
-#     def __init__(self):
-#         print("rag created")
-
-#     async def rag_query(self, question, conversation: list | None = None):
-#         return "This is my rag response"
 
 def boostrap_rag_system():
     global rag

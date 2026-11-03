@@ -1,9 +1,5 @@
 name: relay
 
-models:
-  sentence-transformer:
-    model: ghcr.io/huggingface/text-embeddings-inference
-
 services:
 
   rag-service:
@@ -13,7 +9,7 @@ services:
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
       USER_SERVICE_URL: http://user-service:3000
     ports:
-      - "3080:3080"
+      - "127.0.0.1:3080:3080"
     depends_on:
       user-service:
         condition: service_healthy
@@ -23,10 +19,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 10s
+      # Loading the embedding model can take much longer on a slow or busy machine.
+      start_period: 60s
     restart: unless-stopped
-    models:
-      - sentence-transformer
+
   user-service:
     build: ./user-service
     environment:

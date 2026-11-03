@@ -22,13 +22,16 @@
 # EXPOSE 3080
 # CMD ["fastapi", "run", "--port", "3080"]
 
-#docker run -d -p 3080:3080 relay-rag-service:latest
+#docker run -d -p 3080:3080 --name relay-rag-service relay-rag-service:latest
 #docker build -t rag-service:latest . remember to anme bbay
 FROM python:3.13-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 #Dockers cd command
 WORKDIR /app 
 ENV NODE_ENV=production
+ENV USER_SERVICE_URL=http://localhost:3001
+
+
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project
 

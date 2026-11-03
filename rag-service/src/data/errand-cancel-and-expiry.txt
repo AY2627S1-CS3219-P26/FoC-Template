@@ -1,6 +1,6 @@
 Title: Cancelled and expired errands
-Questions: How do I cancel an errand? What happens if nobody accepts my errand? Do I get my credits back? What does expired mean? How long until an errand expires?
+Questions: How do I cancel an errand? What happens if nobody accepts my errand? Do I get my credits back? What does expired mean? How long until an errand expires? Can I cancel after pickup?
 
-If nobody accepts your errand within the permitted time, it expires automatically. If an errand is cancelled or expires, the credits reserved for it are released back to your available balance, and no credits go to anyone else. You do not need to do anything to get them back.
+An errand can be cancelled while it is Open or Accepted. It cannot be cancelled once it has been picked up. If nobody accepts an Open errand within the permitted time, it expires. If an errand is cancelled or expires, the credits reserved for it are released back to your available balance, and no credits go to anyone else. You do not need to do anything to get them back.
 
-Note: the errand pages are still being built, so the exact expiry time and the rules on when an errand can be cancelled are not available here yet.
+Note: the errand pages are not finished and currently show "Not built yet", so you cannot cancel an errand in the app yet. The exact expiry time is not available here.

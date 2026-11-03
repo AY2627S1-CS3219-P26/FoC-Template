@@ -1,11 +1,12 @@
 Title: What the errand statuses mean
-Questions: What does Open mean? What does Accepted mean? What does Picked up mean? What does Completed mean? What does Expired mean? What is the status of my errand?
+Questions: What does Open mean? What does Accepted mean? What does Picked up mean? What does Delivered mean? What does Completed mean? What does Expired mean? What is the status of my errand?
 
 Open: posted and waiting for a courier.
 Accepted: a courier has taken the errand.
 Picked up: the courier has collected the items.
-Completed: the items were delivered, delivery was confirmed, and the credits went to the courier.
+Delivered: the courier has marked the items as handed over, and the requester still has to confirm.
+Completed: the requester confirmed delivery, and the credits went to the courier.
 Cancelled: the errand was cancelled and the reserved credits were released.
 Expired: no courier accepted within the permitted time, and the reserved credits were released.
 
-The usual order is Open, Accepted, Picked up, Completed. Cancelled and Expired are final outcomes where no credits are paid.
+The usual order is Open, Accepted, Picked up, Delivered, Completed. Cancelled and Expired are final outcomes where no credits are paid.

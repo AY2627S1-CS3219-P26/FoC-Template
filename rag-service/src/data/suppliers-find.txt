@@ -5,6 +5,6 @@ A supplier is a store, facility or landmark on campus where errands can be picke
 
 Zones are Central, Computing, Science, Engineering, Medicine, Business and Residences. Search looks at the name, type, building, zone and address.
 
-Only administrators can add or change suppliers. Students cannot add one.
+Only administrators can add or change suppliers, from the Suppliers page in the admin console. Students cannot add one.
 
-Note: the supplier pages are still being built, so the screens may differ from this description.
+Note: the student pages for browsing suppliers are not finished and currently show "Not built yet", but the assistant can still answer questions about the suppliers.

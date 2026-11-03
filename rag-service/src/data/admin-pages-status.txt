@@ -1,6 +1,10 @@
 Title: What works in the admin console
-Questions: How do I see all students? How do I manage users as admin? How do I resolve a dispute? How do I add a supplier as admin? How do I see reports or orders as admin?
+Questions: How do I see all students? How do I manage users as admin? How do I suspend an account? How do I make someone an administrator? How do I resolve a dispute? How do I add a supplier as admin? How do I deactivate a supplier? How do I decide a report? How do I see orders as admin?
 
-Students works today. It lists every account, 20 per page, with name, username, NUS email, roles, state (Active, Pending verification or Suspended) and the date joined. It is read only, so you cannot edit, suspend or delete an account from this page yet.
+Students lists every account. Open one to see its details, state history, reports and credit balance, to suspend or reinstate it with a reason of 20 to 500 characters, or to make it an administrator or remove that role. You cannot edit or delete an account from this page.
 
-Orders, Reports, Disputes and Suppliers are still being built and currently show a placeholder page, so these tasks cannot be done from the admin console yet.
+Reports lists reports by state: Open, Dismissed or Actioned. Open a report and give a justification of 20 to 500 characters, then press Dismiss report or Suspend account.
+
+Suppliers lists suppliers. Press Add supplier to create one, or open one to edit it and to deactivate or reactivate it.
+
+Orders and Disputes are not finished and currently show "Not built yet", so you cannot see orders or resolve disputes yet.

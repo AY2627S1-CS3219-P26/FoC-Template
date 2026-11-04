@@ -65,6 +65,21 @@ The instance costs money only while it runs. Stop it after testing:
 deploy/scripts/cloud.sh stop
 deploy/scripts/cloud.sh start
 deploy/scripts/cloud.sh status
+deploy/scripts/cloud.sh restart
+```
+
+`restart` makes the services pull the newest `dev` images. It runs on the instance through AWS Systems Manager, so it needs neither SSH nor the Kubernetes API. Changes to the chart itself (values, templates) still go out with `deploy.sh`.
+
+If nobody uses the instance for 4 hours (CPU below 10 %), the CloudWatch alarm `relay-idle-stop` stops it, so a forgotten instance does not use up the budget. Start it again with `cloud.sh start`.
+
+### From GitHub Actions
+
+Without any AWS access of your own: Actions → **cloud** → Run workflow, then pick `start`, `stop`, `status` or `restart` (shown once the workflow is on `main`). After every merge into `dev`, CI publishes the images and then runs `restart`, so a running instance always serves the current integration state (continuous deployment). A stopped instance is left alone.
+
+GitHub Actions gets into AWS with a short-lived OpenID Connect token instead of stored keys, and only workflows on `dev` and `main` may use the role. The workflows need one repository variable, the role from terraform:
+
+```bash
+gh variable set AWS_ROLE_ARN --body "$(terraform -chdir=deploy/terraform output -raw github_role_arn)"
 ```
 
 When kubectl or `deploy.sh` cannot reach the cluster, your public address has changed (other Wi-Fi, and the NUS network changes it often). Run `terraform -chdir=deploy/terraform apply` once more, so SSH and kubectl accept the new address. The app itself stays reachable for everyone.

@@ -22,6 +22,18 @@ variable "ssh_public_key" {
   default     = "~/.ssh/relay-aws.pub"
 }
 
+variable "github_repository" {
+  description = "Repository whose workflows may start, stop and restart the instance."
+  type        = string
+  default     = "AY2627S1-CS3219-P26/FoC-Template"
+}
+
+variable "github_branches" {
+  description = "Branches those workflows have to run on."
+  type        = list(string)
+  default     = ["dev", "main"]
+}
+
 variable "admin_cidrs" {
   description = "Addresses allowed to reach SSH and the Kubernetes API. Empty means only the address you run terraform from."
   type        = list(string)

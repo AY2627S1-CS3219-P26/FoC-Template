@@ -119,6 +119,7 @@ resource "aws_instance" "relay" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.relay.id]
   key_name               = aws_key_pair.relay.key_name
+  iam_instance_profile   = aws_iam_instance_profile.instance.name
 
   root_block_device {
     volume_size = 40

@@ -1,6 +1,6 @@
 # Deployment
 
-Relay runs in Kubernetes from one Helm chart, [`deploy/helm/relay`](../deploy/helm/relay). The same chart and the same images run on a laptop (k3d) and in the cloud (k3s on EC2); only the values files differ (N6.2). Docker Compose stays the quickest way to run everything for development.
+Relay runs in Kubernetes from one Helm chart, [`deploy/helm/relay`](../deploy/helm/relay). Why this setup: [ADR 0004](decisions/0004-cloud-deployment.md). The same chart and the same images run on a laptop (k3d) and in the cloud (k3s on EC2); only the values files differ (N6.2). Docker Compose stays the quickest way to run everything for development.
 
 ## Local Kubernetes (k3d)
 
@@ -94,6 +94,24 @@ deploy/scripts/loadtest.sh
 ```
 
 `loadtest.sh` runs k6 as a Job inside the cluster: 20 virtual users ask for their profile through the gateway for 5 minutes. Meanwhile it records the load and instance count of each service every 15 seconds and finally the scaling events, so the run ends up in `docs/evidence/` as proof.
+
+## Before a demo
+
+1. `aws sso login --profile relay`, then `deploy/scripts/cloud.sh start` about 15 minutes before (or Actions → cloud → start).
+2. Run the smoke test against the HTTPS address. It registers a test account, so do it before the audience watches, not during.
+3. Log in as the administrator (`admin`, `ADMIN_PASSWORD` from `deploy/cloud-secrets.env`). Verification codes for new accounts are in Mailpit under `/mail/`.
+4. To show the autoscaling live: `kubectl --kubeconfig ~/.kube/relay-aws.yaml -n relay get hpa -w` in one terminal and `HOLD=3m AFTER_SECONDS=0 deploy/scripts/loadtest.sh` in another. The first extra instance appears about 2.5 minutes after the start. The run from `docs/evidence/` is the backup if there is no time.
+5. Afterwards `deploy/scripts/cloud.sh stop`. If you forget, the idle alarm stops the instance after 4 hours.
+
+## Freezing the submitted state
+
+`dev` moves with every merge. For the submission, deploy the commit that was handed in with its fixed image tags, so the demonstrated system matches the code:
+
+```bash
+IMAGE_TAG=sha-$(git rev-parse --short=7 HEAD) deploy/scripts/deploy.sh
+```
+
+Use a commit on `dev` or `main` whose CI run has published the images.
 
 ## Adding a service
 

@@ -88,8 +88,8 @@ services:
       BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
 
   order-service:
-    # Off until the image on dev starts: src/routes/order.route.ts imports
-    # ../controllers/order.controller.js, which only exists as .ts, and the image runs plain node.
+    # Off until the order-service image on dev is rebuilt with this branch's Dockerfile, which starts
+    # it through tsx. The image built before could not start (it ran plain node on tsx-style code).
     enabled: false
     port: 3003
     health: /health

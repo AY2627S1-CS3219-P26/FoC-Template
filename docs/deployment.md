@@ -26,6 +26,48 @@ kubectl --context k3d-relay -n relay logs deploy/user-service
 k3d cluster delete relay
 ```
 
+## Cloud (AWS, k3s on EC2)
+
+[`deploy/terraform`](../deploy/terraform) creates one EC2 instance (t3.xlarge, Singapore) with k3s, in its own VPC with a fixed public address. Traefik inside k3s answers on ports 80 and 443; SSH and the Kubernetes API only accept the address terraform was run from. The images come from GHCR, where CI publishes them with the tag `dev` after every merge into `dev`.
+
+Needs the AWS CLI with the SSO profile `relay`, `terraform`, `helm`, `kubectl`, and an SSH key in `~/.ssh/relay-aws` (`ssh-keygen -t ed25519 -f ~/.ssh/relay-aws -N ""`).
+
+Once:
+
+```bash
+aws sso login --profile relay
+export AWS_PROFILE=relay
+terraform -chdir=deploy/terraform init
+terraform -chdir=deploy/terraform apply
+deploy/scripts/cloud-kubeconfig.sh
+```
+
+`deploy/ghcr.env` holds a GitHub token that may read the private images (classic token with only `read:packages`):
+
+```
+GHCR_USERNAME=<github user>
+GHCR_TOKEN=<token>
+```
+
+Deploy, and again after every merge into `dev`:
+
+```bash
+deploy/scripts/deploy.sh
+deploy/scripts/smoke-test.sh http://$(terraform -chdir=deploy/terraform output -raw hostname)
+```
+
+On the first run `deploy.sh` writes random passwords to `deploy/cloud-secrets.env`; the administrator's password is `ADMIN_PASSWORD` there. Both `.env` files stay out of Git.
+
+The instance costs money only while it runs. Stop it after testing:
+
+```bash
+deploy/scripts/cloud.sh stop
+deploy/scripts/cloud.sh start
+deploy/scripts/cloud.sh status
+```
+
+After a different network (other Wi-Fi), run `terraform -chdir=deploy/terraform apply` once more, so SSH and kubectl accept the new address.
+
 ## Adding a service
 
 1. Add an entry under `services` in `deploy/helm/relay/values.yaml` (port, health path, `waitFor`, `secretEnv`, `env`). The comments there explain each field. The service name becomes the host name, so URLs from `compose.yaml` keep working.

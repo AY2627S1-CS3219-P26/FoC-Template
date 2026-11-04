@@ -69,6 +69,17 @@ deploy/scripts/cloud.sh status
 
 When kubectl or `deploy.sh` cannot reach the cluster, your public address has changed (other Wi-Fi, and the NUS network changes it often). Run `terraform -chdir=deploy/terraform apply` once more, so SSH and kubectl accept the new address. The app itself stays reachable for everyone.
 
+## Autoscaling (N6.3)
+
+Every stateless service (`autoscaling` in `values.yaml`) has a HorizontalPodAutoscaler. It follows N6.3: when a service's load stays above 70 % of what one instance asks for (its CPU request) for 2 minutes, Kubernetes starts another instance, one at a time, up to 4. After 5 minutes of low load the extra instances are removed again. Databases and the broker keep one instance each.
+
+```bash
+kubectl --kubeconfig ~/.kube/relay-aws.yaml -n relay get hpa
+deploy/scripts/loadtest.sh
+```
+
+`loadtest.sh` runs k6 as a Job inside the cluster: 20 virtual users ask for their profile through the gateway for 5 minutes. Meanwhile it records the load and instance count of each service every 15 seconds and finally the scaling events, so the run ends up in `docs/evidence/` as proof.
+
 ## Adding a service
 
 1. Add an entry under `services` in `deploy/helm/relay/values.yaml` (port, health path, `waitFor`, `secretEnv`, `env`). The comments there explain each field. The service name becomes the host name, so URLs from `compose.yaml` keep working.

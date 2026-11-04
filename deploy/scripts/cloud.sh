@@ -23,11 +23,13 @@ url="http://$(terraform output -raw hostname)"
 
 case "${1:-status}" in
   start)
+    echo "Starting $instance, waiting until it runs (about a minute)..."
     aws ec2 start-instances --instance-ids "$instance" >/dev/null
     aws ec2 wait instance-running --instance-ids "$instance"
     echo "Running. Relay is back in about two minutes on $url"
     ;;
   stop)
+    echo "Stopping $instance, waiting until it is stopped (one to two minutes)..."
     aws ec2 stop-instances --instance-ids "$instance" >/dev/null
     aws ec2 wait instance-stopped --instance-ids "$instance"
     echo "Stopped. Only the disk and the address cost money now."

@@ -12,6 +12,12 @@ export AWS_PROFILE="${AWS_PROFILE:-relay}" AWS_PAGER=""
 AWS_REGION="$(terraform output -raw region)"
 export AWS_REGION
 
+# The SSO login lasts a few hours; say how to renew it instead of showing the CLI's error.
+if ! aws sts get-caller-identity >/dev/null 2>&1; then
+  echo "The AWS login has expired. Run: aws sso login --profile $AWS_PROFILE" >&2
+  exit 1
+fi
+
 instance="$(terraform output -raw instance_id)"
 url="http://$(terraform output -raw hostname)"
 

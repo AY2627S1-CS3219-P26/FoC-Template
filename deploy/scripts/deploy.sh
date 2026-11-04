@@ -15,7 +15,8 @@ export KUBECONFIG="${RELAY_KUBECONFIG:-$HOME/.kube/relay-aws.yaml}"
 GHCR_FILE=deploy/ghcr.env
 SECRETS_FILE=deploy/cloud-secrets.env
 # Every key under secrets.values in values.yaml. A new key gets a random value on the next run.
-SECRET_KEYS=(BROKER_PASSWORD OTP_SECRET ADMIN_PASSWORD SUPPLIER_DB_PASSWORD ORDER_DB_PASSWORD)
+SECRET_KEYS=(BROKER_PASSWORD OTP_SECRET ADMIN_PASSWORD SUPPLIER_DB_PASSWORD ORDER_DB_PASSWORD MAILPIT_PASSWORD)
+CERT_MANAGER_VERSION=v1.21.3
 
 if [ ! -f "$GHCR_FILE" ]; then
   echo "Missing $GHCR_FILE with GHCR_USERNAME=... and GHCR_TOKEN=..., see docs/deployment.md" >&2
@@ -33,6 +34,12 @@ for key in "${SECRET_KEYS[@]}"; do
 done
 
 host="$(terraform -chdir=deploy/terraform output -raw hostname)"
+
+# cert-manager gets the HTTPS certificate from Let's Encrypt and renews it. The chart's
+# ClusterIssuer needs its resource types, so it comes first.
+helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --version "$CERT_MANAGER_VERSION" --namespace cert-manager --create-namespace \
+  --set crds.enabled=true --wait --timeout 5m >/dev/null
 
 kubectl create namespace relay --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n relay create secret docker-registry ghcr \
@@ -52,5 +59,8 @@ kubectl -n relay rollout status deployment --timeout 5m
 
 kubectl -n relay get pods
 echo
-echo "Relay:   http://$host"
-echo "Mailpit: http://$host/mail/"
+# The first certificate takes about a minute; until then browsers warn about the address.
+kubectl -n relay get certificate relay-tls --no-headers 2>/dev/null \
+  | awk '{ print "Certificate ready: " $2 }'
+echo "Relay:   https://$host"
+echo "Mailpit: https://$host/mail/ (user relay, password MAILPIT_PASSWORD in $SECRETS_FILE)"

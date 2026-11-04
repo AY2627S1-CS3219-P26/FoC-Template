@@ -24,10 +24,13 @@ secrets:
     ADMIN_PASSWORD: change-me
     SUPPLIER_DB_PASSWORD: change-me
     ORDER_DB_PASSWORD: change-me
+    MAILPIT_PASSWORD: change-me
 
 ingress:
   # Empty answers every host name, so http://localhost:<port> works on the laptop.
   host: ""
+  # HTTPS with a Let's Encrypt certificate (cert-manager), plain HTTP redirects to it.
+  # Needs a public host name and cert-manager in the cluster, so only in the cloud.
   tls: false
 
 # Every service of our own. Each one becomes a Deployment and a Service with the same name, so the
@@ -209,6 +212,9 @@ broker:
 # Catches every email and shows it under /mail/. Relay sends no real emails anywhere.
 mailpit:
   image: axllent/mailpit:v1.31.6
+  # Ask for user and MAILPIT_PASSWORD before showing the mails, in the cloud where anyone can reach /mail/.
+  auth: false
+  user: relay
 
 # Small image for the init container that waits for a database.
 waitImage: busybox:1.37

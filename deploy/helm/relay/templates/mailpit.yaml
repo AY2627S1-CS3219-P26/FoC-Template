@@ -21,6 +21,16 @@ spec:
             # Served under /mail/ on the same host as the app, so one address and one certificate cover both.
             - name: MP_WEBROOT
               value: /mail/
+            {{- if .Values.mailpit.auth }}
+            # Asks for a user name and password before showing any mail or answering the API.
+            - name: MAILPIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: MAILPIT_PASSWORD
+            - name: MP_UI_AUTH
+              value: "{{ .Values.mailpit.user }}:$(MAILPIT_PASSWORD)"
+            {{- end }}
           ports:
             - name: http
               containerPort: 8025

@@ -11,3 +11,15 @@ images:
 # deploy.sh creates relay-secrets from deploy/cloud-secrets.env, with random passwords.
 secrets:
   create: false
+
+ingress:
+  tls: true
+
+mailpit:
+  auth: true
+
+services:
+  user-service:
+    env:
+      # The session cookie only travels over HTTPS.
+      COOKIE_SECURE: "true"

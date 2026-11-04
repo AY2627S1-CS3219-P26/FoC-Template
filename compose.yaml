@@ -59,6 +59,8 @@ services:
       PORT: 3008
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MONGO_URL: mongodb://message-db:27017/message-service #uses the container port
+      BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
+      USER_SERVICE_URL: http://user-service:3000
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nus.edu.sg}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
@@ -121,7 +123,7 @@ services:
     volumes:
       - broker-data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -195,14 +197,14 @@ services:
   credit-db:
     image: mongo:8
     # Single-node replica set so credit-service can use multi-document transactions (N4.1.2).
-    command: ["--replSet", "rs0", "--bind_ip_all"]
+    command: [ "--replSet", "rs0", "--bind_ip_all" ]
     volumes:
       - credit-db-data:/data/db
     networks:
       - backend
     # Idempotent self-init: the first healthy check initiates the set, later checks just confirm it.
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'credit-db:27017'}]}).ok }\" | grep -q 1"]
+      test: [ "CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'credit-db:27017'}]}).ok }\" | grep -q 1" ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -222,7 +224,7 @@ services:
     volumes:
       - order-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -261,8 +263,8 @@ volumes:
   broker-data:
   order-db-data:
 
-# edge connects the web client to the services, backend connects the services to their databases
-# and infrastructure. The web client is only on edge, so the gateway has no route to any database.
+    # edge connects the web client to the services, backend connects the services to their databases
+    # and infrastructure. The web client is only on edge, so the gateway has no route to any database.
 networks:
   edge:
   backend:

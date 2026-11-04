@@ -19,8 +19,6 @@ interface MessageContextValue {
 
 const MessageContext = createContext<MessageContextValue | null>(null);
 
-const SOCKET_URL = 'http://localhost:3008';
-
 export function MessageProvider({ children }: { children: ReactNode }) {
     const user = useCurrentUser();
     const userId = user?.id;
@@ -32,12 +30,12 @@ export function MessageProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (userId == null) return;
 
-        const newSocket = io(SOCKET_URL);
+        // Through the gateway, so the browser sends the session cookie along.
+        const newSocket = io({ path: '/api/message/socket.io' });
         setSocket(newSocket);
 
         const onConnect = () => {
             setIsConnected(true);
-            newSocket.emit('join', String(userId));
         };
 
         const onDisconnect = () => {

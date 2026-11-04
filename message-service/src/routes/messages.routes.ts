@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { getConversationByIds, getLastMessageByUserId, getUnreadMessagesByUserId, send } from "../controllers/messages.routes.ts";
+import { getConversationByIds, getLastByUserId, send } from "../controllers/messages.controller.ts";
 
 export const messagesRouter = Router();
 
-//note to self: userId acts as placeholder value
-messagesRouter.get("/last-message/:userId", getLastMessageByUserId)
-messagesRouter.get("/:senderId/:userId", getConversationByIds)
-messagesRouter.get("unread/:userId", getUnreadMessagesByUserId)
-messagesRouter.get("test", getUnreadMessagesByUserId)
 
 messagesRouter.post("/send", send)
+
+//note to self: userId acts as placeholder value
+messagesRouter.get("/last-message/:userId", getLastByUserId)
+messagesRouter.get("/:senderId/:userId", getConversationByIds) // have to be last
+
 
 
 export default messagesRouter;

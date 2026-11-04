@@ -7,7 +7,7 @@ import { connectToDBWithRetry } from "./db.ts";
 import { startMessageConsumer } from "./consumer.ts";
 
 try {
-    //await connectToDBWithRetry();
+    await connectToDBWithRetry();
     void startMessageConsumer();
 } catch (err) {
     logger.fatal({ err }, "could not start, exiting");

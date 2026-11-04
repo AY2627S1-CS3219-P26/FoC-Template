@@ -6,8 +6,7 @@ const EnvSchema = z.object({
     PORT: z.coerce.number().int().positive().default(3008),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     MONGO_URL: z.string().min(1),
-
-
+    USER_SERVICE_URL: z.url(),
     ADMIN_EMAIL: z.email().trim().toLowerCase(),
     ADMIN_PASSWORD: z.string().min(8, "must be at least 8 characters"),
     ADMIN_USERNAME: z.string().trim().min(3).default("admin"),

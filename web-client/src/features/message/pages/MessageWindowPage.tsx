@@ -32,18 +32,15 @@ export function MessageWindowPage() {
             return;
         }
 
-        // The message-service assigns _id when it accepts the message.
-        const message: Omit<Message, "_id"> = {
-            //_tempId: Date.now().toString() + Math.random().toString(),
-            senderId: user.id,
-            receiverId: id,
-            content,
-            status: "unread",
-            timestamp: new Date(),
-        }
-
         // The server only emits to the receiver, so our own copy comes back through the ack.
-        socket.emit('sendMessage', message, (saved: Message) => setSent((prev) => [...prev, saved]));
+        // On a refusal the text goes back into the field, so nothing typed is lost.
+        socket.emit('sendMessage', { receiverId: id, content }, (saved: Message | { error: { message: string } }) => {
+            if ('error' in saved) {
+                setNewMessage(content);
+                return;
+            }
+            setSent((prev) => [...prev, saved]);
+        });
         setNewMessage('');
     };
 

@@ -9,7 +9,6 @@ const messageSchema = new Schema(
         receiverId: { type: String, required: true, trim: true },
         content: { type: String, required: true, trim: true },
         status: { type: String, enum: STATUS, default: "unread" },
-        timestamp: { type: Date, default: Date.now },
     },
     {
         runValidators: true,

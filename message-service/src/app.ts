@@ -2,6 +2,7 @@ import express, { type Request, type Response } from "express";
 import helmet from "helmet";
 
 import cookieParser from "cookie-parser";
+import { cookieHttpMiddleware } from "./middleware/auth.ts";
 import { healthRouter } from "./routes/health.routes.ts";
 import messagesRouter from "./routes/messages.routes.ts";
 import ragRouter from "./routes/rag.routes.ts";
@@ -15,7 +16,7 @@ export function createApp() {
 
 
     app.use(healthRouter);
-    app.use("/messages", messagesRouter);
+    app.use("/messages", cookieHttpMiddleware("member"), messagesRouter);
     app.use("/rag", ragRouter);
 
     return app;

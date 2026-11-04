@@ -3,19 +3,17 @@
 import { Server, Socket } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { logger } from "./lib/logger.ts";
-import Message from "./models/message.model.ts";
+import { cookieSocketEventMiddleware, cookieSocketMiddleware } from "./middleware/auth.ts";
+import { MarkAsReadSchema, SendMessageSchema } from "./schemas/message.schema.ts";
+import { createMessage, markConversationAsRead } from "./services/message.service.ts";
 
 class SocketServer {
     private io: Server;
-    private users = new Map(); // userId -> Set(socketId)
 
     constructor(httpServer: HttpServer) {
-        this.io = new Server(httpServer, {
-            cors: {
-                origin: process.env.CORS_ORIGIN || "*",
-                methods: ["GET", "POST"],
-            },
-        });
+        this.io = new Server(httpServer);
+
+        this.io.use(cookieSocketMiddleware);
 
         this.initializeHandlers();
     }
@@ -23,60 +21,44 @@ class SocketServer {
     private initializeHandlers(): void {
 
         this.io.on("connection", (socket: Socket) => {
-            logger.info("New socket connected");
+            // Always the id the user-service confirmed, never one the client sends.
+            const accountId: string = socket.data.accountId;
 
-            socket.on('join', (userId) => {
-                socket.join(userId); // Join personal room for targeted emits
-
-                if (!this.users.has(userId)) {
-                    this.users.set(userId, new Set());
-                }
-                this.users.get(userId).add(socket.id);
-
-                console.log('User joined with userId:', userId);
-                this.io.emit('onlineUsers', Array.from(this.users.keys()));
-            });
+            socket.use(cookieSocketEventMiddleware(socket));
+            socket.join(accountId); // Join personal room for targeted emits
 
             socket.on('sendMessage', async (data, callback) => {
-                const newMessage = new Message(data);
-                //await newMessage.save();
+                const ack = typeof callback === 'function' ? callback : () => { };
 
-                // Emit to receiver's room (targeted)
-                this.io.to(data.receiverId).emit('receiveMessage', newMessage);
-                logger.info("Message received by server and send to receiver" + JSON.stringify(newMessage));
-                // Ack back to sender
-                if (typeof callback === 'function') {
-                    callback(newMessage);
+                const parsed = SendMessageSchema.safeParse(data);
+                if (!parsed.success) {
+                    ack({ error: { code: "VALIDATION_FAILED", message: "One or more fields are invalid" } });
+                    return;
+                }
+
+                try {
+                    const message = await createMessage(accountId, parsed.data.receiverId, parsed.data.content);
+
+                    // Emit to receiver's room (targeted)
+                    this.io.to(parsed.data.receiverId).emit('receiveMessage', message);
+                    // Ack back to sender
+                    ack(message);
+                } catch (err) {
+                    logger.error({ err }, "could not save message");
+                    ack({ error: { code: "INTERNAL", message: "Could not send the message" } });
                 }
             });
 
-            socket.on('markAsRead', async ({ senderId, receiverId }) => {
-                await Message.updateMany(
-                    { senderId, receiverId, read: false },
-                    { $set: { read: true } }
-                );
+            socket.on('markAsRead', async (data) => {
+                const parsed = MarkAsReadSchema.safeParse(data);
+                if (!parsed.success) return;
 
-
-                this.io.to(senderId).emit('messagesRead', { readerId: receiverId });
-            });
-
-
-            socket.on('disconnect', () => {
-                let disconnectedUserId = null;
-                for (const [userId, socketIds] of this.users.entries()) {
-                    if (socketIds.has(socket.id)) {
-                        socketIds.delete(socket.id);
-                        if (socketIds.size === 0) {
-                            this.users.delete(userId);
-                            disconnectedUserId = userId;
-                        }
-                        break;
-                    }
-                }
-
-                // Cleanup for other users
-                if (disconnectedUserId) {
-                    this.io.emit('onlineUsers', Array.from(this.users.keys()));
+                try {
+                    // Only a real change is announced, so nobody can tell a stranger their messages were read.
+                    const changed = await markConversationAsRead(parsed.data.senderId, accountId);
+                    if (changed > 0) this.io.to(parsed.data.senderId).emit('messagesRead', { readerId: accountId });
+                } catch (err) {
+                    logger.error({ err }, "could not mark messages as read");
                 }
             });
 
@@ -85,6 +67,9 @@ class SocketServer {
                     timestamp: Date.now()
                 });
             });
+
+            // A refused event ends up here, see cookieSocketEventMiddleware.
+            socket.on("error", () => socket.disconnect());
 
             socket.on("disconnect", () => {
                 logger.info({ socketId: socket.id }, "Socket disconnected");

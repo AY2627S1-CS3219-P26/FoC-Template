@@ -28,7 +28,7 @@ k3d cluster delete relay
 
 ## Cloud (AWS, k3s on EC2)
 
-[`deploy/terraform`](../deploy/terraform) creates one EC2 instance (t3.xlarge, Singapore) with k3s, in its own VPC with a fixed public address. Traefik inside k3s answers on ports 80 and 443; SSH and the Kubernetes API only accept the address terraform was run from. The images come from GHCR, where CI publishes them with the tag `dev` after every merge into `dev`.
+[`deploy/terraform`](../deploy/terraform) creates one EC2 instance (t3.xlarge, Singapore) with k3s, in its own VPC with a fixed public address. Traefik inside k3s answers on ports 80 and 443: HTTPS with a Let's Encrypt certificate from cert-manager, plain HTTP redirects to it. SSH and the Kubernetes API only accept the address terraform was run from. The images come from GHCR, where CI publishes them with the tag `dev` after every merge into `dev`.
 
 Needs the AWS CLI with the SSO profile `relay`, `terraform`, `helm`, `kubectl`, and an SSH key in `~/.ssh/relay-aws` (`ssh-keygen -t ed25519 -f ~/.ssh/relay-aws -N ""`).
 
@@ -53,10 +53,11 @@ Deploy, and again after every merge into `dev`:
 
 ```bash
 deploy/scripts/deploy.sh
-deploy/scripts/smoke-test.sh http://$(terraform -chdir=deploy/terraform output -raw hostname)
+MAILBOX_AUTH="relay:$(grep '^MAILPIT_PASSWORD=' deploy/cloud-secrets.env | cut -d= -f2)" \
+  deploy/scripts/smoke-test.sh https://$(terraform -chdir=deploy/terraform output -raw hostname)
 ```
 
-On the first run `deploy.sh` writes random passwords to `deploy/cloud-secrets.env`; the administrator's password is `ADMIN_PASSWORD` there. Both `.env` files stay out of Git.
+On the first run `deploy.sh` writes random passwords to `deploy/cloud-secrets.env`: the administrator's is `ADMIN_PASSWORD`, Mailpit under `/mail/` asks for the user `relay` and `MAILPIT_PASSWORD`. Both `.env` files stay out of Git. `deploy.sh` also installs cert-manager; the first certificate takes about a minute.
 
 The instance costs money only while it runs. Stop it after testing:
 
@@ -66,7 +67,7 @@ deploy/scripts/cloud.sh start
 deploy/scripts/cloud.sh status
 ```
 
-After a different network (other Wi-Fi), run `terraform -chdir=deploy/terraform apply` once more, so SSH and kubectl accept the new address.
+When kubectl or `deploy.sh` cannot reach the cluster, your public address has changed (other Wi-Fi, and the NUS network changes it often). Run `terraform -chdir=deploy/terraform apply` once more, so SSH and kubectl accept the new address. The app itself stays reachable for everyone.
 
 ## Adding a service
 

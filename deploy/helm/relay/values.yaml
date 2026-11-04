@@ -42,10 +42,13 @@ ingress:
 #              variables can use them as $(NAME)
 #   env        plain variables; values may use Helm templates such as {{ .Release.Namespace }}
 #   enabled    false leaves the service out, e.g. while its image does not start yet
+#   autoscaling  more instances under load, e.g. {max: 4}; the rest comes from autoscalingDefaults.
+#              Only for services that keep no state in memory.
 services:
   user-service:
     port: 3000
     health: /health
+    autoscaling: {max: 4}
     waitFor: [user-db:27017]
     secretEnv: [BROKER_PASSWORD, OTP_SECRET, ADMIN_PASSWORD]
     env:
@@ -64,6 +67,7 @@ services:
   supplier-service:
     port: 3002
     health: /health
+    autoscaling: {max: 4}
     # Not tied to the user-service: while that is down every request is refused, and the
     # supplier-service keeps running (N6.1.2).
     waitFor: [supplier-db:5432]
@@ -82,6 +86,7 @@ services:
     port: 3002
     # The credit-service has no /health yet. / answers 200 without a session.
     health: /
+    autoscaling: {max: 4}
     waitFor: [credit-db:27017]
     secretEnv: [BROKER_PASSWORD]
     env:
@@ -96,6 +101,7 @@ services:
     enabled: false
     port: 3003
     health: /health
+    autoscaling: {max: 4}
     waitFor: [order-db:5432]
     secretEnv: [ORDER_DB_PASSWORD]
     env:
@@ -108,6 +114,7 @@ services:
   web-client:
     port: 8080
     health: /healthz
+    autoscaling: {max: 4}
     # No waitFor on purpose: nginx looks the services up per request and stays up while one is down.
     env:
       # nginx resolves these itself and ignores the cluster's search domains, so they need the
@@ -117,6 +124,18 @@ services:
       CREDIT_SERVICE_URL: http://credit-service.{{ .Release.Namespace }}.svc.cluster.local:3002
       # Mailpit is served under /mail/ on the same host, see the ingress.
       DEV_MAILBOX_URL: /mail/
+
+# Scaling rules for every service with autoscaling, written down in N6.3: start another instance
+# when the load stays above 70 % of what one instance asks for (its CPU request) for 2 minutes.
+#   cpuPercent             target load per instance, in percent of the CPU request
+#   scaleUpAfterSeconds    the load has to stay above the target this long before scaling out
+#   scaleDownAfterSeconds  the load has to stay low this long before an instance is removed
+autoscalingDefaults:
+  min: 1
+  max: 4
+  cpuPercent: 70
+  scaleUpAfterSeconds: 120
+  scaleDownAfterSeconds: 300
 
 # Applied to every service unless the service sets its own.
 serviceDefaults:
@@ -133,7 +152,7 @@ serviceDefaults:
 #   args, ready  replace the arguments and the readiness check of the kind
 #   passwordKey  key of the Secret that becomes POSTGRES_PASSWORD
 #   env          extra variables, e.g. POSTGRES_USER
-# A database only counts as reachable once its readiness check passes, so waitFor in a service
+# A database only counts as reachable once its ready check has passed, so waitFor in a service
 # also waits for that, not just for the port.
 databases:
   user-db:

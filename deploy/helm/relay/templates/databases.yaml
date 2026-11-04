@@ -42,13 +42,20 @@ spec:
               value: {{ toString $value | quote }}
             {{- end }}
           {{- end }}
-          readinessProbe:
+          # The real check (mongosh, pg_isready) only runs until it passes once: mongosh is a whole
+          # Node.js program, and running it every few seconds cost about a fifth of a CPU per Mongo.
+          startupProbe:
             exec:
               command:
                 {{- toYaml ($db.ready | default $kind.ready) | nindent 16 }}
             periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 60
+          # Afterwards a cheap port check is enough to notice that the database has gone away.
+          readinessProbe:
+            tcpSocket:
+              port: db
+            periodSeconds: 10
           volumeMounts:
             - name: data
               mountPath: {{ $kind.dataPath }}

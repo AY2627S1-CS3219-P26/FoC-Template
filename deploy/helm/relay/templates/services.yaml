@@ -1,4 +1,5 @@
 {{- range $name, $svc := .Values.services }}
+{{- if ne $svc.enabled false }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -100,4 +101,5 @@ spec:
     - name: http
       port: {{ $svc.port }}
       targetPort: http
+{{- end }}
 {{- end }}

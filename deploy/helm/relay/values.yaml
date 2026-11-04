@@ -17,10 +17,13 @@ images:
 secrets:
   create: true
   name: relay-secrets
+  # Passwords that end up inside a URL (database, broker) may only use letters and digits.
   values:
     BROKER_PASSWORD: change-me
     OTP_SECRET: dev-only-otp-secret-do-not-use-in-production
     ADMIN_PASSWORD: change-me
+    SUPPLIER_DB_PASSWORD: change-me
+    ORDER_DB_PASSWORD: change-me
 
 ingress:
   # Empty answers every host name, so http://localhost:<port> works on the laptop.
@@ -35,6 +38,7 @@ ingress:
 #   secretEnv  keys of the Secret above, handed over as variables of the same name; other
 #              variables can use them as $(NAME)
 #   env        plain variables; values may use Helm templates such as {{ .Release.Namespace }}
+#   enabled    false leaves the service out, e.g. while its image does not start yet
 services:
   user-service:
     port: 3000
@@ -53,6 +57,50 @@ services:
       COOKIE_SECURE: "false"
       ADMIN_EMAIL: admin@nus.edu.sg
       ADMIN_USERNAME: admin
+
+  supplier-service:
+    port: 3002
+    health: /health
+    # Not tied to the user-service: while that is down every request is refused, and the
+    # supplier-service keeps running (N6.1.2).
+    waitFor: [supplier-db:5432]
+    secretEnv: [SUPPLIER_DB_PASSWORD]
+    env:
+      LOG_LEVEL: info
+      SUPPLIER_SERVICE_PORT: "3002"
+      SUPPLIER_DATABASE_URL: postgres://supplier:$(SUPPLIER_DB_PASSWORD)@supplier-db:5432/supplier
+      USER_SERVICE_URL: http://user-service:3000
+      SUPPLIER_TIMEZONE: Asia/Singapore
+      SUPPLIER_SEED_ON_STARTUP: "true"
+      SUPPLIER_AUTH_CACHE_SECONDS: "5"
+      SUPPLIER_READ_CACHE_SECONDS: "2"
+
+  credit-service:
+    port: 3002
+    # The credit-service has no /health yet. / answers 200 without a session.
+    health: /
+    waitFor: [credit-db:27017]
+    secretEnv: [BROKER_PASSWORD]
+    env:
+      # directConnection: the replica set's only member is called localhost, see credit-db.
+      MONGO_URL: mongodb://credit-db:27017/credit-service?directConnection=true
+      USER_SERVICE_URL: http://user-service:3000
+      BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
+
+  order-service:
+    # Off until the image on dev starts: src/routes/order.route.ts imports
+    # ../controllers/order.controller.js, which only exists as .ts, and the image runs plain node.
+    enabled: false
+    port: 3003
+    health: /health
+    waitFor: [order-db:5432]
+    secretEnv: [ORDER_DB_PASSWORD]
+    env:
+      PORT: "3003"
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://order_service:$(ORDER_DB_PASSWORD)@order-db:5432/orders
+      USER_SERVICE_URL: http://user-service:3000
 
   web-client:
     port: 8080
@@ -77,14 +125,49 @@ serviceDefaults:
       memory: 256Mi
 
 # One database per service, each a StatefulSet with its own volume.
-#   kind    mongo or postgres, see databaseKinds
-#   size    size of the volume
-#   args    replaces the arguments of the kind
-#   env     extra variables, e.g. POSTGRES_USER
+#   kind         mongo or postgres, see databaseKinds
+#   size         size of the volume
+#   args, ready  replace the arguments and the readiness check of the kind
+#   passwordKey  key of the Secret that becomes POSTGRES_PASSWORD
+#   env          extra variables, e.g. POSTGRES_USER
+# A database only counts as reachable once its readiness check passes, so waitFor in a service
+# also waits for that, not just for the port.
 databases:
   user-db:
     kind: mongo
     size: 1Gi
+
+  supplier-db:
+    kind: postgres
+    size: 1Gi
+    passwordKey: SUPPLIER_DB_PASSWORD
+    env:
+      POSTGRES_USER: supplier
+      POSTGRES_DB: supplier
+
+  # A single-node replica set, so the credit-service can use multi-document transactions (N4.1.2).
+  credit-db:
+    kind: mongo
+    size: 1Gi
+    args: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+    # Starts the replica set on the first check and reports ready once this node accepts writes.
+    # The member is called localhost: when the set is started, the pod is not ready yet, so the
+    # name credit-db does not lead back to it. Clients connect with directConnection and never
+    # use the member name.
+    ready:
+      - sh
+      - -c
+      - >-
+        mongosh --quiet --eval "try { rs.status() } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}) }; db.hello().isWritablePrimary"
+        | grep -q true
+
+  order-db:
+    kind: postgres
+    size: 1Gi
+    passwordKey: ORDER_DB_PASSWORD
+    env:
+      POSTGRES_USER: order_service
+      POSTGRES_DB: orders
 
 databaseKinds:
   mongo:

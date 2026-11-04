@@ -15,15 +15,33 @@ CLUSTER=relay
 CONTEXT="k3d-$CLUSTER"
 PORT="${RELAY_LOCAL_PORT:-8081}"
 # Our services in the chart. A new service needs an entry here and in values.yaml.
-SERVICES=(user-service web-client)
+SERVICES=(user-service supplier-service credit-service order-service web-client)
+
+# Directory docker builds a service from when compose.yaml does not build it (yet).
+build_context() {
+  case "$1" in
+    order-service) echo . ;; # its Dockerfile copies from order-service/
+    *) echo "$1" ;;
+  esac
+}
 
 if ! k3d cluster get "$CLUSTER" >/dev/null 2>&1; then
   echo "Creating the k3d cluster $CLUSTER (port $PORT)"
   k3d cluster create "$CLUSTER" --port "$PORT:80@loadbalancer" --wait
 fi
 
-echo "Building ${SERVICES[*]}"
-docker compose build "${SERVICES[@]}"
+# compose builds the services it knows, with the same contexts as for docker compose up.
+COMPOSE_SERVICES=()
+for service in "${SERVICES[@]}"; do
+  if docker compose config --services | grep -qx "$service"; then
+    COMPOSE_SERVICES+=("$service")
+  else
+    echo "Building $service"
+    docker build --file "$service/Dockerfile" --tag "relay-$service:latest" "$(build_context "$service")"
+  fi
+done
+echo "Building ${COMPOSE_SERVICES[*]}"
+docker compose build "${COMPOSE_SERVICES[@]}"
 
 # A new tag per run, so Kubernetes sees a new image and replaces the pods.
 TAG="local-$(date +%Y%m%d%H%M%S)"

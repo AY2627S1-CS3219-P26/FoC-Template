@@ -3,6 +3,7 @@
 # with values-cloud.yaml, then restarts the services so they run the newest dev images.
 #
 #   deploy/scripts/deploy.sh
+#   IMAGE_TAG=sha-1a2b3c4 deploy/scripts/deploy.sh    fixed images instead of the moving dev tag
 #
 # Needs two files next to this folder, both ignored by Git:
 #   deploy/ghcr.env            GHCR_USERNAME and GHCR_TOKEN (a token with read:packages)
@@ -51,6 +52,7 @@ kubectl -n relay create secret generic relay-secrets --from-env-file="$SECRETS_F
 helm upgrade --install relay deploy/helm/relay --namespace relay \
   --values deploy/helm/relay/values-cloud.yaml \
   --set ingress.host="$host" \
+  --set images.tag="${IMAGE_TAG:-dev}" \
   --wait --timeout 10m
 
 # The tag stays dev, so Kubernetes does not notice a new image by itself. A restart pulls it.

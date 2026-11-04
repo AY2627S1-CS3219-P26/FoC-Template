@@ -71,6 +71,24 @@ me="$(expect "own profile with the session" 200 "$BASE/api/user/users/me")"
 [ "$(printf '%s' "$me" | jq -r '.username // empty')" = "$username" ] \
   || { echo "FAIL  profile belongs to someone else: $me" >&2; failed=1; }
 
+expect "supplier list with the session" 200 "$BASE/api/supplier/suppliers" >/dev/null
+
+# Verifying the account makes the user-service announce it over the broker, and the
+# credit-service opens a credit account for it. That takes a moment, so ask a few times.
+account="$(printf '%s' "$me" | jq -r '.id // empty')"
+balance=""
+for _ in $(seq 1 15); do
+  balance="$(curl --silent --cookie "$JAR" --write-out '\n%{http_code}' "$BASE/api/credit/account/$account/balance")"
+  [ "${balance##*$'\n'}" = 200 ] && break
+  sleep 1
+done
+if [ "${balance##*$'\n'}" = 200 ]; then
+  echo "ok    credit account opened through the broker: ${balance%$'\n'*}" >&2
+else
+  echo "FAIL  no credit account for $account: ${balance//$'\n'/ }" >&2
+  failed=1
+fi
+
 if [ "$failed" -eq 0 ]; then
   echo "All checks passed against $BASE" >&2
 else

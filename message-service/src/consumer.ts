@@ -34,12 +34,11 @@ export async function startMessageConsumer(): Promise<void> {
                 eventId = event.eventId;
                 if (typeof accountId !== "string" || typeof eventId !== "string") throw new Error("missing ids");
             } catch {
-                channel.nack(message, false, false); // malformed: dead-letter to credit-service.accounts.dead
+                channel.nack(message, false, false); //Negative acknowledgement
                 return;
             }
             try {
                 await messageUser(accountId);
-                console.log(`sending user ${accountId} welcome message (event ${eventId})`);
                 channel.ack(message);
             } catch (err) {
                 console.error(`event ${eventId} failed, will retry:`, err);

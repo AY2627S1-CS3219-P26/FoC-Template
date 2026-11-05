@@ -5,9 +5,12 @@ import { logger } from "./lib/logger.ts";
 import SocketServer from "./webSocket.ts";
 import { connectToDBWithRetry } from "./db.ts";
 import { startMessageConsumer } from "./consumer.ts";
+import Message from "./models/message.model.ts";
 
 try {
     await connectToDBWithRetry();
+    // The unique index has to exist before the first event, and a failure to build it should stop the start.
+    await Message.init();
     void startMessageConsumer();
 } catch (err) {
     logger.fatal({ err }, "could not start, exiting");
@@ -26,11 +29,11 @@ export const socketServer = new SocketServer(server);
 
 async function shutdown(signal: string) {
     logger.info({ signal }, "shutting down");
-    await new Promise((resolve) => server.close(resolve));
-    //await socketServer.close();
+    // Also closes the HTTP server. server.close() alone would wait forever on open sockets.
+    await socketServer.close();
     await mongoose.disconnect();
     process.exit(0);
 }
 
-process.on("SIGTERM", () => void shutdown("SIGTERM"));
-process.on("SIGINT", () => void shutdown("SIGINT"));
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));

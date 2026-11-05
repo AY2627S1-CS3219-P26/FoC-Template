@@ -77,6 +77,10 @@ class SocketServer {
         });
     }
 
+    public close(): Promise<void> {
+        return this.io.close();
+    }
+
     public sendToUser(userId: string, event: string, payload: unknown): void {
         this.io.to(userId).emit(event, payload);
     }

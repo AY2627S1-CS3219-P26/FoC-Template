@@ -1,13 +1,14 @@
 import type { RequestHandler } from "express";
 import type { ExtendedError, Socket } from "socket.io";
 import { config } from "../config.ts";
+import type { Role } from "../types/cookie.js";
 
 const TIMEOUT_MS = 2000;
 const SESSION_COOKIE = "relay_session";
 
-type Role = "member" | "administrator";
 
-// Returns the account id, or null for every answer other than authorized (N1.1.2).
+
+// Returns the account id, or null for every answer other than authorized
 async function authorize(token: string, role: Role): Promise<string | null> {
     try {
         const response = await fetch(`${config.USER_SERVICE_URL}/internal/authorize`, {
@@ -17,7 +18,7 @@ async function authorize(token: string, role: Role): Promise<string | null> {
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
         const result = await response.json();
-        // The user-service also answers a refusal with 200, so only the decision counts.
+
         return response.ok && result.decision === "authorized" ? result.accountId : null;
     } catch {
         return null;
@@ -43,7 +44,7 @@ export function cookieHttpMiddleware(role: Role): RequestHandler {
     };
 }
 
-// Runs once when a socket connects. cookieParser only runs for Express, so the header is read here.
+
 export async function cookieSocketMiddleware(socket: Socket, next: (err?: ExtendedError) => void) {
     const token = getSessionCookieValue(socket.handshake.headers.cookie);
     const accountId = token && await authorize(token, "member");
@@ -57,7 +58,7 @@ export async function cookieSocketMiddleware(socket: Socket, next: (err?: Extend
     next();
 }
 
-// Runs for every event, so a session that ended after connecting cannot keep sending.
+
 export function cookieSocketEventMiddleware(socket: Socket) {
     return async (_event: unknown[], next: (err?: Error) => void) => {
         const accountId = await authorize(socket.data.token, "member");

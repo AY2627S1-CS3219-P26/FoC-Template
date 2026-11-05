@@ -8,7 +8,7 @@ messagesRouter.post("/send", send)
 
 //note to self: userId acts as placeholder value
 messagesRouter.get("/last-message/:userId", getLastByUserId)
-messagesRouter.get("/:senderId/:userId", getConversationByIds) // have to be last
+messagesRouter.get("/:senderId/:receiverId", getConversationByIds) // have to be last
 
 
 

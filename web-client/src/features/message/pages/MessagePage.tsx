@@ -3,6 +3,7 @@ import { Page } from '@/components/Page'
 import { MessageCard } from '../components/MessageCard';
 import { useCurrentUser } from '@/api/user/session';
 import { useOrderByCourierId, useOrderByRequesterId } from '@/api/order/order';
+import { SYSTEM_SENDER_ID, useLastMessage } from '@/api/message/message';
 
 
 
@@ -12,6 +13,7 @@ export function MessagePage() {
     const user = useCurrentUser();
     const courierOrders = useOrderByCourierId(user.id).data ?? [];
     const requesterOrders = useOrderByRequesterId(user.id).data ?? [];
+    const systemMessage = useLastMessage(SYSTEM_SENDER_ID).data;
 
     // One conversation per other person, shown by id until the user-service offer members a way to look up names.
     const conversations = new Map<string, number>();
@@ -38,6 +40,10 @@ export function MessagePage() {
 
 
                 <h2 className="ds-label">Messages</h2>
+
+                {systemMessage && (
+                    <MessageCard conversationId={SYSTEM_SENDER_ID} name="Relay" message={systemMessage.content} />
+                )}
 
                 <MessageCard conversationId="217fbdf5-a630-4093-bfc4-4e2c5fa210ad" name="User" message='This is a test' />
 

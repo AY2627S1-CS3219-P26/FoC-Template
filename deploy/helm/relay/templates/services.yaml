@@ -18,6 +18,8 @@ spec:
     metadata:
       labels:
         {{- include "relay.labels" (dict "root" $ "name" $name) | nindent 8 }}
+        # Which network rules apply, see network-policies.yaml.
+        app.kubernetes.io/component: {{ if $svc.public }}gateway{{ else }}service{{ end }}
       annotations:
         {{- include "relay.secretChecksum" $ | nindent 8 }}
     spec:

@@ -42,6 +42,7 @@ ingress:
 #              variables can use them as $(NAME)
 #   env        plain variables; values may use Helm templates such as {{ .Release.Namespace }}
 #   enabled    false leaves the service out, e.g. while its image does not start yet
+#   public     true when requests from outside reach it through the ingress (only the gateway)
 #   autoscaling  more instances under load, e.g. {max: 4}; the rest comes from autoscalingDefaults.
 #              Only for services that keep no state in memory.
 services:
@@ -114,6 +115,7 @@ services:
   web-client:
     port: 8080
     health: /healthz
+    public: true
     autoscaling: {max: 4}
     # No waitFor on purpose: nginx looks the services up per request and stays up while one is down.
     env:
@@ -153,7 +155,8 @@ serviceDefaults:
 #   passwordKey  key of the Secret that becomes POSTGRES_PASSWORD
 #   env          extra variables, e.g. POSTGRES_USER
 # A database only counts as reachable once its ready check has passed, so waitFor in a service
-# also waits for that, not just for the port.
+# also waits for that, not just for the port. It also only accepts connections from the services
+# that list it in waitFor (network-policies.yaml).
 databases:
   user-db:
     kind: mongo
@@ -237,3 +240,6 @@ mailpit:
 
 # Small image for the init container that waits for a database.
 waitImage: busybox:1.37
+
+# Who may connect to whom inside the cluster, like the two networks in compose.yaml.
+networkPolicies: true

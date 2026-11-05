@@ -35,6 +35,10 @@ spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
   template:
+    metadata:
+      # The network rules let only pods with this label reach the gateway from inside.
+      labels:
+        app.kubernetes.io/name: loadtest
     spec:
       restartPolicy: Never
       containers:

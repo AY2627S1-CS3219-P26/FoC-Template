@@ -9,7 +9,6 @@ import Message from "./models/message.model.ts";
 
 try {
     await connectToDBWithRetry();
-    // The unique index has to exist before the first event, and a failure to build it should stop the start.
     await Message.init();
     void startMessageConsumer();
 } catch (err) {

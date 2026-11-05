@@ -84,6 +84,21 @@ gh variable set AWS_ROLE_ARN --body "$(terraform -chdir=deploy/terraform output 
 
 When kubectl or `deploy.sh` cannot reach the cluster, your public address has changed (other Wi-Fi, and the NUS network changes it often). Run `terraform -chdir=deploy/terraform apply` once more, so SSH and kubectl accept the new address. The app itself stays reachable for everyone.
 
+## Who may reach whom
+
+From outside only ports 80 and 443 lead in, and only to Traefik; every Service in the cluster is internal (`ClusterIP`). Inside the cluster, `templates/network-policies.yaml` rebuilds the two networks of `compose.yaml`: nothing gets in unless a rule allows it.
+
+| Pod | Accepts connections from |
+|---|---|
+| web-client (`public: true`) | Traefik, the load test |
+| services | the web client and the other services |
+| each database | only the services that list it in `waitFor` |
+| RabbitMQ | the services |
+| Mailpit | Traefik (`/mail/`), the services (SMTP) |
+| cert-manager's check pod | Traefik, so the certificate can be renewed |
+
+A new service that uses a database therefore has to list it in `waitFor`, or the database refuses it.
+
 ## Autoscaling (N6.3)
 
 Every stateless service (`autoscaling` in `values.yaml`) has a HorizontalPodAutoscaler. It follows N6.3: when a service's load stays above 70 % of what one instance asks for (its CPU request) for 2 minutes, Kubernetes starts another instance, one at a time, up to 4. After 5 minutes of low load the extra instances are removed again. Databases and the broker keep one instance each.

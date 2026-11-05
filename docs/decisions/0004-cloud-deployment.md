@@ -22,6 +22,7 @@ Relay runs in k3s, a complete Kubernetes distribution, on a single EC2 instance 
 - HTTPS comes from Let's Encrypt through cert-manager, for a host name under sslip.io that maps to the Elastic IP, so no domain is needed. Plain HTTP redirects to HTTPS, session cookies are `Secure`, and Mailpit asks for a password.
 - Every stateless service has a HorizontalPodAutoscaler that follows N6.3: 70 % of the CPU request as target, scale out only after 2 minutes above it, one instance at a time up to 4, scale in after 5 minutes below. Databases and the broker keep one instance.
 - Passwords are random, created by `deploy.sh` into a file that never goes into Git, and handed to the services as a Kubernetes Secret.
+- Network policies rebuild the separation of the two Compose networks inside the cluster: the gateway cannot reach any database or the broker, and each database only accepts the service it belongs to. From outside, only Traefik on ports 80 and 443 is reachable.
 - GitHub Actions operates the instance through an IAM role it assumes with an OpenID Connect token, limited to workflows on `dev` and `main`: start, stop, and a restart onto the newest images through AWS Systems Manager after every merge into `dev`. A CloudWatch alarm stops the instance after 4 hours without use.
 
 ## Alternatives considered

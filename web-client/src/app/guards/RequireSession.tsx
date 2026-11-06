@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useSession } from '@/api/user/session'
 import { SessionPending } from './SessionPending'
-import { MessageProvider } from '@/context/MessageContext'
+import { MessageProvider } from '@/features/message/components/MessageProvider'
 
 // Pages for logged-in accounts only. A guest is sent to the login, and the page they wanted
 // goes along as state.from, so RequireGuest can send them back after logging in.

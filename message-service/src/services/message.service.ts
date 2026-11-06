@@ -57,3 +57,23 @@ export async function getConversation(firstId: string, secondId: string, page: n
 
     return { items: newestFirst.reverse(), page, pageSize, total };
 }
+
+// One row per person the account has written with, newest conversation first, so the inbox
+// needs a single request instead of one per person.
+export async function listConversations(accountId: string) {
+    return Message.aggregate([
+        { $match: { $or: [{ senderId: accountId }, { receiverId: accountId }] } },
+        { $sort: { createdAt: -1, _id: -1 } },
+        {
+            $group: {
+                _id: { $cond: [{ $eq: ["$senderId", accountId] }, "$receiverId", "$senderId"] },
+                lastMessage: { $first: "$$ROOT" },
+                unread: {
+                    $sum: { $cond: [{ $and: [{ $eq: ["$receiverId", accountId] }, { $eq: ["$status", "unread"] }] }, 1, 0] },
+                },
+            },
+        },
+        { $sort: { "lastMessage.createdAt": -1, "lastMessage._id": -1 } },
+        { $project: { _id: 0, otherId: "$_id", lastMessage: 1, unread: 1 } },
+    ]);
+}

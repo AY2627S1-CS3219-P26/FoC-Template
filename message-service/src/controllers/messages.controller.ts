@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 import { ConversationQuerySchema, SendMessageSchema } from "../schemas/message.schema.ts";
-import { createMessage, getConversation, getLastMessageBetween } from "../services/message.service.ts";
+import { createMessage, getConversation, getLastMessageBetween, listConversations } from "../services/message.service.ts";
+
+export async function getConversations(_req: Request, res: Response) {
+    return res.status(200).json(await listConversations(res.locals.accountId));
+}
 
 export async function getLastByUserId(req: Request, res: Response) {
     const accountId: string = res.locals.accountId;

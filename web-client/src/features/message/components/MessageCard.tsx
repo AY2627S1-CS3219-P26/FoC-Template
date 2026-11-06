@@ -1,29 +1,30 @@
-import { useNavigate } from "react-router";
+import { Link } from 'react-router'
+import { SYSTEM_SENDER_ID } from '@/api/message/message'
+import type { Conversation } from '@/api/message/types'
+import { useName } from '@/api/user/member'
+import { formatDateTime } from '@/lib/format'
 
-interface MessageCardProps {
-    conversationId: string;
-    name: string;
-    message: string;
+type MessageCardProps = {
+  conversation: Conversation
 }
 
-export function MessageCard({ conversationId, name, message }: MessageCardProps) {
-    const navigate = useNavigate()
+export function MessageCard({ conversation }: MessageCardProps) {
+  const { otherId, lastMessage, unread } = conversation
+  const isSystem = otherId === SYSTEM_SENDER_ID
+  // Relay is not an account, so there is no name to look up.
+  const name = useName(otherId, !isSystem)
+  const title = isSystem ? 'Relay' : (name.data ?? 'Unknown user')
 
-    function onMessage() {
-        navigate(`/message/${conversationId}`);
-    }
-
-    return (
-
-        <div className="ds-surface grid grid-cols-1 gap-4 p-6 bg-blue-500 transition duration-200 ease-in-out hover:bg-blue-700 hover:scale-105" onClick={onMessage}>
-
-            <div className="grid gap-1">
-                <p className="ds-label">Sender Information</p>
-                <p className="nums-tabular text-3xl font-semibold">{name}</p>
-                <p className="nums-tabular text-2xl">{message}</p>
-            </div>
-
+  return (
+    <li>
+      <Link to={`/message/${otherId}`} className="flex items-start justify-between gap-3 p-4">
+        <div className="grid min-w-0 grid-cols-1 gap-1">
+          <p className="font-semibold wrap-anywhere">{title}</p>
+          <p className="text-muted wrap-anywhere">{lastMessage.content}</p>
+          <p className="text-sm text-subtle">{formatDateTime(lastMessage.createdAt)}</p>
         </div>
-
-    )
+        {unread > 0 && <span className="ds-badge ds-badge--info">{unread} unread</span>}
+      </Link>
+    </li>
+  )
 }

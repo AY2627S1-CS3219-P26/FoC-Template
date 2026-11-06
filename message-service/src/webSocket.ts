@@ -49,16 +49,24 @@ class SocketServer {
                 }
             });
 
-            socket.on('markAsRead', async (data) => {
+            socket.on('markAsRead', async (data, callback) => {
+                const ack = typeof callback === 'function' ? callback : () => { };
+
                 const parsed = MarkAsReadSchema.safeParse(data);
-                if (!parsed.success) return;
+                if (!parsed.success) {
+                    ack({ error: { code: "VALIDATION_FAILED", message: "One or more fields are invalid" } });
+                    return;
+                }
 
                 try {
                     // Only a real change is announced, so nobody can tell a stranger their messages were read.
                     const changed = await markConversationAsRead(parsed.data.senderId, accountId);
                     if (changed > 0) this.io.to(parsed.data.senderId).emit('messagesRead', { readerId: accountId });
+                    // The client reloads its unread counts once this arrives, so they never show the old state.
+                    ack({ changed });
                 } catch (err) {
                     logger.error({ err }, "could not mark messages as read");
+                    ack({ error: { code: "INTERNAL", message: "Could not mark the messages as read" } });
                 }
             });
 

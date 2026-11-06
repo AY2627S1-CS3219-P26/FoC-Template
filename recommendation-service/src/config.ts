@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const EnvSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    ROLE: z.enum(["all", "api", "worker"]).default("all"),
     PORT: z.coerce.number().int().positive().default(3006),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     USER_SERVICE_URL: z.string().url().default("http://localhost:3001"),

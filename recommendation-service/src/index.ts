@@ -8,10 +8,10 @@ const log = createRecommendationLog();
 const weights = createWeightsProvider();
 
 const server = createApp(store, log, weights).listen(config.PORT, () => {
-    logger.info({ port: config.PORT }, "recommendation-service listening");
+    logger.info({ port: config.PORT, role: config.ROLE }, "recommendation-service listening");
 });
 
-void startErrandConsumer(store);
+if (config.ROLE !== "api") void startErrandConsumer(store);
 
 async function shutdown(signal: string) {
     logger.info({ signal }, "shutting down");

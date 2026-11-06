@@ -62,3 +62,22 @@ to request latency. Set `S3_BUCKET` to enable it (unset = disabled, for local de
 `refitWeights()` is a stub that returns the current weights: a real refit needs outcome labels (was
 the errand accepted/completed at that credit price?), which these logs do not yet carry. The pipeline
 (read S3 -> refit -> write DynamoDB -> API reloads) is wired end to end so only that function changes.
+
+## Deploy (AWS, ap-southeast-1)
+
+Two App Runner services run the same image, differing only by the `ROLE` env var. Both listen on
+3006 so App Runner can health check `/health`.
+
+| | API service | Consumer service |
+| --- | --- | --- |
+| `ROLE` | `api` | `worker` |
+| Does | serves `POST /recommendations` | consumes `order.errand.completed`, updates the feature store |
+| Env it needs | `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `SCORER_WEIGHTS_TABLE`, `S3_BUCKET`, `USER_SERVICE_URL`, `AWS_REGION` | `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `BROKER_URL` (Amazon MQ), `AWS_REGION` |
+
+`.github/workflows/deploy-recommendation-service.yml` runs on merge to `dev`: it typechecks and tests,
+builds the image, pushes it to ECR tagged `:<sha>` and `:dev`, then triggers a deploy of each service.
+Turn OFF App Runner's automatic image deployment so the workflow controls when a deploy happens; point
+both services at the `:dev` tag.
+
+GitHub secrets: `AWS_DEPLOY_ROLE_ARN` (OIDC role the workflow assumes), `APP_RUNNER_API_ARN`,
+`APP_RUNNER_CONSUMER_ARN`.

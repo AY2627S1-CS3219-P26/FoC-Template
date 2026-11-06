@@ -1,4 +1,5 @@
 import { vi } from "vitest";
 
-// Tests never send real mail. The mock records every code so a test can read it.
-vi.mock("../src/lib/mailer.ts", () => ({ sendOtpMail: vi.fn() }));
+// index.ts starts the server, the database connection and the consumer. message.service.ts only
+// needs its socketServer, so tests get a stand-in that records what would be pushed.
+vi.mock("../src/index.ts", () => ({ socketServer: { sendToUser: vi.fn() } }));

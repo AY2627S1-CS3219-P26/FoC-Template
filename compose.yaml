@@ -61,10 +61,6 @@ services:
       MONGO_URL: mongodb://message-db:27017/message-service #uses the container port
       BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
       USER_SERVICE_URL: http://user-service:3000
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nus.edu.sg}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
     ports:
       - "127.0.0.1:3008:3008"
     networks:

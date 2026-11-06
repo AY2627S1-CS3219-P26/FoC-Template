@@ -14,13 +14,9 @@ export default defineConfig({
             LOG_LEVEL: "silent",
             // The app never connects by itself in tests; test/helpers/db.ts does.
             MONGO_URL: "mongodb://unused",
-            OTP_SECRET: "test-otp-secret-with-at-least-32-characters",
-            SMTP_HOST: "localhost",
-            SMTP_PORT: "1025",
-            MAIL_FROM: "Relay <no-reply@relay.test>",
-            COOKIE_SECURE: "false",
-            ADMIN_EMAIL: "admin@nus.edu.sg",
-            ADMIN_PASSWORD: "admin-password",
+            // Never called: test/helpers/auth.ts answers in place of the user-service.
+            USER_SERVICE_URL: "http://user-service.test",
+            BROKER_URL: "amqp://unused",
         },
     },
 });

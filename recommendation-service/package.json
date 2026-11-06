@@ -10,10 +10,12 @@
     "dev": "node --watch --env-file-if-exists=.env src/index.ts",
     "start": "node src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "trainer": "node src/trainer/refit-weights.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1163.0",
+    "@aws-sdk/client-s3": "^3.1163.0",
     "@aws-sdk/lib-dynamodb": "^3.1163.0",
     "@types/amqplib": "^0.10.8",
     "amqplib": "^2.2.1",

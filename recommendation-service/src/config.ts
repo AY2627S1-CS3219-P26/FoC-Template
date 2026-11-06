@@ -9,6 +9,9 @@ const EnvSchema = z.object({
     DYNAMODB_TABLE: z.string().default("supplier_stats"),
     DYNAMODB_ENDPOINT: z.string().url().optional(),
     AWS_REGION: z.string().default("ap-southeast-1"),
+    S3_BUCKET: z.string().optional(),
+    S3_ENDPOINT: z.string().url().optional(),
+    SCORER_WEIGHTS_TABLE: z.string().default("scorer_weights"),
 })
 
 const rawEnv = Object.fromEntries(

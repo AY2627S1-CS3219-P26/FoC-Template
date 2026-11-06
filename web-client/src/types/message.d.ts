@@ -6,7 +6,6 @@ export const messageSchema = z.object({
     receiverId: z.string(),
     content: z.string(),
     status: z.enum(["unread", "read"]),
-    timestamp: z.coerce.date().optional(),
     createdAt: z.coerce.date().optional(),
     updatedAt: z.coerce.date().optional(),
 });

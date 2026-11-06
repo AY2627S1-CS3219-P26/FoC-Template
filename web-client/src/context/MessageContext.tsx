@@ -30,7 +30,6 @@ export function MessageProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (userId == null) return;
 
-        // Through the gateway, so the browser sends the session cookie along.
         const newSocket = io({ path: '/api/message/socket.io' });
         setSocket(newSocket);
 

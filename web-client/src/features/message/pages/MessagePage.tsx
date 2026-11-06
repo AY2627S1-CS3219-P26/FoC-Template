@@ -33,8 +33,8 @@ export function MessagePage() {
                 {/* <h2 className="ds-label">AI messages</h2>
             <MessageCard
                 //key={c.id}
-                name="RelayAI"
-                message={"Ask what you want"}
+                name="RelayAI" #1268c530-68bf-4a64-ae18-6884f0931741
+                message={"Ask what you want"} # eeb4e173-feec-4d64-bed0-b6b42e7eaf4f
             /> */}
 
 
@@ -45,7 +45,9 @@ export function MessagePage() {
                     <MessageCard conversationId={SYSTEM_SENDER_ID} name="Relay" message={systemMessage.content} />
                 )}
 
-                <MessageCard conversationId="217fbdf5-a630-4093-bfc4-4e2c5fa210ad" name="User" message='This is a test' />
+                <MessageCard conversationId="217fbdf5-a630-4093-bfc4-4e2c5fa210ad" name="old" message='This is a test' />
+                <MessageCard conversationId="eeb4e173-feec-4d64-bed0-b6b42e7eaf4fd" name="10" message='This is a test' />
+                <MessageCard conversationId="1268c530-68bf-4a64-ae18-6884f0931741" name="11" message='This is a test' />
 
                 {[...conversations].map(([otherId, orderId]) => (
                     <MessageCard

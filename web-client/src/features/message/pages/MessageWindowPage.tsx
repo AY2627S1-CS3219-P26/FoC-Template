@@ -5,7 +5,10 @@ import { MessageField } from "../components/MessageField";
 import { useParams } from "react-router";
 import { useCurrentUser } from "@/api/user/session";
 import { SYSTEM_SENDER_ID, useConversation } from "@/api/message/message";
+import { logger } from "@/lib/logger";
 
+//docker exec -it relay-message-db-1 mongosh message-service
+//db.messages.find().sort({ createdAt: -1 }).limit(10)
 export function MessageWindowPage() {
     const { id = "" } = useParams();
     const user = useCurrentUser();
@@ -16,6 +19,8 @@ export function MessageWindowPage() {
     const [sent, setSent] = useState<Message[]>([]);
     const { messages: received, socket, isConnected } = useMessage();
     const history = useConversation(user.id, id);
+
+    console.log(JSON.stringify(history));
 
     const past = history.data?.pages.flatMap((page) => page.items) ?? [];
     // A message can arrive both live and in a page of history, so _id decides what is one message.
@@ -50,6 +55,7 @@ export function MessageWindowPage() {
             }
             setSent((prev) => [...prev, saved]);
         });
+        logger.info("send message")
         setNewMessage('');
     };
 
@@ -84,7 +90,7 @@ export function MessageWindowPage() {
                     key={m._id}
                     position={m.senderId === user.id ? "right" : "left"}
                     content={m.content}
-                    timestamp={m.timestamp ?? m.createdAt ?? ""}
+                    timestamp={m.createdAt ?? m.createdAt ?? ""}
                 />
             ))}
             <div ref={bottomRef} />

@@ -1,0 +1,8 @@
+Title: How to accept and deliver an errand
+Questions: How do I accept an errand? How do I deliver? How do I earn credits? How do I mark something as picked up? Why can't I accept this errand? Can I accept my own errand? Who confirms delivery?
+
+Couriers choose from the Open errands other students posted. Accepting one makes you its courier. After collecting the items you mark the errand Picked up, and after handing them over you mark it Delivered. The requester then confirms, the errand becomes Completed, and the credits are transferred to you.
+
+An errand has only one courier, and only an Open errand can be accepted. If someone else accepts first, you cannot accept it. You cannot accept your own errand. Only the courier can mark Picked up and Delivered, and only the requester can confirm completion.
+
+Note: the Errands page is not finished and currently shows "Not built yet", so you cannot accept or deliver an errand in the app yet.

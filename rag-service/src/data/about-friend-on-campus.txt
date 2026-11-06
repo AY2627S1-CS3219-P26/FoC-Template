@@ -1,0 +1,4 @@
+Title: What Friend on Campus is
+Questions: What is this app? What is Relay? What is Friend on Campus? How does the platform work? Who can use it?
+
+Friend on Campus is an errand platform for NUS students. The app shows the name Relay in its logo and page titles, and it is the same product. A student who needs something collected from a store or facility on campus posts an errand. Another student accepts it, collects the items and delivers them. The student who posted the errand pays the other student in platform credits. Credits only exist inside the platform and have no money value. You need an NUS email address to create an account. The same account can both post errands and deliver them.

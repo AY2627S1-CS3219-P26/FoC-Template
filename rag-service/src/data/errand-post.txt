@@ -1,0 +1,8 @@
+Title: How to post an errand
+Questions: How do I post an errand? How do I request something? How do I get something delivered? How do I create a request? Why was my errand refused? How many items can I add? How many credits can I offer?
+
+An errand has a pickup supplier, a delivery location, a time you need the items by, 1 to 10 item lines, and a credit reward of 1 to 50 credits for the courier. Credits are reserved from your available balance when the errand is created, so you need enough available credits. The errand then shows as Open for other students to accept.
+
+An errand is refused if the needed-by time is in the past, or if the pickup supplier is inactive or closed at that time. Choose another supplier or time.
+
+Note: the Post an errand page is not finished and currently shows "Not built yet", so you cannot post an errand in the app yet.

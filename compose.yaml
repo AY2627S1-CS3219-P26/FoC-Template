@@ -1,6 +1,30 @@
 name: relay
 
 services:
+
+  rag-service:
+    build: ./rag-service
+    environment:
+      PORT: 3080
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      USER_SERVICE_URL: http://user-service:3000
+    ports:
+      - "127.0.0.1:3080:3080"
+    depends_on:
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      # The image has no wget or curl, and urlopen raises on an error status.
+      test: [ "CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3080/health/', timeout=2)" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      # Loading the embedding model can take much longer on a slow or busy machine.
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - edge
+
   user-service:
     build: ./user-service
     environment:
@@ -30,11 +54,11 @@ services:
       user-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
 
   user-db:
@@ -46,7 +70,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -119,7 +143,7 @@ services:
     volumes:
       - broker-data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -167,7 +191,7 @@ services:
       # Gives the tests a database of their own, so they never touch real data.
       - ./supplier-service/db/create-test-database.sql:/docker-entrypoint-initdb.d/create-test-database.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -193,14 +217,14 @@ services:
   credit-db:
     image: mongo:8
     # Single-node replica set so credit-service can use multi-document transactions (N4.1.2).
-    command: ["--replSet", "rs0", "--bind_ip_all"]
+    command: [ "--replSet", "rs0", "--bind_ip_all" ]
     volumes:
       - credit-db-data:/data/db
     networks:
       - backend
     # Idempotent self-init: the first healthy check initiates the set, later checks just confirm it.
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'credit-db:27017'}]}).ok }\" | grep -q 1"]
+      test: [ "CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'credit-db:27017'}]}).ok }\" | grep -q 1" ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -220,7 +244,7 @@ services:
     volumes:
       - order-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -230,6 +254,7 @@ services:
     build: ./web-client
     environment:
       USER_SERVICE_URL: http://user-service:3000
+      RAG_SERVICE_URL: http://rag-service:3080
       SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
       CREDIT_SERVICE_URL: http://credit-service:3002
       MESSAGE_SERVICE_URL: http://message-service:3008
@@ -242,13 +267,12 @@ services:
     # No depends_on on purpose: nginx looks the services up per request, so the web client
     # starts and stays up while a service is down or being replaced (N6.1.2).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz" ]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 5s
     restart: unless-stopped
-
 
 volumes:
   user-db-data:
@@ -258,8 +282,8 @@ volumes:
   broker-data:
   order-db-data:
 
-# edge connects the web client to the services, backend connects the services to their databases
-# and infrastructure. The web client is only on edge, so the gateway has no route to any database.
+    # edge connects the web client to the services, backend connects the services to their databases
+    # and infrastructure. The web client is only on edge, so the gateway has no route to any database.
 networks:
   edge:
   backend:

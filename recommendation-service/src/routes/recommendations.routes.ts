@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { authorize } from "../auth.ts";
 import { validateRecommendationRequest } from "../validator.ts";
 import { recommendScore, SCORER_VERSION, type SupplierStats } from "../scoring.ts";
 import type { FeatureStore } from "../feature-store.ts";
@@ -16,7 +17,7 @@ const COLD_START_STATS: SupplierStats = {
 export function createRecommendationsRouter(store: FeatureStore): Router {
     const router = Router();
 
-    router.post("/recommendations", async (req, res) => {
+    router.post("/recommendations", authorize(), async (req, res) => {
         const result = validateRecommendationRequest(req.body);
         if (!result.ok) {
             res.status(400).json({ errors: result.errors });

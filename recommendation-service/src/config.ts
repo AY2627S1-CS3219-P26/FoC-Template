@@ -4,6 +4,7 @@ const EnvSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: z.coerce.number().int().positive().default(3006),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+    USER_SERVICE_URL: z.string().url().default("http://localhost:3001"),
     FEATURE_STORE: z.enum(["memory", "dynamodb"]).default("memory"),
     DYNAMODB_TABLE: z.string().default("supplier_stats"),
     DYNAMODB_ENDPOINT: z.string().url().optional(),

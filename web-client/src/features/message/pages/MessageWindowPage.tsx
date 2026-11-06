@@ -20,6 +20,10 @@ export function MessageWindowPage() {
     const { messages: received, socket, isConnected } = useMessage();
     const history = useConversation(user.id, id);
 
+    console.log("Current user:", user.id);
+    console.log("Conversation partner:", id);
+    console.log("History:", history.data?.pages);
+
     console.log(JSON.stringify(history));
 
     const past = history.data?.pages.flatMap((page) => page.items) ?? [];

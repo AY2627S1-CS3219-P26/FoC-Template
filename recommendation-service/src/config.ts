@@ -1,0 +1,24 @@
+import { z } from "zod";
+
+const EnvSchema = z.object({
+    NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    PORT: z.coerce.number().int().positive().default(3006),
+    LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+    FEATURE_STORE: z.enum(["memory", "dynamodb"]).default("memory"),
+    DYNAMODB_TABLE: z.string().default("supplier_stats"),
+    DYNAMODB_ENDPOINT: z.string().url().optional(),
+    AWS_REGION: z.string().default("ap-southeast-1"),
+})
+
+const rawEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([, value]) => value !== "")
+)
+
+const parsed = EnvSchema.safeParse(rawEnv);
+
+if (!parsed.success) {
+    console.error("Invalid environment configuration:\n" + z.prettifyError(parsed.error));
+    process.exit(1);
+}
+
+export const config = parsed.data;

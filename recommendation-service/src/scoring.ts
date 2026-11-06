@@ -4,6 +4,10 @@ const A = 0.5;
 const B = 0.5;
 const C = 0.3;
 
+export type Weights = { a: number; b: number; c: number };
+
+export const DEFAULT_WEIGHTS: Weights = { a: A, b: B, c: C };
+
 const URGENCY_HORIZON_HOURS = 24;
 
 const COLD_START_THRESHOLD = 5;
@@ -47,7 +51,7 @@ function urgency(neededBy: string): number {
     return clamp((URGENCY_HORIZON_HOURS - hoursUntil) / URGENCY_HORIZON_HOURS, 0, 1);
 }
 
-export function recommendScore(input: ScoreInput, stats: SupplierStats): ScoreResult {
+export function recommendScore(input: ScoreInput, stats: SupplierStats, weights: Weights = DEFAULT_WEIGHTS): ScoreResult {
     if (stats.completedCount < COLD_START_THRESHOLD) {
         return {
             recommendedCredits: COLD_START_CREDITS,
@@ -59,9 +63,9 @@ export function recommendScore(input: ScoreInput, stats: SupplierStats): ScoreRe
     const mkt = stats.avgReward;
     const items = input.items.length;
 
-    const itemFactor = A * (stats.avgItems > 0 ? items / stats.avgItems - 1 : 0);
-    const urgencyFactor = B * urgency(input.neededBy);
-    const distanceFactor = C * (stats.avgDist > 0 ? input.distance / stats.avgDist - 1 : 0);
+    const itemFactor = weights.a * (stats.avgItems > 0 ? items / stats.avgItems - 1 : 0);
+    const urgencyFactor = weights.b * urgency(input.neededBy);
+    const distanceFactor = weights.c * (stats.avgDist > 0 ? input.distance / stats.avgDist - 1 : 0);
     const multiplier = 1 + itemFactor + urgencyFactor + distanceFactor;
 
     const recommendedCredits = clamp(Math.round(mkt * multiplier), CREDIT_MIN, CREDIT_MAX);

@@ -129,3 +129,16 @@ To try a consumer by hand, open the management UI, pick the queue under "Queues 
 | Duplicates | Possible. Consumers deduplicate by `accountId`: one credit account per account. |
 | Order | Does not matter. There is exactly one such event per account. |
 | Requirements | F1.1.7, F4.1.1 to F4.1.3, N7.1 |
+
+### `order.errand.completed`, `order.errand.cancelled`, `order.errand.expired`
+
+| | |
+| --- | --- |
+| Producer | order-service |
+| When | An errand enters Completed, Cancelled or Expired (F3.4.1 to F3.4.3). A failed or interrupted creation also becomes Cancelled so any reservation is released. |
+| `data` | `errandRef`: the order id as a string. Completed also carries `courierId`: the courier's user-service account id. |
+| Consumer | credit-service, queue `credit-service.orders`: transfers the reserved reward on Completed, releases it on Cancelled or Expired. |
+| Delivery | The order status and outbox event are written in one PostgreSQL statement. The relay retries every second with the same event id until RabbitMQ confirms routing. |
+| Duplicates | Credit-service's existing transfer/release transactions claim an active reservation once, by `errandRef`. Repeated terminal status requests produce no new event. |
+| Failed creation | Pending orders never appear in the open list. Pending orders left by a crash are cancelled after one minute. Credit-service closes the reference even when release arrives before reservation, so a late reserve cannot lock credits for a cancelled order. |
+| Order | Each order has one terminal event. |

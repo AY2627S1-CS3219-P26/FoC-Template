@@ -7,7 +7,7 @@ type TextFieldProps = {
   onChange: (value: string) => void
   errors?: string[]
   hint?: string
-  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url'
+  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'datetime-local'
   autoComplete?: string
   inputMode?: 'text' | 'email' | 'numeric' | 'tel' | 'search' | 'url'
 }

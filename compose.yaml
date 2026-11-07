@@ -77,6 +77,46 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  message-service:
+    build: ./message-service
+    environment:
+      PORT: 3008
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MONGO_URL: mongodb://message-db:27017/message-service #uses the container port
+      BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
+      USER_SERVICE_URL: http://user-service:3000
+    ports:
+      - "127.0.0.1:3008:3008"
+    networks:
+      - edge
+      - backend
+    depends_on:
+      message-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3008/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  message-db:
+    image: mongo:8 #Pulls mongo image 8 
+    volumes:
+      - message-db-data:/data/db # source/desination stored on my machine/stored inside container
+    ports:
+      - "127.0.0.1:27018:27017" #only on specific interfaces: local port on my machine to docker port
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped #makes the container restart automaticly 
+
   mailpit:
     image: axllent/mailpit:v1.31.6
     ports:
@@ -217,6 +257,7 @@ services:
       RAG_SERVICE_URL: http://rag-service:3080
       SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
       CREDIT_SERVICE_URL: http://credit-service:3002
+      MESSAGE_SERVICE_URL: http://message-service:3008
       # Locally every email lands in Mailpit, so the verify page links to it. Set it to empty to hide the hint.
       DEV_MAILBOX_URL: ${DEV_MAILBOX_URL-http://localhost:8025}
     ports:
@@ -235,6 +276,7 @@ services:
 
 volumes:
   user-db-data:
+  message-db-data:
   supplier-db-data:
   credit-db-data:
   broker-data:

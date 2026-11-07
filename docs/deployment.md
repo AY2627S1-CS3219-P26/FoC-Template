@@ -94,7 +94,7 @@ From outside only ports 80 and 443 lead in, and only to Traefik; every Service i
 | services | the web client and the other services |
 | each database | only the services that list it in `waitFor` |
 | RabbitMQ | the services |
-| Mailpit | Traefik (`/mail/`), the services (SMTP) |
+| Mailpit | Traefik (`/mail/`), the services in `mailpit.senders` (SMTP), today only the user-service |
 | cert-manager's check pod | Traefik, so the certificate can be renewed |
 
 A new service that uses a database therefore has to list it in `waitFor`, or the database refuses it.

@@ -171,3 +171,16 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # Continuous deployment: a running cloud instance switches to the images just published for dev.
+  # A stopped instance is left alone; it picks them up on its next start.
+  deploy:
+    name: deploy to aws
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.publish.result == 'success'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/cloud.yml
+    with:
+      action: restart

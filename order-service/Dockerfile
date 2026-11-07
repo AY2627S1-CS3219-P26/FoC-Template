@@ -7,7 +7,8 @@ ENV NODE_ENV=production
 
 # Copy package files from the order-service directory
 COPY order-service/package.json order-service/package-lock.json ./
-RUN npm ci --omit=dev
+# With dev dependencies, because the service runs through tsx (a dev dependency), like npm start.
+RUN npm ci
 
 # Copy source code
 COPY order-service/src ./src
@@ -22,4 +23,6 @@ EXPOSE 3003
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.ORDER_SERVICE_PORT || 3003) + '/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 
-CMD ["node", "src/index.ts"]
+# tsx, as in npm start: the code imports .js paths and types like plain values, which plain node
+# cannot load.
+CMD ["node", "--import", "tsx", "src/index.ts"]

@@ -114,7 +114,8 @@ spec:
       ports:
         - port: 5672
 ---
-# Mailpit: its inbox through Traefik under /mail/, its SMTP port for the services.
+# Mailpit: its inbox through Traefik under /mail/, its SMTP port only for the services that send
+# email (mailpit.senders).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -132,9 +133,11 @@ spec:
       ports:
         - port: 8025
     - from:
+        {{- range .Values.mailpit.senders }}
         - podSelector:
             matchLabels:
-              app.kubernetes.io/component: service
+              app.kubernetes.io/name: {{ . }}
+        {{- end }}
       ports:
         - port: 1025
 {{- if .Values.ingress.tls }}

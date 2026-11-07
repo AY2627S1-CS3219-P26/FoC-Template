@@ -237,6 +237,8 @@ mailpit:
   # Ask for user and MAILPIT_PASSWORD before showing the mails, in the cloud where anyone can reach /mail/.
   auth: false
   user: relay
+  # Services that send email. Only these reach Mailpit's SMTP port.
+  senders: [user-service]
 
 # Small image for the init container that waits for a database.
 waitImage: busybox:1.37

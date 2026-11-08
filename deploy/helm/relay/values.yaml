@@ -124,6 +124,8 @@ services:
       USER_SERVICE_URL: http://user-service.{{ .Release.Namespace }}.svc.cluster.local:3000
       SUPPLIER_SERVICE_URL: http://supplier-service.{{ .Release.Namespace }}.svc.cluster.local:3002
       CREDIT_SERVICE_URL: http://credit-service.{{ .Release.Namespace }}.svc.cluster.local:3002
+      MESSAGE_SERVICE_URL: http://message-service.{{ .Release.Namespace }}.svc.cluster.local:3008
+      RAG_SERVICE_URL: http://rag-service.{{ .Release.Namespace }}.svc.cluster.local:3080
       # Mailpit is served under /mail/ on the same host, see the ingress.
       DEV_MAILBOX_URL: /mail/
 

@@ -155,6 +155,7 @@ days that join up (`src/domain/availability.ts`).
 | By type or location | `GET /suppliers?type=Printing`, `?type=Food/Coffee`, `?zone=Central`, `?building=COM2` |
 | Combined | `GET /suppliers?zone=Central&type=Food/Coffee&q=roaster` |
 | Deactivated suppliers | `GET /suppliers?status=Inactive` or `?status=all` |
+| Which types, zones and buildings exist | `GET /suppliers/filters` |
 | Is it open at a given time | `GET /suppliers/{id}/availability?at=2026-10-01T12:00:00%2B08:00` |
 
 ## API
@@ -166,6 +167,7 @@ user-service sets when someone logs in. Request and response bodies are JSON.
 | --- | --- | --- |
 | `GET /health` | anyone | 200 when the database answers, 503 when not |
 | `GET /suppliers` | any member | search and list, see below |
+| `GET /suppliers/filters` | any member | the types, zones and buildings in use, for filter menus |
 | `GET /suppliers/{id}` | any member | one supplier, including an Inactive one |
 | `GET /suppliers/{id}/availability` | any member | open or closed at a time, and whether a new errand may use it |
 | `POST /suppliers` | administrator | create, 201 with a `Location` header |
@@ -179,6 +181,15 @@ default 20). Results are sorted by name, ignoring case.
 
 ```json
 { "items": [ ...suppliers ], "page": 1, "pageSize": 20, "total": 21, "totalPages": 2 }
+```
+
+**Filter values.** Type, zone and building are free text, so a client cannot
+know which values exist. This lists each one in use, sorted ignoring case and
+given once when two spellings differ only in case. It takes the same `status`
+as the list (Active by default), so every value finds at least one supplier.
+
+```json
+{ "types": ["Food", "Food/Coffee", "Printing", "Shopping"], "zones": ["Business", "Central", "..."], "buildings": ["Blk AS8", "..."] }
 ```
 
 **A supplier** as returned by every route (values shortened):

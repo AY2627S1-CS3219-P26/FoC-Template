@@ -43,6 +43,14 @@ function whole(
   return value
 }
 
+function status(query: Query, errors: FieldError[]): ListFilters['status'] {
+  const text = single(query, 'status', errors)
+  if (text === null) return 'Active'
+  if (text === 'Active' || text === 'Inactive' || text === 'all') return text
+  errors.push({ field: 'status', message: 'must be one of Active, Inactive, all' })
+  return 'Active'
+}
+
 export function parseListQuery(query: Query): Validated<ListFilters> {
   const errors: FieldError[] = []
 
@@ -59,22 +67,25 @@ export function parseListQuery(query: Query): Validated<ListFilters> {
     return value
   }
 
-  const statusText = single(query, 'status', errors)
-  const status = statusText === null ? 'Active' : statusText
-  if (status !== 'Active' && status !== 'Inactive' && status !== 'all') {
-    errors.push({ field: 'status', message: 'must be one of Active, Inactive, all' })
-  }
+  const listStatus = status(query, errors)
 
   const filters: ListFilters = {
     terms: q === null ? [] : q.split(/\s+/).slice(0, 5),
     type: text('type', 60),
     zone: text('zone', 60),
     building: text('building', 120),
-    status: status === 'Inactive' || status === 'all' ? status : 'Active',
+    status: listStatus,
     page: whole(query, 'page', 1, 100000, 1, errors),
     pageSize: whole(query, 'pageSize', 1, MAX_PAGE_SIZE, MAX_PAGE_SIZE, errors),
   }
   return errors.length > 0 ? { errors } : { value: filters }
+}
+
+// The filter values take the same status as the list, so they match what the list can find.
+export function parseFilterValuesQuery(query: Query): Validated<ListFilters['status']> {
+  const errors: FieldError[] = []
+  const value = status(query, errors)
+  return errors.length > 0 ? { errors } : { value }
 }
 
 // The moment to evaluate opening hours at. It must carry a UTC offset, because

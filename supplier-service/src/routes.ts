@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { type Authorizer, type Operation } from './auth.ts'
 import { HttpError, notFound, validationFailed } from './errors.ts'
 import { evaluateAvailability, toLocalMoment, type LocalMoment } from './domain/availability.ts'
-import { parseAt, parseListQuery } from './domain/query.ts'
+import { parseAt, parseFilterValuesQuery, parseListQuery } from './domain/query.ts'
 import { WEEKDAYS, type Supplier } from './domain/supplier.ts'
 import { formatClock } from './domain/time.ts'
 import { validateCreate, validatePatch } from './domain/validation.ts'
@@ -106,6 +106,14 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
       total,
       totalPages: Math.ceil(total / parsed.value.pageSize),
     }
+  })
+
+  // Type, zone and building are free text, so a client cannot know which values exist. Not
+  // cached: one cheap query, asked once when a list page opens.
+  app.get('/suppliers/filters', { onRequest: requires('supplier.read') }, async (request) => {
+    const parsed = parseFilterValuesQuery(request.query as Record<string, unknown>)
+    if ('errors' in parsed) throw validationFailed(parsed.errors)
+    return repository.listFilterValues(deps.db, parsed.value)
   })
 
   // Inactive suppliers stay retrievable here, for errands that already use them.

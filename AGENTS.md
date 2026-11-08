@@ -4,7 +4,7 @@ Instructions for coding agents working in this repository. Read the AGENTS.md in
 
 ## Structure
 
-One folder per service at the top level: `user-service`, `supplier-service`, `order-service`, `credit-service`. A nice-to-have feature that warrants its own service becomes another folder at the same level. Core implementation stays inside these folders.
+One folder per service at the top level: `user-service`, `supplier-service`, `order-service`, `credit-service`, `message-service`. A nice-to-have feature that warrants its own service becomes another folder at the same level. Core implementation stays inside these folders.
 
 `web-client` is the browser client. It owns no domain rules. Its container (host port 8080) is also the gateway for the browser: it forwards `/api/<service>/...` to the services, so a service needs no CORS and the browser never sees an internal address.
 
@@ -12,7 +12,7 @@ Work in the folder you were asked to work in. Do not change another service to m
 
 `user-service` is implemented in Node.js and TypeScript with Express and MongoDB. The other service folders have no stack decided yet. Do not assume one; each service may choose its own.
 
-Host ports in `compose.yaml`: user-service 3001, supplier-service 3002, order-service 3003, credit-service 3004. Inside the compose network services reach each other by service name, for example `http://user-service:3000`.
+Host ports in `compose.yaml`: user-service 3001, supplier-service 3002, order-service 3003, credit-service 3004, message-service 3008. Inside the compose network services reach each other by service name, for example `http://user-service:3000`. The message-service also listens on 3008 inside the network (`http://message-service:3008`).
 
 `compose.yaml` has two networks. Every service joins `edge`, where the web client reaches it, and `backend`, where its database lives. Databases and infrastructure such as Mailpit join only `backend`, so the web client cannot reach them. Publish host ports on `127.0.0.1` only (`"127.0.0.1:3003:3000"`); 8080 for the web client is the one port open to the network.
 

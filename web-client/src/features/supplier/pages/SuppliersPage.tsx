@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router'
 import { useFavoriteSupplierIds } from '@/api/supplier/favorites'
 import { useSupplierFilterValues, useSuppliers } from '@/api/supplier/suppliers'
 import { EmptyState } from '@/components/EmptyState'
+import { Notice } from '@/components/Notice'
 import { Page } from '@/components/Page'
 import { Pagination } from '@/components/Pagination'
 import { QueryView } from '@/components/QueryView'
@@ -14,8 +15,19 @@ import { AvailabilityText } from '../components/AvailabilityText'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { OpenBadge } from '../components/OpenBadge'
 import { SupplierThumbnail } from '../components/SupplierThumbnail'
+import { useDevicePosition } from '../components/useDevicePosition'
 
 const title = 'Pick up from'
+
+const sortOptions: SelectOption[] = [
+  { value: '', label: 'Name' },
+  { value: 'distance', label: 'Nearest to me' },
+]
+
+// The position is rounded to about 100 m, so finer steps would claim more than is known.
+function distanceText(metres: number): string {
+  return metres < 1000 ? `${Math.max(50, Math.round(metres / 50) * 50)} m away` : `${(metres / 1000).toFixed(1)} km away`
+}
 
 // A value from an old or shared link that no Active supplier uses now still shows as chosen,
 // so the menu never claims a filter that is not applied.
@@ -34,12 +46,22 @@ export function SuppliersPage() {
   // The address bar can hold anything. What is not a page number from 1 shows page 1.
   const page = Math.max(1, Math.trunc(Number(searchParams.get('page'))) || 1)
   const favorites = searchParams.get('favorites') === '1'
+  const openNow = searchParams.get('open') === '1'
+  // Only the wish to sort by distance is in the URL. The position itself is asked for again, so it
+  // never ends up in the history or in a shared link.
+  const byDistance = searchParams.get('sort') === 'distance'
+  const position = useDevicePosition(byDistance)
+  const near = position.status === 'found' ? position.near : undefined
   // No status: the supplier-service lists only Active suppliers, the ones a student can pick.
+  // Until the position is known the list stays sorted by name, so nobody waits on the browser.
   const suppliers = useSuppliers({
     q: q || undefined,
     type: type || undefined,
     zone: zone || undefined,
     favorites: favorites || undefined,
+    openNow: openNow || undefined,
+    sort: near ? 'distance' : undefined,
+    near,
     page,
   })
   // Without these the menus offer only "All", and the search still works.
@@ -57,7 +79,7 @@ export function SuppliersPage() {
   }
 
   // A new filter always starts again at page 1.
-  function setFilter(name: 'q' | 'type' | 'zone' | 'favorites', value: string) {
+  function setFilter(name: 'q' | 'type' | 'zone' | 'favorites' | 'open' | 'sort', value: string) {
     setSearchParams((params) => {
       if (value) params.set(name, value)
       else params.delete(name)
@@ -66,7 +88,7 @@ export function SuppliersPage() {
     })
   }
 
-  function setToggle(name: 'favorites', on: boolean) {
+  function setToggle(name: 'favorites' | 'open', on: boolean) {
     setFilter(name, on ? '1' : '')
   }
 
@@ -82,7 +104,7 @@ export function SuppliersPage() {
     })
   }
 
-  const searched = q !== '' || type !== '' || zone !== ''
+  const searched = q !== '' || type !== '' || zone !== '' || openNow
   const filtered = searched || favorites
 
   return (
@@ -109,20 +131,44 @@ export function SuppliersPage() {
         <button type="submit" className="ds-btn ds-btn--glass">
           Search
         </button>
-        <div className="flex flex-wrap items-end gap-4 md:col-span-3 lg:col-span-5">
-          <div className="grid grid-cols-1 gap-2">
-            <span id="supplier-show" className="ds-field-label">
-              Show
-            </span>
-            {/* Toggles, not choices: each one narrows the list on its own. */}
-            <div role="group" aria-labelledby="supplier-show" className="ds-segmented">
-              <button type="button" aria-pressed={favorites} onClick={() => setToggle('favorites', !favorites)}>
-                Favorites
-              </button>
-            </div>
+        <div className="grid grid-cols-1 gap-2 md:col-span-2">
+          <span id="supplier-show" className="ds-field-label">
+            Show
+          </span>
+          {/* Toggles, not choices: each one narrows the list on its own, and both can be on. */}
+          <div role="group" aria-labelledby="supplier-show" className="ds-segmented justify-self-start">
+            <button type="button" aria-pressed={openNow} onClick={() => setToggle('open', !openNow)}>
+              Open now
+            </button>
+            <button type="button" aria-pressed={favorites} onClick={() => setToggle('favorites', !favorites)}>
+              Favorites
+            </button>
           </div>
         </div>
+        <SelectField
+          label="Sort by"
+          name="sort"
+          value={byDistance ? 'distance' : ''}
+          onChange={(value) => setFilter('sort', value)}
+          options={sortOptions}
+        />
       </form>
+
+      {position.status === 'locating' && (
+        <Notice tone="info" role="status" title="Finding your location…">
+          Your browser may ask first. Until then the list is sorted by name.
+        </Notice>
+      )}
+      {position.status === 'failed' && (
+        <Notice tone="danger" role="alert" title="Cannot sort by distance">
+          <div className="grid grid-cols-1 gap-3">
+            <p>{position.reason} The list is sorted by name.</p>
+            <button type="button" className="ds-btn ds-btn--glass justify-self-start" onClick={() => setFilter('sort', '')}>
+              Sort by name
+            </button>
+          </div>
+        </Notice>
+      )}
 
       <QueryView
         query={suppliers}
@@ -180,6 +226,9 @@ export function SuppliersPage() {
                       </p>
                       <p className="text-sm font-normal text-ink">
                         <AvailabilityText availability={supplier.availability} />
+                        {supplier.distanceMeters !== null && (
+                          <span className="text-muted"> · {distanceText(supplier.distanceMeters)}</span>
+                        )}
                       </p>
                     </div>
                   </Link>

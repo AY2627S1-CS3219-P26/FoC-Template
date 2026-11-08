@@ -43,4 +43,6 @@ export interface Supplier extends SupplierInput {
   updatedAt: Date
   // Null when the supplier has no photo. A new photo gives a new version.
   photoVersion: string | null
+  // From the point a list was asked about. Null without such a point, or without coordinates.
+  distanceMeters: number | null
 }

@@ -42,6 +42,8 @@ interface SupplierRow {
   updated_at: Date
   hours: DayHours[]
   photo_version: string | null
+  // Only in a list that was given a point to measure from.
+  distance_m?: number | null
 }
 
 function toSupplier(row: SupplierRow): Supplier {
@@ -62,6 +64,7 @@ function toSupplier(row: SupplierRow): Supplier {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     photoVersion: row.photo_version,
+    distanceMeters: row.distance_m ?? null,
   }
 }
 
@@ -107,33 +110,55 @@ function buildWhere(filters: ListFilters, accountId: string | null) {
   return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
+// The most a list without paging returns. Far more suppliers than one campus has.
+export const UNPAGED_LIMIT = 2000
+
 // accountId is whose favorites `filters.favorites` means, from the session.
+// `unpaged` returns every match in order, for filters that are applied in code
+// afterwards, such as open now.
 export async function listSuppliers(
   db: Db,
   filters: ListFilters,
   accountId: string | null,
+  unpaged = false,
 ): Promise<{ items: Supplier[]; total: number }> {
   const where = buildWhere(filters, accountId)
-  const limit = `$${where.params.length + 1}`
-  const offset = `$${where.params.length + 2}`
-  const skipped = (filters.page - 1) * filters.pageSize
+  const params = [...where.params]
+  const bind = (value: unknown) => {
+    params.push(value)
+    return `$${params.length}`
+  }
+
+  // Metres on a flat map. Over one campus it is within a few metres of the
+  // distance on a sphere, and it needs no database extension. Null without
+  // coordinates, so those suppliers sort last.
+  let distance = 'NULL::double precision'
+  if (filters.near) {
+    const latitude = bind(filters.near.latitude)
+    const longitude = bind(filters.near.longitude)
+    distance = `111320 * sqrt(power(s.latitude - ${latitude}, 2)
+      + power((s.longitude - ${longitude}) * cos(radians(${latitude}::double precision)), 2))`
+  }
+  const order = filters.sort === 'distance' ? 'distance_m ASC NULLS LAST, lower(s.name), s.id' : 'lower(s.name), s.id'
+  const skipped = unpaged ? 0 : (filters.page - 1) * filters.pageSize
+  const paging = unpaged ? `LIMIT ${UNPAGED_LIMIT}` : `LIMIT ${bind(filters.pageSize)} OFFSET ${bind(skipped)}`
 
   // The page is cut first and only then joined to its opening hours. The total
   // is counted over every match in the same pass.
   const rows = await db.query(
     `WITH page AS (
-       SELECT s.*, count(*) OVER () AS total_count
+       SELECT s.*, ${distance} AS distance_m, count(*) OVER () AS total_count
        FROM suppliers s
        ${where.sql}
-       ORDER BY lower(s.name), s.id
-       LIMIT ${limit} OFFSET ${offset}
+       ORDER BY ${order}
+       ${paging}
      )
      SELECT s.*, COALESCE(h.hours, '[]'::json) AS hours, p.version AS photo_version
      FROM page s
      ${HOURS_JOIN}
      ${PHOTO_JOIN}
-     ORDER BY lower(s.name), s.id`,
-    [...where.params, filters.pageSize, skipped],
+     ORDER BY ${order}`,
+    params,
   )
 
   const items = (rows.rows as SupplierRow[]).map(toSupplier)

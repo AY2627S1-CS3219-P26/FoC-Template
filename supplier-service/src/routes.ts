@@ -60,6 +60,8 @@ function present(supplier: Supplier, moment: LocalMoment) {
         }
       : null,
     availability: evaluateAvailability(supplier.hours, moment),
+    // Whole metres from the list's near point, or null.
+    distanceMeters: supplier.distanceMeters === null ? null : Math.round(supplier.distanceMeters),
     createdAt: supplier.createdAt.toISOString(),
     updatedAt: supplier.updatedAt.toISOString(),
   }
@@ -108,18 +110,33 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
     // answered from memory for a couple of seconds. The opening hours are
     // evaluated below on every request, never cached. A list of favorites
     // belongs to one account and changes at a tap, so it always comes fresh.
-    const accountId = parsed.value.favorites ? request.actorId : null
-    const load = () => repository.listSuppliers(deps.db, parsed.value, accountId)
-    const { items, total } = parsed.value.favorites
-      ? await load()
-      : await deps.listCache.get(JSON.stringify(parsed.value), load)
+    const filters = parsed.value
+    const accountId = filters.favorites ? request.actorId : null
     const moment = toLocalMoment(deps.now(), deps.timeZone)
+    const remembered = (key: object, load: () => Promise<{ items: Supplier[]; total: number }>) =>
+      filters.favorites ? load() : deps.listCache.get(JSON.stringify(key), load)
+
+    let found: { items: Supplier[]; total: number }
+    if (!filters.openNow) {
+      found = await remembered(filters, () => repository.listSuppliers(deps.db, filters, accountId))
+    } else {
+      // Open or closed is worked out in code (src/domain/availability.ts), which copes with hours
+      // past midnight and the end of the week, so the database cannot page by it. Every match is
+      // loaded, the open ones kept and the page cut here, which is quick for one campus. Only the
+      // stored rows may come from memory, never which of them are open.
+      const all = await remembered({ ...filters, openNow: false, page: 0, pageSize: 0 }, () =>
+        repository.listSuppliers(deps.db, filters, accountId, true),
+      )
+      const open = all.items.filter((s) => evaluateAvailability(s.hours, moment).open)
+      const start = (filters.page - 1) * filters.pageSize
+      found = { items: open.slice(start, start + filters.pageSize), total: open.length }
+    }
     return {
-      items: items.map((s) => present(s, moment)),
-      page: parsed.value.page,
-      pageSize: parsed.value.pageSize,
-      total,
-      totalPages: Math.ceil(total / parsed.value.pageSize),
+      items: found.items.map((s) => present(s, moment)),
+      page: filters.page,
+      pageSize: filters.pageSize,
+      total: found.total,
+      totalPages: Math.ceil(found.total / filters.pageSize),
     }
   })
 

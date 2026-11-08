@@ -595,6 +595,87 @@ describe('supplier API', { skip }, () => {
     })
   })
 
+  describe('open now and nearest', () => {
+    const every = (opens: string, closes: string) => DAYS.map((day) => ({ day, opens, closes }))
+    const list = async (query: string) => {
+      const response = await call('GET', `/suppliers${query}`, 'member-token')
+      assert.equal(response.status, 200, JSON.stringify(response.body))
+      return response.body
+    }
+    const names = (body: { items: { name: string }[] }) => body.items.map((s) => s.name)
+
+    it('lists only the suppliers open now, and pages and counts them', async () => {
+      await create({ name: 'Day' })
+      await create({ name: 'Night', hours: every('22:00', '02:00') })
+      await create({ name: 'Always', hours: every('00:00', '24:00') })
+      await create({ name: 'Monday only', hours: [{ day: 'monday', opens: '09:00', closes: '18:00' }] })
+
+      const open = await list('?openNow=true')
+      assert.deepEqual(names(open), ['Always', 'Day'])
+      assert.equal(open.total, 2)
+      assert.equal(open.totalPages, 1)
+      const second = await list('?openNow=true&pageSize=1&page=2')
+      assert.deepEqual(names(second), ['Day'])
+      assert.equal(second.total, 2)
+      assert.deepEqual(names(await list('?openNow=true&q=day')), ['Day'])
+      assert.equal((await list('?openNow=false')).total, 4)
+      assert.equal((await call('GET', '/suppliers?openNow=yes', 'member-token')).status, 400)
+    })
+
+    it('never remembers which suppliers are open, only the suppliers themselves', async () => {
+      let clock = NOW
+      const cached = buildApp({ db: pool, authorizer, timeZone: TIME_ZONE, now: () => clock, readCacheSeconds: 60 })
+      const open = async () =>
+        (
+          await cached.inject({ method: 'GET', url: '/suppliers?openNow=true', headers: { cookie: 'relay_session=member-token' } })
+        ).json().total
+      await create({ name: 'Day' })
+      assert.equal(await open(), 1)
+      clock = new Date('2026-10-01T12:00:00Z') // 20:00 in Singapore, after closing
+      assert.equal(await open(), 0)
+      await cached.close()
+    })
+
+    it('sorts by distance from a point, with suppliers without coordinates last', async () => {
+      await create({ name: 'Library', latitude: 1.2967866, longitude: 103.7732677 })
+      await create({ name: 'Park', latitude: 1.2908445, longitude: 103.7770891 })
+      await create({ name: 'Nowhere', latitude: null, longitude: null })
+      const near = 'near=1.2905,103.7772'
+
+      const nearest = await list(`?sort=distance&${near}`)
+      assert.deepEqual(names(nearest), ['Park', 'Library', 'Nowhere'])
+      const [park, library, nowhere] = nearest.items
+      assert.ok(park.distanceMeters < 100, `${park.distanceMeters}`)
+      assert.ok(library.distanceMeters > 700 && library.distanceMeters < 900, `${library.distanceMeters}`)
+      assert.equal(nowhere.distanceMeters, null)
+
+      const byName = await list(`?${near}`)
+      assert.deepEqual(names(byName), ['Library', 'Nowhere', 'Park'])
+      assert.equal(byName.items[0].distanceMeters, library.distanceMeters)
+      assert.equal((await list('')).items[0].distanceMeters, null)
+    })
+
+    it('combines open now with the nearest first', async () => {
+      await create({ name: 'Library', latitude: 1.2967866, longitude: 103.7732677 })
+      await create({ name: 'Park', latitude: 1.2908445, longitude: 103.7770891, hours: [{ day: 'monday', opens: '09:00', closes: '18:00' }] })
+      await create({ name: 'Hall', latitude: 1.2915, longitude: 103.7768 })
+      assert.deepEqual(names(await list('?openNow=true&sort=distance&near=1.2905,103.7772')), ['Hall', 'Library'])
+    })
+
+    it('refuses a sort by distance without a point, and a point that is not one', async () => {
+      const fields = async (query: string) => {
+        const response = await call('GET', `/suppliers${query}`, 'member-token')
+        assert.equal(response.status, 400)
+        return response.body.error.fields.map((f: { field: string }) => f.field)
+      }
+      assert.deepEqual(await fields('?sort=distance'), ['near'])
+      assert.deepEqual(await fields('?sort=distance&near=here'), ['near'])
+      assert.deepEqual(await fields('?near=95,0'), ['near'])
+      assert.deepEqual(await fields('?near=1.29'), ['near'])
+      assert.deepEqual(await fields('?sort=fastest'), ['sort'])
+    })
+  })
+
   describe('filter values', () => {
     // Which of two spellings is kept depends on the database collation, so only the words are compared.
     const lower = (values: string[]) => values.map((v) => v.toLowerCase())

@@ -156,6 +156,9 @@ days that join up (`src/domain/availability.ts`).
 | Combined | `GET /suppliers?zone=Central&type=Food/Coffee&q=roaster` |
 | Deactivated suppliers | `GET /suppliers?status=Inactive` or `?status=all` |
 | Which types, zones and buildings exist | `GET /suppliers/filters` |
+| Open at this moment | `GET /suppliers?openNow=true` |
+| Nearest first | `GET /suppliers?sort=distance&near=1.297,103.776` |
+| Your own favorites | `GET /suppliers?favorites=true` |
 | Is it open at a given time | `GET /suppliers/{id}/availability?at=2026-10-01T12:00:00%2B08:00` |
 
 ## API
@@ -183,8 +186,18 @@ user-service sets when someone logs in. Request and response bodies are JSON.
 **List.** `q` (keywords, every word must match the name, type, building,
 zone or address), `type`, `zone`, `building`, `status` (`Active`
 by default, `Inactive`, or `all`), `favorites` (`true` for only your own),
-`page` (from 1) and `pageSize` (1 to 20, default 20). Results are sorted by name,
-ignoring case.
+`openNow` (`true` for only those open at this moment), `near`
+(`latitude,longitude` to measure from), `sort` (`name` by default, or `distance`,
+which needs `near`), `page` (from 1) and `pageSize` (1 to 20, default 20). Results
+are sorted by name, ignoring case, unless sorted by distance, where suppliers
+without coordinates come last. With `near`, every supplier has `distanceMeters`.
+
+Open or closed is worked out in code, which copes with hours past midnight, so
+`openNow` loads every match (at most 2000), keeps the open ones and cuts the page
+itself. Only the stored rows may come from the read cache, never which are open.
+Distances are on a flat map, within a few metres over one campus. The web client
+rounds the student's position to three decimals, about 110 m, and the service
+log shows `near=hidden`.
 
 ```json
 { "items": [ ...suppliers ], "page": 1, "pageSize": 20, "total": 21, "totalPages": 2 }
@@ -215,7 +228,9 @@ as the list (Active by default), so every value finds at least one supplier.
   "contact": { "phone": null, "email": null },
   "hours": [{ "day": "monday", "opens": "09:00", "closes": "16:00" }, "..."],
   "status": "Active",
+  "photo": { "path": "/suppliers/0d3c6c7e-.../photo?v=...", "thumbnailPath": "/suppliers/0d3c6c7e-.../photo?size=thumbnail&v=..." },
   "availability": { "open": true, "closesAt": "16:00", "nextOpensAt": null },
+  "distanceMeters": null,
   "createdAt": "2026-10-01T04:00:00.000Z",
   "updatedAt": "2026-10-01T04:00:00.000Z"
 }
@@ -429,6 +444,44 @@ deactivated. The file has no campus zone, per-day hours or contact details, so:
   before photos existed, and only to a seeded supplier that still has its seed
   name and no photo. `seed_runs` records that this happened, so a restart never
   brings back a photo an administrator removed.
+- **Coordinates** are taken as written, except one: Cheers Unmanned Convenience
+  Store had longitude 103.7526298, about 1.8 km west of its building, Engineering
+  Block E3. It now has the centre of E3 from OpenStreetMap (way 139971771),
+  1.2995065, 103.7716961. A test checks that every seed supplier is on the campus.
+
+## Deploying
+
+Photos, favorites, open now and nearest need no change to the deployment, so a
+pull request merged into `dev` is all it takes:
+
+1. CI builds the `supplier-service` and `web-client` images and publishes them to
+   GHCR (`.github/workflows/ci.yml`, job `publish`). With the AWS deployment, the
+   same merge also rolls them out to the cloud instance.
+2. When the new supplier-service starts, it applies the migrations it has not run
+   yet (`002_supplier_photos.sql`, `003_supplier_favorites.sql`) and adds the seed
+   photos. Both take a database lock, so several copies that start together still
+   do it once.
+
+There is no new environment variable, secret, port, volume or Helm value. Worth
+knowing all the same:
+
+- **Storage.** A photo is about 250 KB and its thumbnail about 15 KB, in the
+  supplier database. Its cloud volume is 1 GiB (`databases.supplier-db.size` in
+  the Helm values), room for thousands of photos.
+- **Memory.** Each service may use 256 MiB in the cloud. The browser shrinks the
+  photos, so the service holds at most about 1.75 MB for one upload.
+- **Upload size.** The gateway lets 2 MB through on the supplier routes
+  (`web-client/nginx/templates/routes/supplier.conf.template`), which ships in the
+  web-client image.
+- **Location.** Browsers share a position only with a page over HTTPS, or from
+  localhost. The cloud serves HTTPS. On plain HTTP elsewhere, "Nearest to me"
+  says it cannot ask, and the list stays sorted by name.
+- **A database seeded earlier.** The corrected Cheers coordinate reaches only a
+  new database. On an existing one, an administrator opens the supplier, uses
+  "Pick on map", or types latitude 1.2995065 and longitude 103.7716961, and saves.
+- **Logs.** The supplier-service log shows `near=hidden`. The gateway's nginx
+  access log still records the rounded position, about 110 m; changing its log
+  format is a platform change.
 
 ## Tests
 

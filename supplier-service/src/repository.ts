@@ -82,7 +82,7 @@ function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, (c) => `\\${c}`)
 }
 
-function buildWhere(filters: ListFilters) {
+function buildWhere(filters: ListFilters, accountId: string | null) {
   const clauses: string[] = []
   const params: unknown[] = []
   const bind = (value: unknown) => {
@@ -91,6 +91,11 @@ function buildWhere(filters: ListFilters) {
   }
 
   if (filters.status !== 'all') clauses.push(`s.status = ${bind(filters.status)}`)
+  if (filters.favorites) {
+    clauses.push(
+      `EXISTS (SELECT 1 FROM supplier_favorites f WHERE f.supplier_id = s.id AND f.account_id = ${bind(accountId)})`,
+    )
+  }
   if (filters.type) clauses.push(`lower(s.type) = lower(${bind(filters.type)})`)
   if (filters.zone) clauses.push(`lower(s.zone) = lower(${bind(filters.zone)})`)
   if (filters.building) clauses.push(`lower(s.building) = lower(${bind(filters.building)})`)
@@ -102,11 +107,13 @@ function buildWhere(filters: ListFilters) {
   return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
+// accountId is whose favorites `filters.favorites` means, from the session.
 export async function listSuppliers(
   db: Db,
   filters: ListFilters,
+  accountId: string | null,
 ): Promise<{ items: Supplier[]; total: number }> {
-  const where = buildWhere(filters)
+  const where = buildWhere(filters, accountId)
   const limit = `$${where.params.length + 1}`
   const offset = `$${where.params.length + 2}`
   const skipped = (filters.page - 1) * filters.pageSize
@@ -317,6 +324,35 @@ export async function getSupplierPhoto(
   if (!UUID.test(id)) return null
   const result = await db.query(PHOTO_QUERIES[size], [id])
   return (result.rows[0] as { bytes: Buffer; type: string; version: string } | undefined) ?? null
+}
+
+export async function listFavoriteIds(db: Db, accountId: string): Promise<string[]> {
+  const result = await db.query(
+    'SELECT supplier_id FROM supplier_favorites WHERE account_id = $1 ORDER BY created_at, supplier_id',
+    [accountId],
+  )
+  return result.rows.map((row) => row.supplier_id as string)
+}
+
+// Adding a favorite twice keeps one. False when there is no such supplier.
+export async function addFavorite(db: Db, accountId: string, supplierId: string): Promise<boolean> {
+  if (!UUID.test(supplierId)) return false
+  try {
+    await db.query(
+      'INSERT INTO supplier_favorites (account_id, supplier_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [accountId, supplierId],
+    )
+    return true
+  } catch (error) {
+    // 23503: the supplier the foreign key points at does not exist.
+    if ((error as { code?: string }).code === '23503') return false
+    throw error
+  }
+}
+
+export async function removeFavorite(db: Db, accountId: string, supplierId: string): Promise<void> {
+  if (!UUID.test(supplierId)) return
+  await db.query('DELETE FROM supplier_favorites WHERE account_id = $1 AND supplier_id = $2', [accountId, supplierId])
 }
 
 export async function countSuppliers(db: Db): Promise<number> {

@@ -173,14 +173,18 @@ user-service sets when someone logs in. Request and response bodies are JSON.
 | `POST /suppliers` | administrator | create, 201 with a `Location` header |
 | `PATCH /suppliers/{id}` | administrator | change any field except `id` and `createdAt` |
 | `DELETE /suppliers/{id}` | administrator | deactivate: sets status Inactive, the record stays |
+| `GET /suppliers/favorites` | any member | the ids of your own favorite suppliers |
+| `PUT /suppliers/{id}/favorite` | any member | add a supplier to your favorites, 204 |
+| `DELETE /suppliers/{id}/favorite` | any member | remove it, 204 |
 | `GET /suppliers/{id}/photo` | any member | the photo, or `?size=thumbnail` for the small copy |
 | `PUT /suppliers/{id}/photo` | administrator | add or replace the photo |
 | `DELETE /suppliers/{id}/photo` | administrator | remove the photo |
 
 **List.** `q` (keywords, every word must match the name, type, building,
 zone or address), `type`, `zone`, `building`, `status` (`Active`
-by default, `Inactive`, or `all`), `page` (from 1) and `pageSize` (1 to 20,
-default 20). Results are sorted by name, ignoring case.
+by default, `Inactive`, or `all`), `favorites` (`true` for only your own),
+`page` (from 1) and `pageSize` (1 to 20, default 20). Results are sorted by name,
+ignoring case.
 
 ```json
 { "items": [ ...suppliers ], "page": 1, "pageSize": 20, "total": 21, "totalPages": 2 }
@@ -252,6 +256,17 @@ curl -X POST http://localhost:3002/suppliers \
 
 `hours` lists the weekdays the supplier is open. A weekday left out is closed.
 Times are `HH:MM`, and closing at `24:00` or after midnight is allowed.
+
+**Favorites.** Each account keeps its own list in `supplier_favorites`, keyed by
+the `accountId` the user-service returns when it authorizes the request. So the
+user-service stores nothing for this, and nobody can name another account:
+there is no account in the path, the query or the body. `GET /suppliers/favorites`
+answers `{ "supplierIds": [...] }`, and `GET /suppliers?favorites=true` lists only
+your favorites, together with every other filter. That list is never served from
+the read cache, because it belongs to one account and changes at a tap. Adding or
+removing a favorite twice gives the same result. An account that an administrator
+deletes leaves its rows behind, a few bytes each, because the user-service
+announces no deletion.
 
 **Photos.** A supplier has at most one photo and a square thumbnail for lists.
 Every supplier in a response has `photo`, which is null or holds two paths on

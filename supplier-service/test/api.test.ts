@@ -111,6 +111,9 @@ describe('supplier API', { skip }, () => {
         ['GET', `/suppliers/${id}`],
         ['GET', `/suppliers/${id}/availability`],
         ['GET', `/suppliers/${id}/photo`],
+        ['GET', '/suppliers/favorites'],
+        ['PUT', `/suppliers/${id}/favorite`],
+        ['DELETE', `/suppliers/${id}/favorite`],
         ['POST', '/suppliers'],
         ['PATCH', `/suppliers/${id}`],
         ['DELETE', `/suppliers/${id}`],
@@ -523,6 +526,75 @@ describe('supplier API', { skip }, () => {
     })
   })
 
+  describe('favorites', () => {
+    const favoriteIds = async (token: string) => {
+      const response = await call('GET', '/suppliers/favorites', token)
+      assert.equal(response.status, 200)
+      return [...response.body.supplierIds].sort()
+    }
+
+    it('keeps the favorites of each account apart', async () => {
+      const a = await create({ name: 'A' })
+      const b = await create({ name: 'B' })
+      assert.equal((await call('PUT', `/suppliers/${a.id}/favorite`, 'member-token')).status, 204)
+      await call('PUT', `/suppliers/${b.id}/favorite`, 'member-token')
+      await call('PUT', `/suppliers/${b.id}/favorite`, 'other-member-token')
+
+      assert.deepEqual(await favoriteIds('member-token'), [a.id, b.id].sort())
+      assert.deepEqual(await favoriteIds('other-member-token'), [b.id])
+      assert.deepEqual(await favoriteIds('admin-token'), [])
+    })
+
+    it('takes the account only from the session, never from the request', async () => {
+      const a = await create({ name: 'A' })
+      await call('PUT', `/suppliers/${a.id}/favorite?accountId=member-account-3`, 'member-token', {
+        accountId: 'member-account-3',
+      })
+      assert.deepEqual(await favoriteIds('member-token'), [a.id])
+      assert.deepEqual(await favoriteIds('other-member-token'), [])
+    })
+
+    it('adds and removes the same way when repeated', async () => {
+      const a = await create({ name: 'A' })
+      assert.equal((await call('PUT', `/suppliers/${a.id}/favorite`, 'member-token')).status, 204)
+      assert.equal((await call('PUT', `/suppliers/${a.id}/favorite`, 'member-token')).status, 204)
+      assert.deepEqual(await favoriteIds('member-token'), [a.id])
+      assert.equal((await call('DELETE', `/suppliers/${a.id}/favorite`, 'member-token')).status, 204)
+      assert.equal((await call('DELETE', `/suppliers/${a.id}/favorite`, 'member-token')).status, 204)
+      assert.deepEqual(await favoriteIds('member-token'), [])
+    })
+
+    it('answers 404 for a supplier that does not exist', async () => {
+      assert.equal((await call('PUT', '/suppliers/00000000-0000-4000-8000-000000000000/favorite', 'member-token')).status, 404)
+      assert.equal((await call('PUT', '/suppliers/not-a-uuid/favorite', 'member-token')).status, 404)
+    })
+
+    it('refuses a caller without a session or with an account that is not active', async () => {
+      const a = await create({ name: 'A' })
+      assert.equal((await call('PUT', `/suppliers/${a.id}/favorite`)).status, 401)
+      assert.equal((await call('GET', '/suppliers/favorites')).status, 401)
+      assert.equal((await call('PUT', `/suppliers/${a.id}/favorite`, 'suspended-token')).status, 403)
+      assert.equal((await call('GET', '/suppliers/favorites', 'suspended-token')).status, 403)
+    })
+
+    it('lists only the caller own favorites with favorites=true, together with the other filters', async () => {
+      const a = await create({ name: 'A', type: 'Food' })
+      const b = await create({ name: 'B', type: 'Printing' })
+      await create({ name: 'C', type: 'Food' })
+      await call('PUT', `/suppliers/${a.id}/favorite`, 'member-token')
+      await call('PUT', `/suppliers/${b.id}/favorite`, 'member-token')
+      await call('PUT', `/suppliers/${b.id}/favorite`, 'other-member-token')
+
+      const names = async (query: string, token = 'member-token') =>
+        (await call('GET', `/suppliers${query}`, token)).body.items.map((s: { name: string }) => s.name)
+      assert.deepEqual(await names('?favorites=true'), ['A', 'B'])
+      assert.deepEqual(await names('?favorites=true&type=food'), ['A'])
+      assert.deepEqual(await names('?favorites=true', 'other-member-token'), ['B'])
+      assert.deepEqual(await names('?favorites=false'), ['A', 'B', 'C'])
+      assert.equal((await call('GET', '/suppliers?favorites=maybe', 'member-token')).status, 400)
+    })
+  })
+
   describe('filter values', () => {
     // Which of two spellings is kept depends on the database collation, so only the words are compared.
     const lower = (values: string[]) => values.map((v) => v.toLowerCase())
@@ -627,6 +699,21 @@ describe('supplier API', { skip }, () => {
         payload: photoBody(),
       })
       assert.notEqual(await photo(), null)
+    })
+
+    it('never serves a list of favorites from memory', async () => {
+      const { id } = await create()
+      const favorites = async () =>
+        (
+          await cached.inject({
+            method: 'GET',
+            url: '/suppliers?favorites=true',
+            headers: { cookie: 'relay_session=member-token' },
+          })
+        ).json().total
+      assert.equal(await favorites(), 0)
+      await cached.inject({ method: 'PUT', url: `/suppliers/${id}/favorite`, headers: { cookie: 'relay_session=member-token' } })
+      assert.equal(await favorites(), 1)
     })
 
     it('never answers a caller who has no right to the memory', async () => {

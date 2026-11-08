@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { useFavoriteSupplierIds } from '@/api/supplier/favorites'
 import { useSupplierFilterValues, useSuppliers } from '@/api/supplier/suppliers'
 import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
@@ -10,6 +11,7 @@ import { SelectField } from '@/components/SelectField'
 import type { SelectOption } from '@/components/SelectField'
 import { TextField } from '@/components/TextField'
 import { AvailabilityText } from '../components/AvailabilityText'
+import { FavoriteButton } from '../components/FavoriteButton'
 import { OpenBadge } from '../components/OpenBadge'
 import { SupplierThumbnail } from '../components/SupplierThumbnail'
 
@@ -31,10 +33,18 @@ export function SuppliersPage() {
   const zone = searchParams.get('zone') ?? ''
   // The address bar can hold anything. What is not a page number from 1 shows page 1.
   const page = Math.max(1, Math.trunc(Number(searchParams.get('page'))) || 1)
+  const favorites = searchParams.get('favorites') === '1'
   // No status: the supplier-service lists only Active suppliers, the ones a student can pick.
-  const suppliers = useSuppliers({ q: q || undefined, type: type || undefined, zone: zone || undefined, page })
+  const suppliers = useSuppliers({
+    q: q || undefined,
+    type: type || undefined,
+    zone: zone || undefined,
+    favorites: favorites || undefined,
+    page,
+  })
   // Without these the menus offer only "All", and the search still works.
   const filterValues = useSupplierFilterValues()
+  const favoriteIds = useFavoriteSupplierIds()
   const total = suppliers.data?.total
 
   // The box holds what is typed until the search runs. When back, forward or "Clear filters"
@@ -47,13 +57,17 @@ export function SuppliersPage() {
   }
 
   // A new filter always starts again at page 1.
-  function setFilter(name: 'q' | 'type' | 'zone', value: string) {
+  function setFilter(name: 'q' | 'type' | 'zone' | 'favorites', value: string) {
     setSearchParams((params) => {
       if (value) params.set(name, value)
       else params.delete(name)
       params.delete('page')
       return params
     })
+  }
+
+  function setToggle(name: 'favorites', on: boolean) {
+    setFilter(name, on ? '1' : '')
   }
 
   function handleSearch(event: SubmitEvent<HTMLFormElement>) {
@@ -68,7 +82,8 @@ export function SuppliersPage() {
     })
   }
 
-  const filtered = q !== '' || type !== '' || zone !== ''
+  const searched = q !== '' || type !== '' || zone !== ''
+  const filtered = searched || favorites
 
   return (
     <Page title={title} subtitle={total === undefined ? undefined : `${total} ${total === 1 ? 'supplier' : 'suppliers'}`}>
@@ -94,6 +109,19 @@ export function SuppliersPage() {
         <button type="submit" className="ds-btn ds-btn--glass">
           Search
         </button>
+        <div className="flex flex-wrap items-end gap-4 md:col-span-3 lg:col-span-5">
+          <div className="grid grid-cols-1 gap-2">
+            <span id="supplier-show" className="ds-field-label">
+              Show
+            </span>
+            {/* Toggles, not choices: each one narrows the list on its own. */}
+            <div role="group" aria-labelledby="supplier-show" className="ds-segmented">
+              <button type="button" aria-pressed={favorites} onClick={() => setToggle('favorites', !favorites)}>
+                Favorites
+              </button>
+            </div>
+          </div>
+        </div>
       </form>
 
       <QueryView
@@ -101,36 +129,52 @@ export function SuppliersPage() {
         loadingLabel="Loading suppliers"
         isEmpty={(result) => result.items.length === 0}
         empty={
-          <EmptyState
-            title={filtered ? 'No suppliers match these filters' : total ? `There is no page ${page}` : 'No suppliers yet'}
-            action={
-              filtered || total ? (
-                <button type="button" className="ds-btn ds-btn--glass" onClick={() => setSearchParams({})}>
-                  {filtered ? 'Clear filters' : 'Go to page 1'}
+          favorites && !searched && !total ? (
+            <EmptyState
+              title="No favorites yet"
+              description="Tap the heart next to a supplier to keep it here."
+              action={
+                <button type="button" className="ds-btn ds-btn--glass" onClick={() => setToggle('favorites', false)}>
+                  Show all suppliers
                 </button>
-              ) : (
-                <Link to="/errands" className="ds-btn ds-btn--glass">
-                  Browse errands
-                </Link>
-              )
-            }
-          />
+              }
+            />
+          ) : (
+            <EmptyState
+              title={filtered ? 'No suppliers match these filters' : total ? `There is no page ${page}` : 'No suppliers yet'}
+              action={
+                filtered || total ? (
+                  <button type="button" className="ds-btn ds-btn--glass" onClick={() => setSearchParams({})}>
+                    {filtered ? 'Clear filters' : 'Go to page 1'}
+                  </button>
+                ) : (
+                  <Link to="/errands" className="ds-btn ds-btn--glass">
+                    Browse errands
+                  </Link>
+                )
+              }
+            />
+          )
         }
       >
         {(result) => (
           <>
             <ul className="ds-surface ds-rows">
               {result.items.map((supplier) => (
-                <li key={supplier.id}>
-                  {/* The whole row is the link, so it is easy to hit on a phone. */}
+                <li key={supplier.id} className="flex items-start">
+                  {/* Most of the row is the link, so it is easy to hit on a phone. The heart sits
+                      beside it, not inside, because a button may not be part of a link. */}
                   <Link
                     to={`/suppliers/${supplier.id}`}
                     state={{ backLabel: title }}
-                    className="flex items-start gap-3 p-4"
+                    className="flex min-w-0 flex-1 items-start gap-3 py-4 pl-4"
                   >
                     <SupplierThumbnail supplier={supplier} />
                     <div className="grid min-w-0 flex-1 grid-cols-1 gap-1">
-                      <p className="wrap-anywhere">{supplier.name}</p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="min-w-0 wrap-anywhere">{supplier.name}</p>
+                        <OpenBadge supplier={supplier} />
+                      </div>
                       <p className="font-normal text-muted wrap-anywhere">
                         {supplier.type} · {supplier.zone} · {supplier.address}
                       </p>
@@ -138,8 +182,10 @@ export function SuppliersPage() {
                         <AvailabilityText availability={supplier.availability} />
                       </p>
                     </div>
-                    <OpenBadge supplier={supplier} />
                   </Link>
+                  <div className="py-3 pr-3 pl-1">
+                    <FavoriteButton supplier={supplier} favorite={favoriteIds.data?.has(supplier.id) ?? false} />
+                  </div>
                 </li>
               ))}
             </ul>

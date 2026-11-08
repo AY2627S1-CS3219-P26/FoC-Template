@@ -67,6 +67,10 @@ describe('requests that are settled before the database', () => {
     ['GET', `/suppliers/${ID}`],
     ['GET', `/suppliers/${ID}/availability`],
     ['GET', `/suppliers/${ID}/photo`],
+    // A member may keep favorites, so these three are allowed to one, unlike the routes after them.
+    ['GET', '/suppliers/favorites'],
+    ['PUT', `/suppliers/${ID}/favorite`],
+    ['DELETE', `/suppliers/${ID}/favorite`],
     ['POST', '/suppliers'],
     ['PATCH', `/suppliers/${ID}`],
     ['DELETE', `/suppliers/${ID}`],
@@ -104,7 +108,7 @@ describe('requests that are settled before the database', () => {
   })
 
   it('answers 403 to a member on every route that changes a supplier', async () => {
-    for (const [method, url] of ROUTES.slice(5)) {
+    for (const [method, url] of ROUTES.slice(8)) {
       const response = await call(method, url, 'member-token', method === 'DELETE' ? undefined : VALID_SUPPLIER)
       assert.equal(response.status, 403, `${method} ${url}`)
       assert.equal(response.body.error.code, 'FORBIDDEN')

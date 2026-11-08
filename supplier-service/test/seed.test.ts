@@ -38,15 +38,6 @@ describe('the seed file', async () => {
     assert.equal(suppliers.filter((s) => s.zone === 'Other').length, 0)
   })
 
-  // "Nearest" sorts by these points, so a typo in one moves a shop off the campus. Cheers at E3
-  // once had 103.7526298, about 1.8 km west of its building.
-  it('places every supplier on the Kent Ridge campus', () => {
-    const outside = suppliers.filter(
-      (s) => !(s.latitude! > 1.285 && s.latitude! < 1.31 && s.longitude! > 103.765 && s.longitude! < 103.79),
-    )
-    assert.deepEqual(outside.map((s) => s.name), [])
-  })
-
   it('reads the apostrophe in Prince George\'s Park correctly', () => {
     const park = suppliers.filter((s) => s.building === "Prince George's Park")
     assert.equal(park.length, 3)

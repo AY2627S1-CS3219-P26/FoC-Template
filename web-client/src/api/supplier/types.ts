@@ -38,6 +38,8 @@ export type Supplier = {
   // Paths on the supplier-service; supplierImageUrl in ./photos turns them into URLs.
   photo: { path: string; thumbnailPath: string } | null
   availability: SupplierAvailability
+  // Whole metres from the list's `near` point. Null without one, or without coordinates.
+  distanceMeters: number | null
   createdAt: string
   updatedAt: string
 }
@@ -63,6 +65,11 @@ export type SupplierFilters = {
   status?: SupplierStatus | 'all'
   // Only the favorites of whoever is logged in; the supplier-service knows whose from the session.
   favorites?: boolean
+  // Only the suppliers open now, on the campus clock.
+  openNow?: boolean
+  // "latitude,longitude" to measure distances from. 'distance' needs it.
+  near?: string
+  sort?: 'name' | 'distance'
   page: number
   // 1 to 20. The supplier-service uses 20 when none is given.
   pageSize?: number

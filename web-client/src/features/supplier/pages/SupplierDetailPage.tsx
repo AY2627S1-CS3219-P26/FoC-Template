@@ -1,4 +1,5 @@
 import { useParams } from 'react-router'
+import { useFavoriteSupplierIds } from '@/api/supplier/favorites'
 import { supplierMapUrl } from '@/api/supplier/maps'
 import { supplierImageUrl } from '@/api/supplier/photos'
 import { useSupplier } from '@/api/supplier/suppliers'
@@ -9,6 +10,7 @@ import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { AvailabilityText } from '../components/AvailabilityText'
 import { BackButton } from '../components/BackButton'
+import { FavoriteButton } from '../components/FavoriteButton'
 import { GoogleMapsLink } from '../components/GoogleMapsLink'
 import { OpenBadge } from '../components/OpenBadge'
 
@@ -31,13 +33,21 @@ function hoursOn(supplier: Supplier, day: Weekday): string | null {
 export function SupplierDetailPage() {
   const { id = '' } = useParams()
   const supplier = useSupplier(id)
+  const favoriteIds = useFavoriteSupplierIds()
   const mapUrl = supplier.data ? supplierMapUrl(supplier.data) : null
 
   return (
     <Page
       title={supplier.data?.name ?? 'Supplier'}
       subtitle={supplier.data ? `${supplier.data.type} · ${supplier.data.building}` : undefined}
-      actions={<BackButton fallbackTo="/suppliers" fallbackLabel="Pick up from" />}
+      actions={
+        <>
+          {supplier.data && (
+            <FavoriteButton supplier={supplier.data} favorite={favoriteIds.data?.has(supplier.data.id) ?? false} />
+          )}
+          <BackButton fallbackTo="/suppliers" fallbackLabel="Pick up from" />
+        </>
+      }
     >
       <QueryView query={supplier} loadingLabel="Loading supplier">
         {(current) => (

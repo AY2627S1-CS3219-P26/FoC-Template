@@ -14,6 +14,8 @@ interface Session {
 // session of an account that is no longer Active.
 export const SESSIONS: Record<string, Session> = {
   'member-token': { accountId: 'member-account-1', active: true, roles: ['member'] },
+  // A second student, so that tests can show one account never sees another's data.
+  'other-member-token': { accountId: 'member-account-3', active: true, roles: ['member'] },
   'admin-token': {
     accountId: 'admin-account-1',
     active: true,

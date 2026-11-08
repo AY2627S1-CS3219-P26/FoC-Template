@@ -106,10 +106,13 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
 
     // Suppliers change rarely and are read constantly, so the same search is
     // answered from memory for a couple of seconds. The opening hours are
-    // evaluated below on every request, never cached.
-    const { items, total } = await deps.listCache.get(JSON.stringify(parsed.value), () =>
-      repository.listSuppliers(deps.db, parsed.value),
-    )
+    // evaluated below on every request, never cached. A list of favorites
+    // belongs to one account and changes at a tap, so it always comes fresh.
+    const accountId = parsed.value.favorites ? request.actorId : null
+    const load = () => repository.listSuppliers(deps.db, parsed.value, accountId)
+    const { items, total } = parsed.value.favorites
+      ? await load()
+      : await deps.listCache.get(JSON.stringify(parsed.value), load)
     const moment = toLocalMoment(deps.now(), deps.timeZone)
     return {
       items: items.map((s) => present(s, moment)),
@@ -126,6 +129,23 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
     const parsed = parseFilterValuesQuery(request.query as Record<string, unknown>)
     if ('errors' in parsed) throw validationFailed(parsed.errors)
     return repository.listFilterValues(deps.db, parsed.value)
+  })
+
+  // The caller's own favorites. The account comes from the session, so nobody can
+  // ask for another account's. A read, so its approval may come from the auth cache.
+  app.get('/suppliers/favorites', { onRequest: requires('supplier.read') }, async (request) => ({
+    supplierIds: await repository.listFavoriteIds(deps.db, request.actorId),
+  }))
+
+  app.put<{ Params: Params }>('/suppliers/:id/favorite', { onRequest: requires('supplier.favorite') }, async (request, reply) => {
+    if (!(await repository.addFavorite(deps.db, request.actorId, request.params.id))) throw notFound()
+    return reply.status(204).send()
+  })
+
+  // Removing a favorite that is not there changes nothing, so it answers the same.
+  app.delete<{ Params: Params }>('/suppliers/:id/favorite', { onRequest: requires('supplier.favorite') }, async (request, reply) => {
+    await repository.removeFavorite(deps.db, request.actorId, request.params.id)
+    return reply.status(204).send()
   })
 
   // Inactive suppliers stay retrievable here, for errands that already use them.

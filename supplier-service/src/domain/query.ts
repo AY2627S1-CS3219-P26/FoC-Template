@@ -8,6 +8,8 @@ export interface ListFilters {
   zone: string | null
   building: string | null
   status: 'Active' | 'Inactive' | 'all'
+  // Only the caller's own favorites. Whose they are comes from the session, never the query.
+  favorites: boolean
   page: number
   pageSize: number
 }
@@ -43,6 +45,14 @@ function whole(
   return value
 }
 
+function flag(query: Query, key: string, errors: FieldError[]): boolean {
+  const text = single(query, key, errors)
+  if (text === null || text === 'false') return false
+  if (text === 'true') return true
+  errors.push({ field: key, message: 'must be true or false' })
+  return false
+}
+
 function status(query: Query, errors: FieldError[]): ListFilters['status'] {
   const text = single(query, 'status', errors)
   if (text === null) return 'Active'
@@ -75,6 +85,7 @@ export function parseListQuery(query: Query): Validated<ListFilters> {
     zone: text('zone', 60),
     building: text('building', 120),
     status: listStatus,
+    favorites: flag(query, 'favorites', errors),
     page: whole(query, 'page', 1, 100000, 1, errors),
     pageSize: whole(query, 'pageSize', 1, MAX_PAGE_SIZE, MAX_PAGE_SIZE, errors),
   }

@@ -444,10 +444,6 @@ deactivated. The file has no campus zone, per-day hours or contact details, so:
   before photos existed, and only to a seeded supplier that still has its seed
   name and no photo. `seed_runs` records that this happened, so a restart never
   brings back a photo an administrator removed.
-- **Coordinates** are taken as written, except one: Cheers Unmanned Convenience
-  Store had longitude 103.7526298, about 1.8 km west of its building, Engineering
-  Block E3. It now has the centre of E3 from OpenStreetMap (way 139971771),
-  1.2995065, 103.7716961. A test checks that every seed supplier is on the campus.
 
 ## Deploying
 
@@ -476,9 +472,6 @@ knowing all the same:
 - **Location.** Browsers share a position only with a page over HTTPS, or from
   localhost. The cloud serves HTTPS. On plain HTTP elsewhere, "Nearest to me"
   says it cannot ask, and the list stays sorted by name.
-- **A database seeded earlier.** The corrected Cheers coordinate reaches only a
-  new database. On an existing one, an administrator opens the supplier, uses
-  "Pick on map", or types latitude 1.2995065 and longitude 103.7716961, and saves.
 - **Logs.** The supplier-service log shows `near=hidden`. The gateway's nginx
   access log still records the rounded position, about 110 m; changing its log
   format is a platform change.

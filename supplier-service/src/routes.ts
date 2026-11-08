@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { type Authorizer, type Operation } from './auth.ts'
 import { HttpError, notFound, validationFailed } from './errors.ts'
 import { evaluateAvailability, toLocalMoment, type LocalMoment } from './domain/availability.ts'
+import { MAX_PHOTO_BYTES, MAX_THUMBNAIL_BYTES, validatePhoto } from './domain/photo.ts'
 import { parseAt, parseFilterValuesQuery, parseListQuery } from './domain/query.ts'
 import { WEEKDAYS, type Supplier } from './domain/supplier.ts'
 import { formatClock } from './domain/time.ts'
@@ -21,6 +22,9 @@ export interface RouteDeps {
 interface Params {
   id: string
 }
+
+// Base64 makes the two images a third larger, and the JSON around them needs a little room.
+const PHOTO_BODY_LIMIT = Math.ceil(((MAX_PHOTO_BYTES + MAX_THUMBNAIL_BYTES) * 4) / 3) + 4096
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -47,6 +51,14 @@ function present(supplier: Supplier, moment: LocalMoment) {
       closes: formatClock(h.closes),
     })),
     status: supplier.status,
+    // Paths on this service, like the Location header. The version in them changes with
+    // every new photo, so a browser may keep a photo it fetched through one for good.
+    photo: supplier.photoVersion
+      ? {
+          path: `/suppliers/${supplier.id}/photo?v=${supplier.photoVersion}`,
+          thumbnailPath: `/suppliers/${supplier.id}/photo?size=thumbnail&v=${supplier.photoVersion}`,
+        }
+      : null,
     availability: evaluateAvailability(supplier.hours, moment),
     createdAt: supplier.createdAt.toISOString(),
     updatedAt: supplier.updatedAt.toISOString(),
@@ -142,6 +154,44 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
       // What a new errand may use: not deactivated, and open at that time.
       orderable: supplier.status === 'Active' && availability.open,
     }
+  })
+
+  app.get<{ Params: Params }>('/suppliers/:id/photo', { onRequest: requires('supplier.read') }, async (request, reply) => {
+    const query = request.query as Record<string, unknown>
+    const size = query.size ?? 'photo'
+    if (size !== 'photo' && size !== 'thumbnail') {
+      throw validationFailed([{ field: 'size', message: 'must be photo or thumbnail' }])
+    }
+    const photo = await repository.getSupplierPhoto(deps.db, request.params.id, size)
+    if (!photo) throw new HttpError(404, 'NOT_FOUND', 'This supplier has no photo')
+
+    const etag = `"${photo.version}-${size}"`
+    // private: only a signed-in member may see it, so no shared cache may keep a copy.
+    reply.header('cache-control', query.v === photo.version ? 'private, max-age=31536000, immutable' : 'private, no-cache')
+    reply.header('etag', etag)
+    reply.header('x-content-type-options', 'nosniff')
+    if (request.headers['if-none-match'] === etag) return reply.status(304).send()
+    return reply.type(photo.type).send(photo.bytes)
+  })
+
+  app.put<{ Params: Params }>(
+    '/suppliers/:id/photo',
+    { onRequest: requires('supplier.update'), bodyLimit: PHOTO_BODY_LIMIT },
+    async (request) => {
+      const parsed = validatePhoto(request.body)
+      if ('errors' in parsed) throw validationFailed(parsed.errors)
+      const supplier = await repository.setSupplierPhoto(deps.db, request.params.id, parsed.value, request.actorId)
+      deps.listCache.clear()
+      if (!supplier) throw notFound()
+      return present(supplier, toLocalMoment(deps.now(), deps.timeZone))
+    },
+  )
+
+  app.delete<{ Params: Params }>('/suppliers/:id/photo', { onRequest: requires('supplier.update') }, async (request) => {
+    const supplier = await repository.removeSupplierPhoto(deps.db, request.params.id, request.actorId)
+    deps.listCache.clear()
+    if (!supplier) throw notFound()
+    return present(supplier, toLocalMoment(deps.now(), deps.timeZone))
   })
 
   app.post('/suppliers', { onRequest: requires('supplier.create') }, async (request, reply) => {

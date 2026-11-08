@@ -3,6 +3,7 @@ import { CachingAuthorizer, UserServiceAuthorizer } from './auth.ts'
 import { buildApp } from './app.ts'
 import { loadConfig } from './config.ts'
 import { createPool, migrate } from './db.ts'
+import { seedPhotosOnce } from './seed/photos.ts'
 import { seedIfEmpty } from './seed/seed.ts'
 
 const config = loadConfig()
@@ -24,7 +25,10 @@ const app = buildApp({
 const applied = await migrate(pool, path.join(import.meta.dirname, 'migrations'))
 for (const file of applied) app.log.info(`Applied migration ${file}`)
 
-if (config.seedOnStartup) await seedIfEmpty(pool, config.seedCsvPath, app.log)
+if (config.seedOnStartup) {
+  await seedIfEmpty(pool, config.seedCsvPath, app.log)
+  await seedPhotosOnce(pool, config.seedCsvPath, app.log)
+}
 
 await app.listen({ port: config.port, host: '0.0.0.0' })
 

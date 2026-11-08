@@ -48,7 +48,7 @@ describe('requests that are settled before the database', () => {
     assert.deepEqual(queries, [], 'no request in this file may have reached the database')
   })
 
-  const call = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, token?: string, payload?: object | string) => {
+  const call = async (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, token?: string, payload?: object | string) => {
     const response = await app.inject({
       method,
       url,
@@ -66,9 +66,12 @@ describe('requests that are settled before the database', () => {
     ['GET', '/suppliers/filters'],
     ['GET', `/suppliers/${ID}`],
     ['GET', `/suppliers/${ID}/availability`],
+    ['GET', `/suppliers/${ID}/photo`],
     ['POST', '/suppliers'],
     ['PATCH', `/suppliers/${ID}`],
     ['DELETE', `/suppliers/${ID}`],
+    ['PUT', `/suppliers/${ID}/photo`],
+    ['DELETE', `/suppliers/${ID}/photo`],
   ] as const
 
   it('answers 401 on every route without a session', async () => {
@@ -101,7 +104,7 @@ describe('requests that are settled before the database', () => {
   })
 
   it('answers 403 to a member on every route that changes a supplier', async () => {
-    for (const [method, url] of ROUTES.slice(4)) {
+    for (const [method, url] of ROUTES.slice(5)) {
       const response = await call(method, url, 'member-token', method === 'DELETE' ? undefined : VALID_SUPPLIER)
       assert.equal(response.status, 403, `${method} ${url}`)
       assert.equal(response.body.error.code, 'FORBIDDEN')

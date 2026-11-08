@@ -173,6 +173,9 @@ user-service sets when someone logs in. Request and response bodies are JSON.
 | `POST /suppliers` | administrator | create, 201 with a `Location` header |
 | `PATCH /suppliers/{id}` | administrator | change any field except `id` and `createdAt` |
 | `DELETE /suppliers/{id}` | administrator | deactivate: sets status Inactive, the record stays |
+| `GET /suppliers/{id}/photo` | any member | the photo, or `?size=thumbnail` for the small copy |
+| `PUT /suppliers/{id}/photo` | administrator | add or replace the photo |
+| `DELETE /suppliers/{id}/photo` | administrator | remove the photo |
 
 **List.** `q` (keywords, every word must match the name, type, building,
 zone or address), `type`, `zone`, `building`, `status` (`Active`
@@ -250,6 +253,25 @@ curl -X POST http://localhost:3002/suppliers \
 `hours` lists the weekdays the supplier is open. A weekday left out is closed.
 Times are `HH:MM`, and closing at `24:00` or after midnight is allowed.
 
+**Photos.** A supplier has at most one photo and a square thumbnail for lists.
+Every supplier in a response has `photo`, which is null or holds two paths on
+this service, such as `/suppliers/{id}/photo?v=1a2b3c4d5e6f7a8b`. The `v` changes with
+every new photo, so a link that carries the current one is cached for a year
+(`private, max-age=31536000, immutable`). An old link still shows the current
+photo but is not cached, and every answer has an `ETag`.
+
+`PUT` takes both images as data URLs, which is what a browser canvas gives:
+
+```json
+{ "photo": "data:image/jpeg;base64,...", "thumbnail": "data:image/jpeg;base64,..." }
+```
+
+The photo may be 1 MB and the thumbnail 256 KB, as JPEG, PNG or WebP. The type is
+read from the file's first bytes and must match the one the data URL names. The
+web client shrinks a photo to 1280 px and a 240 px square before it sends it,
+so any phone photo fits. The images live in the `supplier_photos` table, apart
+from the suppliers, so that listing suppliers never reads them.
+
 **Errors** always look like this. `fields` is present for validation errors and
 names every invalid field, so a form can show them all at once.
 
@@ -261,6 +283,7 @@ names every invalid field, so a form can show them all at once.
 | Status | Code | When |
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST` | invalid fields or query, malformed JSON |
+| 413 | `BAD_REQUEST` | a request body over the limit: 64 KB, or about 1.75 MB for a photo |
 | 401 | `UNAUTHENTICATED` | no session cookie at all |
 | 403 | `FORBIDDEN` | the user-service did not confirm it: an unknown or ended session, an account that is not Active, a missing role, or the user-service could not be asked |
 | 404 | `NOT_FOUND` | no such supplier or route |
@@ -384,6 +407,13 @@ deactivated. The file has no campus zone, per-day hours or contact details, so:
 - **Buildings** written two ways (`Com 2`, `Com2`) are joined.
 - **Address** is the building and floor, such as `COM3, Level 1`.
 - The file is Windows-1252, not UTF-8, and is decoded as such.
+- **Photos.** The `ImageURL` column names a photo for 6 suppliers. The originals
+  in `data/images` are 2.6 to 5 MB each, so shrunk copies are in
+  `data/images/resized` as `NAME.jpg` and `NAME.thumb.jpg`, about 1.4 MB for
+  all 12. They are added once per database, also to a database that was seeded
+  before photos existed, and only to a seeded supplier that still has its seed
+  name and no photo. `seed_runs` records that this happened, so a restart never
+  brings back a photo an administrator removed.
 
 ## Tests
 
@@ -426,5 +456,4 @@ invalid one is settled before the database is reached.
 - Availability of 99.9% (N2.1.1) is not measured. There is one instance, and
   running more (N6.3) needs no change to the service, because it keeps no state
   of its own apart from the two short caches.
-- Supplier images. The seed file has links for only 6 of the 21 suppliers, and
-  they point at GitHub pages, not image files.
+- Photos for the other 15 seed suppliers. The seed file has photos for only 6.

@@ -1,5 +1,6 @@
 import { useParams } from 'react-router'
 import { supplierMapUrl } from '@/api/supplier/maps'
+import { supplierImageUrl } from '@/api/supplier/photos'
 import { useSupplier } from '@/api/supplier/suppliers'
 import { weekdays } from '@/api/supplier/types'
 import type { Supplier, Weekday } from '@/api/supplier/types'
@@ -41,6 +42,13 @@ export function SupplierDetailPage() {
       <QueryView query={supplier} loadingLabel="Loading supplier">
         {(current) => (
           <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+            {current.photo && (
+              <img
+                src={supplierImageUrl(current.photo.path)}
+                alt={`Photo of ${current.name}`}
+                className="h-56 w-full rounded-card object-cover md:col-span-2 md:h-72"
+              />
+            )}
             {current.status === 'Inactive' && (
               <div className="md:col-span-2">
                 <Notice tone="info" title="You cannot pick this supplier">

@@ -7,6 +7,7 @@ import { createFakeUserService } from '../dev/fake-user-service.ts'
 import { buildApp } from '../src/app.ts'
 import { UserServiceAuthorizer, type Authorizer } from '../src/auth.ts'
 import { createPool, migrate, type Pool } from '../src/db.ts'
+import { seedPhotosOnce } from '../src/seed/photos.ts'
 import { seedIfEmpty } from '../src/seed/seed.ts'
 
 // These tests empty the suppliers table, so they only run against a database
@@ -41,6 +42,16 @@ const cafe = (overrides: object = {}) => ({
 
 const silent = { info() {}, warn() {} }
 
+// The service checks only the first bytes of an image, so a short buffer with the
+// right start stands in for a real one.
+const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(60, 1)])
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(60, 2)])
+const dataUrl = (type: string, bytes: Buffer) => `data:${type};base64,${bytes.toString('base64')}`
+const photoBody = (photo = JPEG, thumbnail = PNG) => ({
+  photo: dataUrl('image/jpeg', photo),
+  thumbnail: dataUrl('image/png', thumbnail),
+})
+
 describe('supplier API', { skip }, () => {
   let pool: Pool
   let app: FastifyInstance
@@ -65,10 +76,10 @@ describe('supplier API', { skip }, () => {
   })
 
   beforeEach(async () => {
-    await pool.query('TRUNCATE suppliers CASCADE')
+    await pool.query('TRUNCATE suppliers, seed_runs CASCADE')
   })
 
-  async function call(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, token?: string, payload?: object) {
+  async function call(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, token?: string, payload?: object) {
     const response = await app.inject({
       method,
       url,
@@ -99,9 +110,12 @@ describe('supplier API', { skip }, () => {
         ['GET', '/suppliers/filters'],
         ['GET', `/suppliers/${id}`],
         ['GET', `/suppliers/${id}/availability`],
+        ['GET', `/suppliers/${id}/photo`],
         ['POST', '/suppliers'],
         ['PATCH', `/suppliers/${id}`],
         ['DELETE', `/suppliers/${id}`],
+        ['PUT', `/suppliers/${id}/photo`],
+        ['DELETE', `/suppliers/${id}/photo`],
       ] as const) {
         const response = await call(method, url, undefined, method === 'GET' ? undefined : {})
         assert.equal(response.status, 401, `${method} ${url}`)
@@ -418,6 +432,97 @@ describe('supplier API', { skip }, () => {
     })
   })
 
+  describe('photos', () => {
+    const fetchPhoto = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers: { cookie: 'relay_session=member-token', ...headers } })
+
+    it('stores a photo and its thumbnail, and links both from the supplier', async () => {
+      const { id } = await create()
+      const response = await call('PUT', `/suppliers/${id}/photo`, 'admin-token', photoBody())
+      assert.equal(response.status, 200, JSON.stringify(response.body))
+      const { path: photoPath, thumbnailPath } = response.body.photo
+      assert.match(photoPath, new RegExp(`^/suppliers/${id}/photo\\?v=[0-9a-f]{16}$`))
+      assert.equal(thumbnailPath, photoPath.replace('?v=', '?size=thumbnail&v='))
+
+      const photo = await fetchPhoto(photoPath)
+      assert.equal(photo.statusCode, 200)
+      assert.equal(photo.headers['content-type'], 'image/jpeg')
+      assert.deepEqual(photo.rawPayload, JPEG)
+      assert.equal(photo.headers['cache-control'], 'private, max-age=31536000, immutable')
+      const thumbnail = await fetchPhoto(thumbnailPath)
+      assert.equal(thumbnail.headers['content-type'], 'image/png')
+      assert.deepEqual(thumbnail.rawPayload, PNG)
+
+      assert.deepEqual((await call('GET', '/suppliers', 'member-token')).body.items[0].photo, response.body.photo)
+      assert.deepEqual((await call('GET', `/suppliers/${id}`, 'member-token')).body.photo, response.body.photo)
+    })
+
+    it('answers a repeated request with 304, and caches a link only while it names the current photo', async () => {
+      const { id } = await create()
+      const first = (await call('PUT', `/suppliers/${id}/photo`, 'admin-token', photoBody())).body.photo.path
+      const etag = (await fetchPhoto(first)).headers.etag as string
+      assert.equal((await fetchPhoto(first, { 'if-none-match': etag })).statusCode, 304)
+
+      const other = Buffer.concat([JPEG, Buffer.from('new')])
+      const second = (await call('PUT', `/suppliers/${id}/photo`, 'admin-token', photoBody(other))).body.photo.path
+      assert.notEqual(second, first)
+      const old = await fetchPhoto(first)
+      assert.deepEqual(old.rawPayload, other, 'an old link shows the current photo')
+      assert.equal(old.headers['cache-control'], 'private, no-cache')
+      assert.equal((await fetchPhoto(first, { 'if-none-match': etag })).statusCode, 200)
+    })
+
+    it('lets only an administrator change the photo, and changes nothing otherwise', async () => {
+      const { id } = await create()
+      assert.equal((await call('PUT', `/suppliers/${id}/photo`, 'member-token', photoBody())).status, 403)
+      assert.equal((await call('DELETE', `/suppliers/${id}/photo`, 'member-token')).status, 403)
+      assert.equal((await call('PUT', `/suppliers/${id}/photo`, undefined, photoBody())).status, 401)
+      assert.equal((await fetchPhoto(`/suppliers/${id}/photo`)).statusCode, 404)
+    })
+
+    it('names each invalid image and stores nothing', async () => {
+      const { id } = await create()
+      const response = await call('PUT', `/suppliers/${id}/photo`, 'admin-token', {
+        photo: 'not an image',
+        thumbnail: dataUrl('image/png', JPEG),
+        caption: 'x',
+      })
+      assert.equal(response.status, 400)
+      assert.deepEqual(response.body.error.fields.map((f: { field: string }) => f.field).sort(), ['caption', 'photo', 'thumbnail'])
+      assert.equal((await fetchPhoto(`/suppliers/${id}/photo`)).statusCode, 404)
+    })
+
+    it('refuses a photo over 1 MB, and a request body over the limit', async () => {
+      const { id } = await create()
+      const large = Buffer.concat([JPEG, Buffer.alloc(1024 * 1024)])
+      const tooLarge = await call('PUT', `/suppliers/${id}/photo`, 'admin-token', photoBody(large))
+      assert.equal(tooLarge.status, 400)
+      assert.deepEqual(tooLarge.body.error.fields, [{ field: 'photo', message: 'must be at most 1 MB' }])
+
+      const huge = await call('PUT', `/suppliers/${id}/photo`, 'admin-token', { photo: 'x'.repeat(3 * 1024 * 1024) })
+      assert.equal(huge.status, 413)
+    })
+
+    it('removes the photo, and removing it again changes nothing', async () => {
+      const { id } = await create()
+      await call('PUT', `/suppliers/${id}/photo`, 'admin-token', photoBody())
+      const removed = await call('DELETE', `/suppliers/${id}/photo`, 'admin-token')
+      assert.equal(removed.status, 200)
+      assert.equal(removed.body.photo, null)
+      assert.equal((await fetchPhoto(`/suppliers/${id}/photo`)).statusCode, 404)
+      assert.equal((await call('DELETE', `/suppliers/${id}/photo`, 'admin-token')).status, 200)
+    })
+
+    it('answers 404 for a supplier that does not exist, and 400 for an unknown size', async () => {
+      const missing = '00000000-0000-4000-8000-000000000000'
+      assert.equal((await call('PUT', `/suppliers/${missing}/photo`, 'admin-token', photoBody())).status, 404)
+      assert.equal((await call('DELETE', `/suppliers/${missing}/photo`, 'admin-token')).status, 404)
+      assert.equal((await fetchPhoto('/suppliers/not-a-uuid/photo')).statusCode, 404)
+      const { id } = await create()
+      assert.equal((await fetchPhoto(`/suppliers/${id}/photo?size=huge`)).statusCode, 400)
+    })
+  })
+
   describe('filter values', () => {
     // Which of two spellings is kept depends on the database collation, so only the words are compared.
     const lower = (values: string[]) => values.map((v) => v.toLowerCase())
@@ -508,6 +613,22 @@ describe('supplier API', { skip }, () => {
       assert.equal(await total(), 1, 'a deactivated supplier disappears from the listing at once')
     })
 
+    it('shows a new photo in the listing at once', async () => {
+      const { id } = await create()
+      const photo = async () =>
+        (
+          await cached.inject({ method: 'GET', url: '/suppliers', headers: { cookie: 'relay_session=member-token' } })
+        ).json().items[0].photo
+      assert.equal(await photo(), null)
+      await cached.inject({
+        method: 'PUT',
+        url: `/suppliers/${id}/photo`,
+        headers: { cookie: 'relay_session=admin-token' },
+        payload: photoBody(),
+      })
+      assert.notEqual(await photo(), null)
+    })
+
     it('never answers a caller who has no right to the memory', async () => {
       await create()
       await total()
@@ -555,6 +676,23 @@ describe('supplier API', { skip }, () => {
       const results = await Promise.all([1, 2, 3, 4].map(() => seedIfEmpty(pool, SEED_FILE, silent)))
       assert.deepEqual(results.sort((a, b) => b - a), [21, 0, 0, 0])
       assert.equal((await search('')).total, 21)
+    })
+
+    it('adds the seed photos once, and never brings back one an administrator removed', async () => {
+      assert.equal(await seedPhotosOnce(pool, SEED_FILE, silent), 6)
+      const [coop] = (await search('?q=Co-op')).items
+      assert.notEqual(coop.photo, null)
+      const image = await app.inject({ method: 'GET', url: coop.photo.path, headers: { cookie: 'relay_session=member-token' } })
+      assert.equal(image.headers['content-type'], 'image/jpeg')
+
+      await call('DELETE', `/suppliers/${coop.id}/photo`, 'admin-token')
+      assert.equal(await seedPhotosOnce(pool, SEED_FILE, silent), 0)
+      assert.equal((await search('?q=Co-op')).items[0].photo, null)
+    })
+
+    it('keeps its one run when the photo files are missing', async () => {
+      assert.equal(await seedPhotosOnce(pool, SEED_FILE, silent, path.join(import.meta.dirname, 'no-such-folder')), 0)
+      assert.equal(await seedPhotosOnce(pool, SEED_FILE, silent), 6)
     })
 
     it('does not run the migrations twice', async () => {

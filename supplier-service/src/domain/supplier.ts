@@ -41,4 +41,6 @@ export interface Supplier extends SupplierInput {
   id: string
   createdAt: Date
   updatedAt: Date
+  // Null when the supplier has no photo. A new photo gives a new version.
+  photoVersion: string | null
 }

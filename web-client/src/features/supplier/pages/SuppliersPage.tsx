@@ -11,6 +11,7 @@ import type { SelectOption } from '@/components/SelectField'
 import { TextField } from '@/components/TextField'
 import { AvailabilityText } from '../components/AvailabilityText'
 import { OpenBadge } from '../components/OpenBadge'
+import { SupplierThumbnail } from '../components/SupplierThumbnail'
 
 const title = 'Pick up from'
 
@@ -125,9 +126,10 @@ export function SuppliersPage() {
                   <Link
                     to={`/suppliers/${supplier.id}`}
                     state={{ backLabel: title }}
-                    className="flex items-start justify-between gap-3 p-4"
+                    className="flex items-start gap-3 p-4"
                   >
-                    <div className="grid min-w-0 grid-cols-1 gap-1">
+                    <SupplierThumbnail supplier={supplier} />
+                    <div className="grid min-w-0 flex-1 grid-cols-1 gap-1">
                       <p className="wrap-anywhere">{supplier.name}</p>
                       <p className="font-normal text-muted wrap-anywhere">
                         {supplier.type} · {supplier.zone} · {supplier.address}

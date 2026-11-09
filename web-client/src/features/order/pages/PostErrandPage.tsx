@@ -1,49 +1,3 @@
-// import { useState } from 'react'
-// import { suppliersOf } from '@/api/order/order'
-// import { useSuppliers } from '@/api/supplier/suppliers'
-// import { Notice } from '@/components/Notice'
-// import { ErrandForm } from '@/features/order/components/ErrandForm'
-
-// const ERRANDS_PATH = '/errands'
-
-// export function PostErrandPage() {
-//   const suppliers = useSuppliers({ page: 1, status: 'all' })
-//   const [posted, setPosted] = useState(false)
-//   const [formKey, setFormKey] = useState(0) // remounting the form clears it for "Post another"
-
-//   return (
-//     <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-6 p-4 sm:p-6">
-//       <header className="grid gap-2">
-//         <h1>Post an errand</h1>
-//         <p className="opacity-70">Tell couriers what to pick up and where to bring it.</p>
-//       </header>
-
-//       {posted ? (
-//         <div className="ds-surface grid grid-cols-1 gap-4 p-5">
-//           <Notice tone="success" role="status" title="Errand posted" />
-//           <p>Couriers can see it now. You will find it under “My requests”.</p>
-//           <div className="flex flex-wrap gap-3">
-//             <a className="ds-btn ds-btn--primary" href={ERRANDS_PATH}>
-//               View my errands
-//             </a>
-//             <button
-//               type="button"
-//               className="ds-btn"
-//               onClick={() => {
-//                 setPosted(false)
-//                 setFormKey((key) => key + 1)
-//               }}
-//             >
-//               Post another
-//             </button>
-//           </div>
-//         </div>
-//       ) : (
-//         <ErrandForm key={formKey} suppliers={suppliersOf(suppliers.data)} onCreated={() => setPosted(true)} />
-//       )}
-//     </div>
-// )}
-
 import { useState } from 'react'
 import { useSuppliers } from '@/api/supplier/suppliers'
 import { useRecommendation } from '@/api/recommendation/recommendations'
@@ -51,7 +5,10 @@ import { useCreateOrder } from '@/api/order/order'
 import { Notice } from '@/components/Notice'
 import { SubmitButton } from '@/components/SubmitButton'
 import { Page } from '@/components/Page'
-import { SelectField } from '@/components/SelectField'
+import type { Supplier } from '@/api/supplier/types'
+import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
+import { PickUpList } from '../components/PickupList'
+// import { SelectField } from '@/components/SelectField'
 import { TextField } from '@/components/TextField'
 import { ApiError, fieldErrorsOf } from '@/lib/http'
 import { FormError } from '@/components/FormError'
@@ -70,6 +27,7 @@ function defaultNeededBy(now = new Date()): string {
 export function PostErrandPage() {
   const suppliers = useSuppliers({ page: 1 })
 
+  console.log("suppliers")
   console.log(suppliers)
 
   const recommend = useRecommendation()
@@ -77,18 +35,21 @@ export function PostErrandPage() {
   const ERRANDS_PATH = '/errands'
   const fieldErrors = fieldErrorsOf(create.error)
 
-  const [supplierId, setSupplierId] = useState('')
+  
+  const [supplier, setSupplier] = useState<Supplier | null>(null)
+  const supplierId = supplier?.id ?? ''
   const [location, setLocation] = useState('')
   const [neededBy, setNeededBy] = useState(defaultNeededBy)
   const [itemsText, setItemsText] = useState('')
   const [credits, setCredits] = useState('')
   const [posted, setPosted] = useState(false)
   const [timeError, setTimeError] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
 
-  const supplierOptions = [
-    { value: '', label: 'Select a supplier' },
-    ...(suppliers.data?.items ?? []).map((s) => ({ value: s.id, label: s.name })),
-  ]
+  // const supplierOptions = [
+  //   { value: '', label: 'Select a supplier' },
+  //   ...(suppliers.data?.items ?? []).map((s) => ({ value: s.id, label: s.name })),
+  // ]
 
   function suggest() {
     const items = itemsText
@@ -137,7 +98,7 @@ export function PostErrandPage() {
   }
 
   function resetForm() {
-    setSupplierId('')
+    setSupplier(null)
     setLocation('')
     setNeededBy(defaultNeededBy())
     setItemsText('')
@@ -153,7 +114,7 @@ export function PostErrandPage() {
 
   const pastTimeFromService =
     create.error instanceof ApiError && String(create.error.message).includes('NEEDED_BY_TIME_IN_PAST')
-    
+
   const neededByErrors = timeError
     ? [timeError]
     : (fieldErrors.neededByTime ?? (pastTimeFromService ? ['The needed-by time must be in the future.'] : undefined))
@@ -163,12 +124,38 @@ export function PostErrandPage() {
       {!posted ? (
         <form className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
           <FormError error={create.error} fields={['supplierId', 'deliveryLocation', 'neededByTime', 'itemLines', 'creditReward']} />
-          <SelectField label="Supplier" name="supplierId" value={supplierId} onChange={setSupplierId} options={supplierOptions} errors={fieldErrors.supplierId}/>
-          {fieldErrors.supplierId?.[0] && (
-            <p className="text-sm text-danger mt-1">
-              {fieldErrors.supplierId[0]}
-            </p>
-          )}
+          {/* Choose pick up */}
+          <div className="grid gap-2">
+            <span>
+              Picking up from
+            </span>
+            {supplier ? (
+              <div className="flex items-center gap-3">
+                <SupplierThumbnail supplier={supplier} />
+                <div className="grid min-w-0 flex-1 gap-1">
+                  <p className="wrap-anywhere">{supplier.name}</p>
+                  <p className="text-sm text-muted wrap-anywhere">
+                    {supplier.type} · {supplier.zone}
+                  </p>
+                </div>
+                <button type="button" className="ds-btn ds-btn--glass shrink-0" onClick={() => setPicking(true)}>
+                  Change
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                aria-labelledby="pickup-label"
+                className="ds-btn ds-btn--glass justify-self-start"
+                onClick={() => setPicking(true)}
+              >
+                Choose a pickup location
+              </button>
+            )}
+            {fieldErrors.supplierId?.[0] && <p className='text-danger'>{fieldErrors.supplierId?.[0]}</p>}
+          </div>
+          {/* <SelectField label="Supplier" name="supplierId" value={supplierId} onChange={setSupplierId} options={supplierOptions} errors={fieldErrors.supplierId}/> */}
+          
           <TextField
             label="Drop-off location"
             name="location"
@@ -247,6 +234,17 @@ export function PostErrandPage() {
         </div>
         ) 
       }
+      {/* show the pick up list */}
+      {picking && (
+        <PickUpList
+          selectedId={supplierId}
+          onSelect={(chosen) => {
+            setSupplier(chosen)
+            setPicking(false)
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </Page>
   )
 }

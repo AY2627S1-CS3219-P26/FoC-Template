@@ -231,6 +231,21 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  recommendation-service:
+    build: ./recommendation-service
+    environment:
+      PORT: 3006
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      USER_SERVICE_URL: http://user-service:3000
+      BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
+      FEATURE_STORE: memory
+    ports:
+      - "127.0.0.1:3006:3006"
+    networks:
+      - edge
+      - backend
+    restart: unless-stopped
+
   order-db:
     image: postgres:17-alpine
     environment:
@@ -257,6 +272,7 @@ services:
       RAG_SERVICE_URL: http://rag-service:3080
       SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
       CREDIT_SERVICE_URL: http://credit-service:3002
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:3006
       MESSAGE_SERVICE_URL: http://message-service:3008
       # Locally every email lands in Mailpit, so the verify page links to it. Set it to empty to hide the hint.
       DEV_MAILBOX_URL: ${DEV_MAILBOX_URL-http://localhost:8025}

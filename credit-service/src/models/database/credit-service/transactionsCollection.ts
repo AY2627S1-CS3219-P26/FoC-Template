@@ -16,3 +16,15 @@ export async function findTransactionsByUserId(userId: string) {
 export async function findTransactionsByErrandRef(errandRef: string) {
     return collection.find({ errandRef }).toArray();
 }
+
+// F4.5.3 (admin): the whole ledger for the dashboard, newest first, one page at a time. An optional
+// userId scopes it to one account. Count and page come back together so the caller builds a
+// Paginated response without a second round trip.
+export async function findTransactions({ userId, page, pageSize }: { userId?: string; page: number; pageSize: number }) {
+    const filter = userId ? { userId } : {};
+    const [items, total] = await Promise.all([
+        collection.find(filter).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).toArray(),
+        collection.countDocuments(filter),
+    ]);
+    return { items, page, pageSize, total };
+}

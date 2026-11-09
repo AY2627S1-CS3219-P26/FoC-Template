@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react"
-// import type { SubmitEvent } from "react"
-import { useSuppliers } from '@/api/supplier/suppliers'
-// , useSupplierFilterValues
+import type { SubmitEvent } from "react"
+import { useSuppliers, useSupplierFilterValues } from '@/api/supplier/suppliers'
 import type { Supplier, } from '@/api/supplier/types'
 // SupplierStatus 
 import { EmptyState } from '@/components/EmptyState'
 import { Pagination } from '@/components/Pagination'
 import { QueryView } from '@/components/QueryView'
-// import type { SelectOption } from '@/components/SelectField'
-// import { TextField } from '@/components/TextField'
+import type { SelectOption } from '@/components/SelectField'
+import { SelectField } from "@/components/SelectField"
+import { TextField } from '@/components/TextField'
 import { AvailabilityText } from '@/features/supplier/components/AvailabilityText'
 import { OpenBadge } from '@/features/supplier/components/OpenBadge'
 import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
@@ -22,13 +22,18 @@ type PickUpListProps = {
 
 export function PickUpList({ selectedId, onSelect, onClose}: PickUpListProps) {
     const ref = useRef<HTMLDialogElement>(null)
-    // const [search, setSearch] = useState('')
+    const [search, setSearch] = useState('')
     const [page, setPage] = useState(1)
     const [q, setQ] = useState('')
     const [type, setType] = useState('')
 
     const suppliers = useSuppliers({ q: q || undefined, type: type || undefined, page })
-    // const filterValues = useSupplierFilterValues()
+    
+    const filterValues = useSupplierFilterValues()
+    const typeOptions: SelectOption[] = [
+        { value: '', label: 'All types' },
+        ...(filterValues.data?.types ?? []).map((value) => ({ value, label: value })),
+    ]
 
     const filtered = q !== '' || type !== '' 
     const total = suppliers.data?.total
@@ -38,14 +43,14 @@ export function PickUpList({ selectedId, onSelect, onClose}: PickUpListProps) {
         if (dialog && !dialog.open) dialog.showModal()
     }, [])
 
-    // function handleSearch(event: SubmitEvent<HTMLFormElement>) {
-    //     event.preventDefault()
-    //     setQ(search.trim())
-    //     setPage(1)
-    // }
+    function handleSearch(event: SubmitEvent<HTMLFormElement>) {
+        event.preventDefault()
+        setQ(search.trim())
+        setPage(1)
+    }
 
     function clearFilters() {
-        // setSearch('')
+        setSearch('')
         setQ('')
         setType('')
         setPage(1)
@@ -54,15 +59,28 @@ export function PickUpList({ selectedId, onSelect, onClose}: PickUpListProps) {
     return (
         <dialog ref={ref} onClose={onClose} onClick={(event) => { if (event.target == ref.current) ref.current?.close}}
             className="m-0 h-dvh max-h-none w-dvw max-w-none bg-backdrop p-0 text-ink backdrop:bg-[rgb(0_0_0/0.4)] sm:m-auto sm:h-auto sm:max-h-[85dvh] sm:w-full sm:max-w-2xl sm:rounded-panel">
-            <div>
-                <header className="flex items-center">
+            <div className="flex h-dvh flex-col sm:h-auto sm:max-h-[85dvh] p-5">
+                <header className="flex items-center justify-between gap-3">
                     <h2 className="text-ink">Pick up from</h2>
                     <button type="button" className="ds-btn ds-btn--primary" onClick={() => ref.current?.close()}>
                         Close
                     </button>
                 </header>
-                <form>
-                    
+                <form role="search" noValidate onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-4 md:items-end p-3">
+                    <div className="md:col-span-2">
+                        {/* No hint below the box: it would push the status and the button out of line with it. */}
+                        <TextField label="Search name of location" name="q" type="search" value={search} onChange={setSearch} />
+                    </div>
+                    <SelectField
+                        label="Type"
+                        name="type"
+                        value={type}
+                        onChange={(value) => setType(value)}
+                        options={typeOptions}
+                    />
+                    <button type="submit" className="ds-btn ds-btn--glass">
+                        Search
+                    </button>
                 </form>
                 
                 {/* List */}

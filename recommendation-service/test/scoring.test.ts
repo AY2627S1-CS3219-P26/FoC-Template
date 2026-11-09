@@ -1,0 +1,40 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { recommendScore, type SupplierStats } from "../src/scoring.ts";
+
+const farFuture = () => new Date(Date.now() + 48 * 3_600_000).toISOString();
+
+const base = { avgLeadTimeMin: 30, lastEventId: "evt-0", updatedAt: "2026-01-01T00:00:00.000Z" };
+
+test("cold start: fewer than 5 completed errands returns the flat default", () => {
+    const stats: SupplierStats = { completedCount: 3, avgReward: 30, avgItems: 4, avgDist: 10, ...base };
+    const result = recommendScore({ items: ["a", "b"], neededBy: farFuture(), distance: 10 }, stats);
+
+    assert.equal(result.recommendedCredits, 10);
+    assert.equal(result.basis, "default");
+});
+
+test("clamps to the floor of 1 when the formula would go below it", () => {
+    const stats: SupplierStats = { completedCount: 10, avgReward: 2, avgItems: 10, avgDist: 10, ...base };
+    const result = recommendScore({ items: [], neededBy: farFuture(), distance: 0 }, stats);
+
+    assert.equal(result.recommendedCredits, 1);
+    assert.equal(result.basis, "formula");
+});
+
+test("clamps to the ceiling of 50 when the formula would overshoot", () => {
+    const stats: SupplierStats = { completedCount: 10, avgReward: 40, avgItems: 2, avgDist: 1, ...base };
+    const result = recommendScore({ items: ["a", "b"], neededBy: farFuture(), distance: 1000 }, stats);
+
+    assert.equal(result.recommendedCredits, 50);
+    assert.equal(result.basis, "formula");
+});
+
+test("normal case: a perfectly average errand returns the market rate", () => {
+    const stats: SupplierStats = { completedCount: 10, avgReward: 20, avgItems: 4, avgDist: 10, ...base };
+    const result = recommendScore({ items: ["a", "b", "c", "d"], neededBy: farFuture(), distance: 10 }, stats);
+
+    assert.equal(result.recommendedCredits, 20);
+    assert.equal(result.basis, "formula");
+    assert.equal(result.contributions.multiplier, 1);
+});

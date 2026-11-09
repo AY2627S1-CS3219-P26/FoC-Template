@@ -48,7 +48,7 @@ describe('requests that are settled before the database', () => {
     assert.deepEqual(queries, [], 'no request in this file may have reached the database')
   })
 
-  const call = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, token?: string, payload?: object | string) => {
+  const call = async (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, token?: string, payload?: object | string) => {
     const response = await app.inject({
       method,
       url,
@@ -63,11 +63,19 @@ describe('requests that are settled before the database', () => {
 
   const ROUTES = [
     ['GET', '/suppliers'],
+    ['GET', '/suppliers/filters'],
     ['GET', `/suppliers/${ID}`],
     ['GET', `/suppliers/${ID}/availability`],
+    ['GET', `/suppliers/${ID}/photo`],
+    // A member may keep favorites, so these three are allowed to one, unlike the routes after them.
+    ['GET', '/suppliers/favorites'],
+    ['PUT', `/suppliers/${ID}/favorite`],
+    ['DELETE', `/suppliers/${ID}/favorite`],
     ['POST', '/suppliers'],
     ['PATCH', `/suppliers/${ID}`],
     ['DELETE', `/suppliers/${ID}`],
+    ['PUT', `/suppliers/${ID}/photo`],
+    ['DELETE', `/suppliers/${ID}/photo`],
   ] as const
 
   it('answers 401 on every route without a session', async () => {
@@ -100,7 +108,7 @@ describe('requests that are settled before the database', () => {
   })
 
   it('answers 403 to a member on every route that changes a supplier', async () => {
-    for (const [method, url] of ROUTES.slice(3)) {
+    for (const [method, url] of ROUTES.slice(8)) {
       const response = await call(method, url, 'member-token', method === 'DELETE' ? undefined : VALID_SUPPLIER)
       assert.equal(response.status, 403, `${method} ${url}`)
       assert.equal(response.body.error.code, 'FORBIDDEN')

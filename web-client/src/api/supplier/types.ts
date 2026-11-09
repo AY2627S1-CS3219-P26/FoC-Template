@@ -35,16 +35,61 @@ export type Supplier = {
   // Only the days it opens. A weekday that is not listed is closed all day.
   hours: SupplierHours[]
   status: SupplierStatus
+  // Paths on the supplier-service; supplierImageUrl in ./photos turns them into URLs.
+  photo: { path: string; thumbnailPath: string } | null
   availability: SupplierAvailability
+  // Whole metres from the list's `near` point. Null without one, or without coordinates.
+  distanceMeters: number | null
   createdAt: string
   updatedAt: string
 }
 
+// GET /suppliers/favorites: the ids of the logged-in account's favorites.
+export type SupplierFavorites = {
+  supplierIds: string[]
+}
+
+// PUT /suppliers/:id/photo: both images as data URLs, at most 1 MB and 256 KB.
+export type SupplierPhotoInput = {
+  photo: string
+  thumbnail: string
+}
+
+// The supplier-service matches type, zone and building ignoring case.
 export type SupplierFilters = {
   q?: string
+  type?: string
+  zone?: string
+  building?: string
   // The supplier-service lists only Active suppliers unless told otherwise.
   status?: SupplierStatus | 'all'
+  // Only the favorites of whoever is logged in; the supplier-service knows whose from the session.
+  favorites?: boolean
+  // Only the suppliers open now, on the campus clock.
+  openNow?: boolean
+  // "latitude,longitude" to measure distances from. 'distance' needs it.
+  near?: string
+  sort?: 'name' | 'distance'
   page: number
+  // 1 to 20. The supplier-service uses 20 when none is given.
+  pageSize?: number
+}
+
+// GET /suppliers/filters: every type, zone and building in use by suppliers of that status.
+export type SupplierFilterValues = {
+  types: string[]
+  zones: string[]
+  buildings: string[]
+}
+
+// GET /suppliers/:id/availability. orderable is true only when the supplier is Active and open at `at`,
+// which is what a new errand needs (F3.1.3).
+export type SupplierAvailabilityCheck = SupplierAvailability & {
+  supplierId: string
+  at: string
+  timezone: string
+  status: SupplierStatus
+  orderable: boolean
 }
 
 // The body of a create or update. Numbers and times are sent as the user typed them when they

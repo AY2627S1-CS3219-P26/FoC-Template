@@ -1,12 +1,18 @@
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
+import { createServer } from "node:http";
 import request from "supertest";
-import { vi } from "vitest";
+import { afterAll, vi } from "vitest";
 import { createApp } from "../../src/app.ts";
 import { sendOtpMail } from "../../src/lib/mailer.ts";
 import { hashPassword } from "../../src/lib/password.ts";
 import { UserModel, type AccountState, type Role } from "../../src/models/user.model.ts";
 
-export const app = createApp();
+// supertest would listen on "::" and then connect to 127.0.0.1, where on macOS another process
+// can hold the same port and answer instead. So the app listens on 127.0.0.1 itself.
+export const app = createServer(createApp()).listen(0, "127.0.0.1");
+await once(app, "listening");
+afterAll(() => new Promise((resolve) => app.close(resolve)));
 
 export const PASSWORD = "correct-password";
 

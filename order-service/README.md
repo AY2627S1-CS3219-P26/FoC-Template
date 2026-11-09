@@ -3,7 +3,7 @@
 Owns errand creation and lifecycle state. Uses Node 24, Express and PostgreSQL.
 
 From the repository root, run `docker compose up --build`. The service is at
-`http://localhost:3005`, credit-service is at `http://localhost:3004`, and the
+`http://localhost:3003`, credit-service is at `http://localhost:3004`, and the
 browser gateway forwards `/api/order/orders` to this service. `GET /health` is public.
 The order tables are created on startup; existing data is preserved.
 

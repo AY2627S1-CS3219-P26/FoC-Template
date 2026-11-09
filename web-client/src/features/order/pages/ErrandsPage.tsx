@@ -1,5 +1,9 @@
-import { PlaceholderPage } from '@/components/PlaceholderPage'
+import { Page } from '@/components/Page'
+import { MessageErrand } from '../components/MessageErrand'
 
+//Insert the id of the errand owner in receiverId
 export function ErrandsPage() {
-  return <PlaceholderPage title="Errands" owner="order-service" file="src/features/order/pages/ErrandsPage.tsx" />
+  return <Page title="Errands" subtitle="Your current errands">
+    <MessageErrand receiverId="receiverId" />
+  </Page>
 }

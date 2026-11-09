@@ -28,3 +28,7 @@ export function useConversation(accountId: string, otherId: string) {
     getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
   })
 }
+
+export function postMessage(content: string, receiverId: string) {
+  return request<Message>('message', '/messages/send', { method: 'POST', body: { receiverId, content } })
+}

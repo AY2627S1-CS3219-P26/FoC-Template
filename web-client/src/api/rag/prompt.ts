@@ -21,14 +21,3 @@ export async function postPrompt(prompt: string, messages: Message[]) {
 
     }
 }
-
-// export async function getPrompt(prompt: string) {
-//     const query = prompt
-//     try {
-        
-//         const method = 'GET';
-//         return await request<queryResponse>('rag', '/query/', { method, query })
-//     } catch (e) {
-
-//     }
-// }

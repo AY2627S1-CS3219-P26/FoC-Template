@@ -7,6 +7,7 @@ import { createFakeUserService } from '../dev/fake-user-service.ts'
 import { buildApp } from '../src/app.ts'
 import { UserServiceAuthorizer, type Authorizer } from '../src/auth.ts'
 import { createPool, migrate, type Pool } from '../src/db.ts'
+import { loadWalkMap } from '../src/map.ts'
 import { seedPhotosOnce } from '../src/seed/photos.ts'
 import { seedIfEmpty } from '../src/seed/seed.ts'
 
@@ -65,7 +66,7 @@ describe('supplier API', { skip }, () => {
     await new Promise<void>((resolve) => userService.listen(0, resolve))
     const port = (userService.address() as AddressInfo).port
     authorizer = new UserServiceAuthorizer(`http://localhost:${port}`)
-    app = buildApp({ db: pool, authorizer, timeZone: TIME_ZONE, now: () => NOW })
+    app = buildApp({ db: pool, authorizer, timeZone: TIME_ZONE, now: () => NOW, walkMap: (await loadWalkMap()).map })
     await app.ready()
   })
 
@@ -112,6 +113,7 @@ describe('supplier API', { skip }, () => {
         ['GET', `/suppliers/${id}/availability`],
         ['GET', `/suppliers/${id}/photo`],
         ['GET', '/suppliers/favorites'],
+        ['POST', `/suppliers/${id}/route`],
         ['PUT', `/suppliers/${id}/favorite`],
         ['DELETE', `/suppliers/${id}/favorite`],
         ['POST', '/suppliers'],
@@ -592,6 +594,48 @@ describe('supplier API', { skip }, () => {
       assert.deepEqual(await names('?favorites=true', 'other-member-token'), ['B'])
       assert.deepEqual(await names('?favorites=false'), ['A', 'B', 'C'])
       assert.equal((await call('GET', '/suppliers?favorites=maybe', 'member-token')).status, 400)
+    })
+  })
+
+  describe('walking routes', () => {
+    // NUS Co-op, and a point in Prince George's Park: about 1.4 km on the paths.
+    const coop = { latitude: 1.2967866, longitude: 103.7732677 }
+    const park = { latitude: 1.2908, longitude: 103.7809 }
+    const walk = (id: string, to: object, token = 'member-token') => call('POST', `/suppliers/${id}/route`, token, { to })
+
+    it('walks from the supplier to any point on the map', async () => {
+      const { id } = await create(coop)
+      const response = await walk(id, park)
+      assert.equal(response.status, 200, JSON.stringify(response.body))
+      const { metres, seconds, estimated, mapVersion } = response.body
+      assert.equal(estimated, false)
+      assert.ok(metres > 1300 && metres < 1550, `${metres} m`)
+      assert.equal(seconds, Math.round(metres / 1.3))
+      assert.match(mapVersion, /^\d{4}-\d{2}-\d{2}$/)
+    })
+
+    it('estimates a walk to a point off the map, and says so', async () => {
+      const { id } = await create(coop)
+      const response = await walk(id, { latitude: 1.3644, longitude: 103.9915 })
+      assert.equal(response.status, 200)
+      assert.equal(response.body.estimated, true)
+      assert.equal(response.body.mapVersion, null)
+    })
+
+    it('refuses a supplier without a map location, one that does not exist, and a bad point', async () => {
+      const { id } = await create({ latitude: null, longitude: null })
+      const noLocation = await walk(id, park)
+      assert.equal(noLocation.status, 422)
+      assert.equal(noLocation.body.error.code, 'NO_LOCATION')
+      assert.equal((await walk('00000000-0000-4000-8000-000000000000', park)).status, 404)
+      const bad = await walk(id, { latitude: 'north', longitude: 103.7 })
+      assert.equal(bad.status, 400)
+      assert.deepEqual(bad.body.error.fields.map((f: { field: string }) => f.field), ['to.latitude'])
+    })
+
+    it('needs an active account, like every read', async () => {
+      const { id } = await create(coop)
+      assert.equal((await walk(id, park, 'suspended-token')).status, 403)
     })
   })
 

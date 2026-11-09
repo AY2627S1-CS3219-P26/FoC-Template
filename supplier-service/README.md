@@ -182,6 +182,7 @@ user-service sets when someone logs in. Request and response bodies are JSON.
 | `GET /suppliers/{id}/photo` | any member | the photo, or `?size=thumbnail` for the small copy |
 | `PUT /suppliers/{id}/photo` | administrator | add or replace the photo |
 | `DELETE /suppliers/{id}/photo` | administrator | remove the photo |
+| `POST /suppliers/{id}/route` | any member | the walk from the supplier to a point, such as an errand's drop-off |
 
 **List.** `q` (keywords, every word must match the name, type, building,
 zone or address), `type`, `zone`, `building`, `status` (`Active`
@@ -302,6 +303,55 @@ web client shrinks a photo to 1280 px and a 240 px square before it sends it,
 so any phone photo fits. The images live in the `supplier_photos` table, apart
 from the suppliers, so that listing suppliers never reads them.
 
+**Walking routes.** The walk from the supplier to any point, computed in the
+service on a map of the paths around NUS. No outside service is asked.
+
+```bash
+curl -X POST http://localhost:3002/suppliers/{id}/route -b cookies.txt \
+  -H "Content-Type: application/json" -d '{"to":{"latitude":1.2908,"longitude":103.7809}}'
+```
+
+```json
+{ "metres": 1424, "seconds": 1095, "estimated": false, "mapVersion": "2026-11-09" }
+```
+
+- **Why POST:** the point may be where a student lives, so it travels in the body.
+  That keeps it out of the gateway's access log. The service does not log it and
+  stores nothing.
+- **Time:** `seconds` is `metres` at 1.3 m/s, the walking speed of the pgRouting
+  workshop.
+- **Estimates:** a point with no mapped path point within 150 m is off the map.
+  The paths have points at their bends and crossings, so a point beside the
+  middle of a long straight road can be off the map too. A walk to or from such
+  a point, or any walk while the map is missing, is the straight line times 1.3,
+  a rough guess. The answer then says `"estimated": true` and
+  `"mapVersion": null`.
+- **Errors:** a supplier without coordinates gets 422 `NO_LOCATION`.
+
+**How it is computed.** `src/domain/walking.ts` snaps both points to the nearest
+mapped path point through a grid of about 110 m cells. It then finds the
+shortest walk with A\*, which is Dijkstra's search led by the straight-line
+distance. On this map a walk under 2 km takes about 0.2 ms, and one of 2 to 5 km
+about 1 to 3 ms, measured on a laptop.
+
+**The map.** `map/nus-walk.graph` (1.8 MB) covers about 6 x 6 km around NUS:
+campus, Prince George's Park, Clementi, Dover, one-north and West Coast. It is
+built ahead from OpenStreetMap data and shipped in the image, so the service
+never downloads anything. Its licence is in `map/README.md`.
+
+To rebuild it, about once a semester or when a route is reported wrong:
+
+```bash
+cd supplier-service
+node dev/build-walk-map.ts
+```
+
+The script downloads the area once from the Overpass API, waiting longer each
+time the server is busy. It writes both files in `map/` and prints a few known
+walks. Compare those with the last map, run the tests, and commit both files in
+one pull request. Each route carries `mapVersion`, the date of the OpenStreetMap
+data, so errands keep the map they were walked on.
+
 **Errors** always look like this. `fields` is present for validation errors and
 names every invalid field, so a form can show them all at once.
 
@@ -314,6 +364,7 @@ names every invalid field, so a form can show them all at once.
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST` | invalid fields or query, malformed JSON |
 | 413 | `BAD_REQUEST` | a request body over the limit: 64 KB, or about 1.75 MB for a photo |
+| 422 | `NO_LOCATION` | a walking route from a supplier that has no coordinates |
 | 401 | `UNAUTHENTICATED` | no session cookie at all |
 | 403 | `FORBIDDEN` | the user-service did not confirm it: an unknown or ended session, an account that is not Active, a missing role, or the user-service could not be asked |
 | 404 | `NOT_FOUND` | no such supplier or route |
@@ -447,8 +498,8 @@ deactivated. The file has no campus zone, per-day hours or contact details, so:
 
 ## Deploying
 
-Photos, favorites, open now and nearest need no change to the deployment, so a
-pull request merged into `dev` is all it takes:
+Photos, favorites, open now, nearest and walking routes need no change to the
+deployment, so a pull request merged into `dev` is all it takes:
 
 1. CI builds the `supplier-service` and `web-client` images and publishes them to
    GHCR (`.github/workflows/ci.yml`, job `publish`). With the AWS deployment, the
@@ -464,8 +515,13 @@ knowing all the same:
 - **Storage.** A photo is about 250 KB and its thumbnail about 15 KB, in the
   supplier database. Its cloud volume is 1 GiB (`databases.supplier-db.size` in
   the Helm values), room for thousands of photos.
-- **Memory.** Each service may use 256 MiB in the cloud. The browser shrinks the
+- **Memory.** Each service may use 256 MiB in the cloud. With the walking map the
+  service uses about 45 to 55 MiB, measured in Docker. The browser shrinks the
   photos, so the service holds at most about 1.75 MB for one upload.
+- **Walking map.** It is in the image (`map/`, about 2 MB). The service reads it
+  at start-up, and never downloads anything, so it needs no internet access.
+  Without the map it still starts, and every route is an estimate. The health
+  check stays green, because routes are an extra.
 - **Upload size.** The gateway lets 2 MB through on the supplier routes
   (`web-client/nginx/templates/routes/supplier.conf.template`), which ships in the
   web-client image.

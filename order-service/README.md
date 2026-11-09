@@ -54,8 +54,9 @@ automatically, which releases its reward. Users cannot set Expired themselves.
 
 For local development, run the dependencies in Compose, set the variables in
 the root `.env.example`, then run `npm ci` and `npm run dev` in `order-service`.
-Run the focused tests from the repository root:
+Run the type check and the tests in `order-service`:
 
 ```sh
-node --experimental-test-module-mocks --test order-service/test/*.test.ts credit-service/test/*.test.ts
+npm run typecheck
+npm test
 ```

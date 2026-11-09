@@ -10,4 +10,4 @@ Node 24 runs the TypeScript directly (no build step), with Express 4, PostgreSQL
 - Pending and Rejected orders are not errands (`isErrand`). No endpoint returns them.
 - Errors are `AppError` from `src/errors.ts`, thrown and answered by the handler in `src/app.ts` as `{ error: { code, message, details } }`. Field errors go in `details.fields`, built with `validationError` from `src/util/validation.ts`.
 - `src/schema.sql` runs on every start. A change to an existing table has to be idempotent (`ADD COLUMN IF NOT EXISTS`, drop and re-add a constraint).
-- Run the tests from the repository root: `node --experimental-test-module-mocks --test order-service/test/*.test.ts`.
+- Run `npm run typecheck` and `npm test` in `order-service`; CI runs the same.

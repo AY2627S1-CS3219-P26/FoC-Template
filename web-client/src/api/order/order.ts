@@ -109,82 +109,46 @@ export function useUpdateOrderStatus() {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
-
+ 
 function errorParts(err: unknown) {
   const rec = isRecord(err) ? err : {}
   const status = typeof rec.status === 'number' ? rec.status : 0
   const code = typeof rec.code === 'string' ? rec.code : ''
   const message = err instanceof Error ? err.message : ''
-  const details = rec.details
-  return {
-    status,
-    code,
-    message,
-    details,
-    network: code === 'NETWORK_ERROR' || err instanceof TypeError,
-  }
+  const details = rec.details ?? (isRecord(rec.body) ? rec.body.details : undefined)
+  return { status, code, message, details }
 }
+ 
+/** The service's error code, e.g. NEEDED_BY_TIME_IN_PAST ('' when there is none). */
+export function orderErrorCode(err: unknown): string {
+  return errorParts(err).code
+}
+ 
+/** Turn an ApiError from the order-service into something a student can act on. */
 export function describeOrderError(err: unknown, fallback: string): string {
-  const { status, code, message, network } = errorParts(err)
-
-  if (network) {
-    return 'Could not reach the server. Check your connection and try again.'
-  }
-
-  if (status === 401 || status === 403) {
-    if (message.includes(' ') && !message.startsWith('Access denied')) return message
-    return 'Your session has expired. Please sign in again.'
-  }
-
-  console.log(code)
-
-  switch (code || message) {
-    case 'NEEDED_BY_TIME_IN_PAST':
-      return 'The needed-by time must be in the future.'
-
+  const { status, code, message } = errorParts(err)
+  if (code === 'NETWORK_ERROR') return message
+  if (status === 401) return 'Your session has expired. Please sign in again.'
+  switch (code) {
     case 'SUPPLIER_NOT_FOUND':
       return 'That pickup location no longer exists.'
-
     case 'SUPPLIER_NOT_ORDERABLE':
       return 'That pickup location is closed or inactive at your needed-by time.'
-
     case 'SUPPLIER_UNAVAILABLE':
     case 'DEPENDENCY_UNAVAILABLE':
       return 'A required service is unavailable right now. Check “My requests” before trying again so you do not create a duplicate.'
-
     case 'CREDIT_RESERVATION_FAILED':
       return 'Could not reserve the reward. You may not have enough available credits.'
-
     case 'INVALID_STATE_TRANSITION':
     case 'STATUS_UPDATE_FAILED':
       return 'This errand changed in the meantime. The list has been refreshed.'
-
-    case 'ORDER_NOT_FOUND':
-      return 'This errand could not be found. It may have been removed.'
-
-    case 'REQUESTER_CANNOT_ACCEPT_OWN_ORDER':
-      return 'You cannot accept your own errand.'
-
-    case 'ORDER_NOT_AVAILABLE':
-      return 'This errand is no longer available.'
-
-    case 'ORDER_ACCEPTANCE_FAILED':
-      return 'Could not accept this errand. Please refresh and try again.'
-
-    case 'UNAUTHORIZED_COURIER_ACTION':
-      return 'Only the assigned courier can update this errand status.'
-
-    case 'UNAUTHORIZED_REQUESTER_ACTION':
-      return 'Only the requester can perform this action.'
-
-    case 'ORDER_CREATION_FAILED':
-      return 'Could not create your errand. Please try again.'
-
     default:
-      return message.includes(' ') ? message : fallback
+      // The services send a readable message with every error.
+      return message || fallback
   }
 }
-
+ 
+/** Zod `format()` output from the service (400 `details`) -> first message per field. */
 export function orderFieldErrors(err: unknown): Record<string, string> {
   const out: Record<string, string> = {}
   const { details } = errorParts(err)

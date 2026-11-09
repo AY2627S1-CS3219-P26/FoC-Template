@@ -1,5 +1,9 @@
 import type { OrderModel, Order, OrderStatus } from "../models/order.model.ts";
 import type { CreateOrderInput } from "../schemas/order.schema.ts";
+import { CreateOrderSchema } from "../schemas/order.schema.ts";
+import { fieldErrorsOf, createError } from "../util/validation.ts";
+import { AppError } from "../errors.ts";
+import type { FieldErrors } from "../util/validation.ts";
 import type { createServiceClients } from "./clients.ts";
 
 export const SYSTEM_ACTOR = "system";
@@ -28,10 +32,21 @@ export function allowedTransitions(order: Order, accountId: string): OrderStatus
 export function createOrderService(model: typeof OrderModel, clients: ReturnType<typeof createServiceClients>) {
     return {
         async createOrder(requesterId: string, input: CreateOrderInput, cookie: string): Promise<Order> {
+            const parsed = CreateOrderSchema.safeParse(input);
+        
+            console.log(parsed.success)
+
+            if (!parsed.success) {
+                throw createError(fieldErrorsOf(parsed.error));
+            }
+
+            const validInput = parsed.data;
+
             // Validate needed-by time is not in the past
             const neededTime = new Date(input.neededByTime);
             if (neededTime <= new Date()) {
-                throw new Error("NEEDED_BY_TIME_IN_PAST");
+                throw createError({ neededByTime: ["Needed-by time must be in the future."] });
+                //throw new Error("NEEDED_BY_TIME_IN_PAST");
             }
 
             await clients.checkSupplier(input.supplierId, input.neededByTime, cookie);

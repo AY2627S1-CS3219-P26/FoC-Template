@@ -53,7 +53,8 @@ import { SubmitButton } from '@/components/SubmitButton'
 import { Page } from '@/components/Page'
 import { SelectField } from '@/components/SelectField'
 import { TextField } from '@/components/TextField'
-import { ApiError } from '@/lib/http'
+import { ApiError, fieldErrorsOf } from '@/lib/http'
+import { FormError } from '@/components/FormError'
 
 const pct = (n: number) => `${n >= 0 ? '+' : ''}${Math.round(n * 100)}%`
 
@@ -68,9 +69,13 @@ function defaultNeededBy(now = new Date()): string {
 
 export function PostErrandPage() {
   const suppliers = useSuppliers({ page: 1 })
+
+  console.log(suppliers)
+
   const recommend = useRecommendation()
   const create = useCreateOrder()
   const ERRANDS_PATH = '/errands'
+  const fieldErrors = fieldErrorsOf(create.error)
 
   const [supplierId, setSupplierId] = useState('')
   const [location, setLocation] = useState('')
@@ -78,6 +83,7 @@ export function PostErrandPage() {
   const [itemsText, setItemsText] = useState('')
   const [credits, setCredits] = useState('')
   const [posted, setPosted] = useState(false)
+  const [timeError, setTimeError] = useState<string | null>(null)
 
   const supplierOptions = [
     { value: '', label: 'Select a supplier' },
@@ -98,6 +104,8 @@ export function PostErrandPage() {
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
+    console.log(fieldErrors)
+
     if (create.isPending) return
 
     const items = itemsText
@@ -106,6 +114,12 @@ export function PostErrandPage() {
       .filter(Boolean)
 
     const when = new Date(neededBy)
+
+    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      setTimeError('Choose a needed-by time in the future.')
+      return
+    }
+    setTimeError(null)
 
     create.mutate({
       supplierId,
@@ -129,6 +143,7 @@ export function PostErrandPage() {
     setItemsText('')
     setCredits('')
     setPosted(false)
+    setTimeError(null)
 
     create.reset()
     recommend.reset()
@@ -136,25 +151,39 @@ export function PostErrandPage() {
 
   const suggestion = recommend.data
 
+  const pastTimeFromService =
+    create.error instanceof ApiError && String(create.error.message).includes('NEEDED_BY_TIME_IN_PAST')
+    
+  const neededByErrors = timeError
+    ? [timeError]
+    : (fieldErrors.neededByTime ?? (pastTimeFromService ? ['The needed-by time must be in the future.'] : undefined))
+
   return (
     <Page title="Post an errand" subtitle="Describe the errand and set the credits you'll offer">
       {!posted ? (
         <form className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
-          <SelectField label="Supplier" name="supplierId" value={supplierId} onChange={setSupplierId} options={supplierOptions} />
+          <FormError error={create.error} fields={['supplierId', 'deliveryLocation', 'neededByTime', 'itemLines', 'creditReward']} />
+          <SelectField label="Supplier" name="supplierId" value={supplierId} onChange={setSupplierId} options={supplierOptions} errors={fieldErrors.supplierId}/>
+          {fieldErrors.supplierId?.[0] && (
+            <p className="text-sm text-danger mt-1">
+              {fieldErrors.supplierId[0]}
+            </p>
+          )}
           <TextField
             label="Drop-off location"
             name="location"
             value={location}
             onChange={setLocation}
             hint="Where the errand ends, e.g. COM3 or Kent Ridge MRT"
+            errors={fieldErrors.deliveryLocation}
           />
-          <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} />
-          <TextField label="Items" name="items" value={itemsText} onChange={setItemsText} hint="Comma-separated, e.g. coffee, sandwich" />
+          <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} errors={neededByErrors}/>
+          <TextField label="Items" name="items" value={itemsText} onChange={setItemsText} hint="Comma-separated, e.g. coffee, sandwich" errors={fieldErrors.itemLines}/>
 
           <div className="grid gap-2">
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <TextField label="Credits" name="credits" value={credits} onChange={setCredits} inputMode="numeric" />
+                <TextField label="Credits" name="credits" value={credits} onChange={setCredits} inputMode="numeric" errors={fieldErrors.creditReward}/>
               </div>
               <button
                 type="button"

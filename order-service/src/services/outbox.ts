@@ -10,6 +10,9 @@ export async function relayOutbox(db: Database, publish: (event: Event) => Promi
             UPDATE orders SET status = 'Cancelled', updated_at = now()
             WHERE status = 'Pending' AND created_at < now() - interval '1 minute'
             RETURNING id
+        ), logged AS (
+            INSERT INTO order_transitions (order_id, from_status, to_status, actor)
+            SELECT id, 'Pending', 'Cancelled', 'system' FROM cancelled
         )
         INSERT INTO order_outbox (type, data)
         SELECT 'order.errand.cancelled', jsonb_build_object('errandRef', id::text)

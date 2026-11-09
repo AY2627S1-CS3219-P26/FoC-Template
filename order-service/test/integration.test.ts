@@ -11,6 +11,7 @@ const input = {
 function setup() {
     let order: any;
     const effects: string[] = [];
+    const transitions: string[][] = [];
     const model: any = {
         async create(data: any) {
             order = { id: 42, requester_id: data.requesterId, courier_id: null,
@@ -18,9 +19,10 @@ function setup() {
             return { ...order };
         },
         async findById() { return order ? { ...order } : null; },
-        async updateStatus(_id: number, status: string, expected: string) {
+        async updateStatus(_id: number, status: string, expected: string, actor: string) {
             if (order.status !== expected) return null;
             order.status = status;
+            transitions.push([expected, status, actor]);
             if (["Completed", "Cancelled", "Expired"].includes(status)) effects.push(status);
             return { ...order };
         },
@@ -32,7 +34,7 @@ function setup() {
             effects.push("reserve");
         },
     };
-    return { service: createOrderService(model, clients), model, clients, effects, order: () => order };
+    return { service: createOrderService(model, clients), model, clients, effects, transitions, order: () => order };
 }
 
 test("creation validates supplier and reserves credits before making an order Open", async () => {
@@ -40,6 +42,7 @@ test("creation validates supplier and reserves credits before making an order Op
     const order = await ctx.service.createOrder("requester", input, "relay_session=valid");
     assert.equal(order.status, "Open");
     assert.deepEqual(ctx.effects, ["supplier", "reserve"]);
+    assert.deepEqual(ctx.transitions, [["Pending", "Open", "requester"]]);
 });
 
 test("supplier rejection creates no order or credit reservation", async () => {
@@ -56,6 +59,7 @@ test("credit rejection cancels the pending order and schedules release", async (
     await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), /CREDIT_RESERVATION_FAILED/);
     assert.equal(ctx.order().status, "Cancelled");
     assert.deepEqual(ctx.effects, ["supplier", "Cancelled"]);
+    assert.deepEqual(ctx.transitions, [["Pending", "Cancelled", "system"]]);
 });
 
 test("completion and cancellation use the persisted lifecycle, and repeated completion is safe", async () => {
@@ -67,6 +71,8 @@ test("completion and cancellation use the persisted lifecycle, and repeated comp
     assert.equal((await ctx.service.updateOrderStatus(42, "requester", "Completed")).status, "Completed");
     assert.equal((await ctx.service.updateOrderStatus(42, "requester", "Completed")).status, "Completed");
     assert.deepEqual(ctx.effects, ["supplier", "reserve", "Completed"]);
+    // The refused and the repeated request leave no record.
+    assert.deepEqual(ctx.transitions, [["Pending", "Open", "requester"], ["Delivered", "Completed", "requester"]]);
 });
 
 test("an unrelated user cannot cancel, and status PATCH cannot bypass courier acceptance", async () => {

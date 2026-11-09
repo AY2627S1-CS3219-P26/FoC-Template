@@ -2,6 +2,8 @@ import type { OrderModel, Order, OrderStatus } from "../models/order.model.ts";
 import type { CreateOrderInput } from "../schemas/order.schema.ts";
 import type { createServiceClients } from "./clients.ts";
 
+export const SYSTEM_ACTOR = "system";
+
 export function createOrderService(model: typeof OrderModel, clients: ReturnType<typeof createServiceClients>) {
     return {
         async createOrder(requesterId: string, input: CreateOrderInput, cookie: string): Promise<Order> {
@@ -22,13 +24,13 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             });
             try {
                 await clients.reserve(requesterId, String(newOrder.id), input.creditReward, cookie);
-                const opened = await model.updateStatus(newOrder.id, "Open", "Pending");
+                const opened = await model.updateStatus(newOrder.id, "Open", "Pending", requesterId);
                 if (!opened) throw new Error("ORDER_CREATION_FAILED");
                 return opened;
             } catch (error) {
                 // A timed-out reservation may still succeed remotely. The durable release uses
                 // the same errand reference and is retried without storing the session cookie.
-                await model.updateStatus(newOrder.id, "Cancelled", "Pending");
+                await model.updateStatus(newOrder.id, "Cancelled", "Pending", SYSTEM_ACTOR);
                 throw error;
             }
         },
@@ -87,7 +89,7 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
                 throw new Error("INVALID_STATE_TRANSITION");
             }
 
-            const updated = await model.updateStatus(orderId, newStatus, current);
+            const updated = await model.updateStatus(orderId, newStatus, current, userId);
             if (!updated) throw new Error("STATUS_UPDATE_FAILED");
 
             return updated;

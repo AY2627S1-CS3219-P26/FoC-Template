@@ -144,7 +144,14 @@ export const OrderModel = {
             ), queued AS (
                 INSERT INTO order_outbox (type, data)
                 SELECT 'order.errand.' || lower(status),
-                    jsonb_build_object('errandRef', id::text, 'courierId', courier_id)
+                    jsonb_build_object(
+                        'errandRef', id::text,
+                        'courierId', courier_id,
+                        'supplierId', supplier_id,
+                        'deliverySupplierId', delivery_location,
+                        'creditReward', credit_reward,
+                        'itemCount', coalesce(array_length(item_lines, 1), 0)
+                    )
                 FROM updated WHERE status IN ('Completed', 'Cancelled', 'Expired')
             )
             SELECT * FROM updated;

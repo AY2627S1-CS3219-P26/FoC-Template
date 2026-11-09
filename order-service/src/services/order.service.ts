@@ -76,7 +76,7 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
                 throw new Error("REQUESTER_CANNOT_ACCEPT_OWN_ORDER");
             }
 
-            if (order.status !== "Open") {
+            if (order.status !== "Open" || new Date(order.needed_by_time) <= new Date()) {
                 throw new Error("ORDER_NOT_AVAILABLE");
             }
 

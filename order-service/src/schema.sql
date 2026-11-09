@@ -32,3 +32,5 @@ CREATE TABLE IF NOT EXISTS order_transitions (
 );
 
 CREATE INDEX IF NOT EXISTS order_transitions_by_order ON order_transitions (order_id, occurred_at, id);
+
+CREATE INDEX IF NOT EXISTS orders_open_by_needed_by ON orders (needed_by_time) WHERE status = 'Open';

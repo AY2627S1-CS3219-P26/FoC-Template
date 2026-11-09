@@ -2,7 +2,26 @@ import type { Event } from "../broker.ts";
 
 type Database = { query(sql: string, values?: unknown[]): Promise<{ rows: any[] }> };
 
+// An errand nobody accepted by its needed-by time is of no use any more, so its reward is released.
+export async function expireOverdueOrders(db: Database): Promise<void> {
+    await db.query(`
+        WITH expired AS (
+            UPDATE orders SET status = 'Expired', updated_at = now()
+            WHERE status = 'Open' AND needed_by_time <= now()
+            RETURNING id
+        ), logged AS (
+            INSERT INTO order_transitions (order_id, from_status, to_status, actor)
+            SELECT id, 'Open', 'Expired', 'system' FROM expired
+        )
+        INSERT INTO order_outbox (type, data)
+        SELECT 'order.errand.expired', jsonb_build_object('errandRef', id::text)
+        FROM expired;
+    `);
+}
+
 export async function relayOutbox(db: Database, publish: (event: Event) => Promise<void>): Promise<void> {
+    await expireOverdueOrders(db);
+
     // A crash during reservation leaves a Pending order. Cancel it and release any
     // remote reservation without needing to keep the user's session credentials.
     await db.query(`

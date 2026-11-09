@@ -15,10 +15,15 @@ function setup() {
     const model: any = {
         async create(data: any) {
             order = { id: 42, requester_id: data.requesterId, courier_id: null,
-                status: "Pending", credit_reward: data.creditReward };
+                status: "Pending", credit_reward: data.creditReward, needed_by_time: new Date(data.neededByTime) };
             return { ...order };
         },
         async findById() { return order ? { ...order } : null; },
+        async acceptOrder(_id: number, courierId: string) {
+            order.status = "Accepted";
+            order.courier_id = courierId;
+            return { ...order };
+        },
         async updateStatus(_id: number, status: string, expected: string, actor: string) {
             if (order.status !== expected) return null;
             order.status = status;
@@ -93,6 +98,16 @@ test("each participant may only instruct the transitions of their role, and nobo
     await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Cancelled"), /UNAUTHORIZED/);
     assert.equal((await ctx.service.updateOrderStatus(42, "courier", "PickedUp")).status, "PickedUp");
     await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Completed"), /INVALID_STATE_TRANSITION/);
+});
+
+test("an errand can be accepted until its needed-by time, not after", async () => {
+    const ctx = setup();
+    await ctx.service.createOrder("requester", input, "relay_session=valid");
+    ctx.order().needed_by_time = new Date(Date.now() - 1000);
+    await assert.rejects(ctx.service.acceptOrder(42, "courier"), /ORDER_NOT_AVAILABLE/);
+    assert.equal(ctx.order().status, "Open");
+    ctx.order().needed_by_time = new Date(Date.now() + 60_000);
+    assert.equal((await ctx.service.acceptOrder(42, "courier")).status, "Accepted");
 });
 
 test("allowed transitions follow the state machine for requester and courier", () => {

@@ -34,8 +34,8 @@ See [the event catalog](../docs/events.md). The broker publisher follows
 A release closes its errand reference in credit-service even if it arrives before
 reservation. A Pending order left by a crash is cancelled after one minute. Creation
 is not an atomic transaction across PostgreSQL and MongoDB: recovery is eventual,
-and retrying a POST creates another order. Automatic expiry scheduling is not
-implemented; changing an order to Expired triggers release.
+and retrying a POST creates another order. An Open order that nobody accepted by its needed-by time is set to Expired
+automatically, which releases its reward. Users cannot set Expired themselves.
 
 For local development, run the dependencies in Compose, set the variables in
 the root `.env.example`, then run `npm ci` and `npm run dev` in `order-service`.

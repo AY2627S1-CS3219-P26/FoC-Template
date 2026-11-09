@@ -68,7 +68,7 @@ export const OrderModel = {
     },
 
     async findOpenRequests(): Promise<Order[]> {
-        const result: QueryResult<Order> = await pool.query(`SELECT * FROM orders WHERE status = 'Open' ORDER BY created_at DESC;`);
+        const result: QueryResult<Order> = await pool.query(`SELECT * FROM orders WHERE status = 'Open' AND needed_by_time > now() ORDER BY created_at DESC;`);
         return result.rows;
     },
 
@@ -111,7 +111,7 @@ export const OrderModel = {
             WITH updated AS (
                 UPDATE orders
                 SET courier_id = $1, status = 'Accepted', updated_at = now()
-                WHERE id = $2 AND status = 'Open' AND requester_id != $1
+                WHERE id = $2 AND status = 'Open' AND requester_id != $1 AND needed_by_time > now()
                 RETURNING *
             ), logged AS (
                 INSERT INTO order_transitions (order_id, from_status, to_status, actor)

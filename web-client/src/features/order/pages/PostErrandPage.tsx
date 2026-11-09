@@ -1,53 +1,47 @@
 import { useState } from 'react'
-import { useSuppliers } from '@/api/order'
+import { suppliersOf } from '@/api/order/order'
+import { useSuppliers } from '@/api/supplier/suppliers'
+import { Notice } from '@/components/Notice'
 import { ErrandForm } from '@/features/order/components/ErrandForm'
-import './ErrandsPage.css'
 
 // "Errands" route used for the links below; change it if your router uses another path.
 const ERRANDS_PATH = '/errands'
 
 export function PostErrandPage() {
-  const suppliers = useSuppliers() // swap for your existing supplier hook if you have one
+  const suppliers = useSuppliers({ page: 1, status: 'all' })
   const [posted, setPosted] = useState(false)
   const [formKey, setFormKey] = useState(0) // remounting the form clears it for "Post another"
 
   return (
-    <section className="errands" aria-labelledby="post-errand-title">
-      <header className="errands__header">
-        <div>
-          <h1 id="post-errand-title">Post an errand</h1>
-          <p className="errands__sub">
-            Tell couriers what to pick up and where to bring it. The reward is reserved from your credits when you post
-            and paid to your courier when you confirm delivery.
-          </p>
-        </div>
+    <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-6 p-4 sm:p-6">
+      <header className="grid gap-2">
+        <h1>Post an errand</h1>
+        <p className="opacity-70">Tell couriers what to pick up and where to bring it.</p>
       </header>
 
-      <div className="errands__postcard">
-        {posted ? (
-          <div className="errands__success" role="status">
-            <h2>Errand posted</h2>
-            <p>Couriers can see it now. You will find it under “My requests”.</p>
-            <div className="errands__dialogactions">
-              <button
-                type="button"
-                className="errands__btn"
-                onClick={() => {
-                  setPosted(false)
-                  setFormKey((k) => k + 1)
-                }}
-              >
-                Post another
-              </button>
-              <a className="errands__btn errands__btn--primary" href={ERRANDS_PATH}>
-                View my errands
-              </a>
-            </div>
+      {posted ? (
+        <div className="ds-surface grid grid-cols-1 gap-4 p-5">
+          <Notice tone="success" role="status" title="Errand posted" />
+          <p>Couriers can see it now. You will find it under “My requests”.</p>
+          <div className="flex flex-wrap gap-3">
+            <a className="ds-btn ds-btn--primary" href={ERRANDS_PATH}>
+              View my errands
+            </a>
+            <button
+              type="button"
+              className="ds-btn"
+              onClick={() => {
+                setPosted(false)
+                setFormKey((key) => key + 1)
+              }}
+            >
+              Post another
+            </button>
           </div>
-        ) : (
-          <ErrandForm key={formKey} suppliers={suppliers.data ?? []} onCreated={() => setPosted(true)} />
-        )}
-      </div>
-    </section>
+        </div>
+      ) : (
+        <ErrandForm key={formKey} suppliers={suppliersOf(suppliers.data)} onCreated={() => setPosted(true)} />
+      )}
+    </div>
   )
 }

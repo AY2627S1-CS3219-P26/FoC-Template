@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from '@/lib/http'
+import type { Supplier } from '@/api/supplier/types'
 
-// Mirrors order-service/src/models/order.model.ts (the service returns snake_case rows).
 export type OrderStatus =
   | 'Pending'
   | 'Open'
@@ -36,8 +36,6 @@ export type CreateOrderInput = {
   creditReward: number
 }
 
-export type Supplier = { id: string; name: string }
-
 export type MyOrders = { orders: Order[]; accountId: string }
 
 // Refetch while the page is visible so couriers see new errands and requesters see progress.
@@ -51,7 +49,7 @@ export function useOpenOrders() {
   })
 }
 
-// Orders I requested or am delivering, plus my account id (GET /orders/mine).
+// Orders I requested or am delivering, plus account id (GET /orders/mine).
 export function useMyOrders() {
   return useQuery({
     queryKey: ['order', 'mine'],
@@ -63,22 +61,16 @@ export function useMyOrders() {
   })
 }
 
-// TEMPORARY: replace with your existing supplier api hook (and its Supplier type) if you have one.
-export function useSuppliers() {
-  return useQuery({
-    queryKey: ['supplier', 'list'],
-    queryFn: async ({ signal }): Promise<Supplier[]> => {
-      const body = await request<unknown>('supplier', '/suppliers', { signal })
-      const list = Array.isArray(body) ? body : isRecord(body) && Array.isArray(body.data) ? body.data : []
-      return list.flatMap((item: unknown): Supplier[] => {
-        if (!isRecord(item)) return []
-        const id = item.id ?? item._id
-        if ((typeof id !== 'string' && typeof id !== 'number') || typeof item.name !== 'string') return []
-        return [{ id: String(id), name: item.name }]
-      })
-    },
-    retry: false,
-  })
+// Pulls the suppliers out of the page that useSuppliers returns
+export function suppliersOf(page: unknown): Supplier[] {
+  const list = Array.isArray(page)
+    ? page
+    : isRecord(page)
+      ? [page.items, page.data, page.results].find(Array.isArray) ?? []
+      : []
+  return (list as unknown[]).filter(
+    (item): item is Supplier => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string',
+  )
 }
 
 function useInvalidateOrders() {
@@ -90,7 +82,7 @@ export function useCreateOrder() {
   const invalidate = useInvalidateOrders()
   return useMutation({
     mutationFn: (input: CreateOrderInput) =>
-      request<{ data: Order }>('order', '/orders', { method: 'POST', body: JSON.stringify(input) }),
+      request<{ data: Order }>('order', '/orders', { method: 'POST', body: input }),
     onSettled: invalidate,
   })
 }
@@ -107,17 +99,12 @@ export function useUpdateOrderStatus() {
   const invalidate = useInvalidateOrders()
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: OrderStatus }) =>
-      request<{ data: Order }>('order', `/orders/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      }),
+      request<{ data: Order }>('order', `/orders/${id}/status`, { method: 'PATCH', body: { status } }),
     onSettled: invalidate,
   })
 }
 
 // ---- Error helpers ----------------------------------------------------------
-// Written against the shape the service returns ({ error, details? }) but tolerant of
-// however @/lib/http surfaces failures (status / message / details or body.details).
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -126,42 +113,78 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function errorParts(err: unknown) {
   const rec = isRecord(err) ? err : {}
   const status = typeof rec.status === 'number' ? rec.status : 0
-  const message = err instanceof Error ? err.message : typeof rec.error === 'string' ? rec.error : ''
-  const details = rec.details ?? (isRecord(rec.body) ? rec.body.details : undefined)
-  return { status, message, details, network: err instanceof TypeError }
+  const code = typeof rec.code === 'string' ? rec.code : ''
+  const message = err instanceof Error ? err.message : ''
+  const details = rec.details
+  return {
+    status,
+    code,
+    message,
+    details,
+    network: code === 'NETWORK_ERROR' || err instanceof TypeError,
+  }
 }
-
-/** Turn a service error into something a student can act on. */
 export function describeOrderError(err: unknown, fallback: string): string {
-  const { status, message, network } = errorParts(err)
-  if (network) return 'Could not reach the server. Check your connection and try again.'
+  const { status, code, message, network } = errorParts(err)
+
+  if (network) {
+    return 'Could not reach the server. Check your connection and try again.'
+  }
+
   if (status === 401 || status === 403) {
-    // Accept/status endpoints send readable 403 messages; auth failures send codes.
     if (message.includes(' ') && !message.startsWith('Access denied')) return message
     return 'Your session has expired. Please sign in again.'
   }
-  switch (message) {
+
+  console.log(code)
+
+  switch (code || message) {
     case 'NEEDED_BY_TIME_IN_PAST':
       return 'The needed-by time must be in the future.'
+
     case 'SUPPLIER_NOT_FOUND':
       return 'That pickup location no longer exists.'
+
     case 'SUPPLIER_NOT_ORDERABLE':
       return 'That pickup location is closed or inactive at your needed-by time.'
+
     case 'SUPPLIER_UNAVAILABLE':
     case 'DEPENDENCY_UNAVAILABLE':
       return 'A required service is unavailable right now. Check “My requests” before trying again so you do not create a duplicate.'
+
     case 'CREDIT_RESERVATION_FAILED':
       return 'Could not reserve the reward. You may not have enough available credits.'
+
     case 'INVALID_STATE_TRANSITION':
     case 'STATUS_UPDATE_FAILED':
       return 'This errand changed in the meantime. The list has been refreshed.'
+
+    case 'ORDER_NOT_FOUND':
+      return 'This errand could not be found. It may have been removed.'
+
+    case 'REQUESTER_CANNOT_ACCEPT_OWN_ORDER':
+      return 'You cannot accept your own errand.'
+
+    case 'ORDER_NOT_AVAILABLE':
+      return 'This errand is no longer available.'
+
+    case 'ORDER_ACCEPTANCE_FAILED':
+      return 'Could not accept this errand. Please refresh and try again.'
+
+    case 'UNAUTHORIZED_COURIER_ACTION':
+      return 'Only the assigned courier can update this errand status.'
+
+    case 'UNAUTHORIZED_REQUESTER_ACTION':
+      return 'Only the requester can perform this action.'
+
+    case 'ORDER_CREATION_FAILED':
+      return 'Could not create your errand. Please try again.'
+
     default:
-      // Readable messages from the service (they contain spaces) are shown as is.
       return message.includes(' ') ? message : fallback
   }
 }
 
-/** Zod `format()` output from the service (400 `details`) -> first message per field. */
 export function orderFieldErrors(err: unknown): Record<string, string> {
   const out: Record<string, string> = {}
   const { details } = errorParts(err)

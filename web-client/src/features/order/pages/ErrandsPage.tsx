@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   describeOrderError,
+  suppliersOf,
   useAcceptOrder,
   useMyOrders,
   useOpenOrders,
-  useSuppliers,
   useUpdateOrderStatus,
 } from '@/api/order/order'
-import type { Order, OrderStatus, Supplier } from '@/api/order/order'
-import { ErrandForm } from '@/features/order/components/ErrandForm'
-import './ErrandsPage.css'
+import type { Order, OrderStatus } from '@/api/order/order'
+import { useSuppliers } from '@/api/supplier/suppliers'
+import type { Supplier } from '@/api/supplier/types'
+import { Notice } from '@/components/Notice'
 
 /*
  * Errands page: browse open errands (courier), track the errands I requested,
@@ -21,7 +22,7 @@ import './ErrandsPage.css'
  */
 
 type Tab = 'browse' | 'requests' | 'deliveries'
-type Notice = { kind: 'ok' | 'error'; text: string }
+type Flash = { kind: 'ok' | 'error'; text: string }
 
 const TERMINAL: OrderStatus[] = ['Completed', 'Cancelled', 'Expired']
 
@@ -35,6 +36,23 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   Cancelled: 'Cancelled',
   Expired: 'Expired',
 }
+
+const BADGE_TONE: Record<OrderStatus, string> = {
+  Pending: 'bg-neutral-surface text-neutral',
+  Open: 'bg-danger-surface text-danger',
+  Accepted: 'bg-info-surface text-info',
+  PickedUp: 'bg-info-surface text-info',
+  Delivered: 'bg-info-surface text-info',
+  Completed: 'bg-success-surface text-success',
+  Cancelled: 'bg-neutral-surface text-neutral',
+  Expired: 'bg-neutral-surface text-neutral',
+}
+
+const TABS = [
+  ['browse', 'Browse open'],
+  ['requests', 'My requests'],
+  ['deliveries', 'My deliveries'],
+] as const
 
 // ---------------------------------------------------------------------------
 // Formatting
@@ -67,21 +85,20 @@ function relativeTo(iso: string, now: number): string {
 
 export function ErrandsPage() {
   const [tab, setTab] = useState<Tab>('browse')
-  const [notice, setNotice] = useState<Notice | null>(null)
+  const [flash, setFlash] = useState<Flash | null>(null)
   const [busy, setBusy] = useState<number[]>([])
-  const [showForm, setShowForm] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
   const openQuery = useOpenOrders()
   const mineQuery = useMyOrders()
-  const suppliersQuery = useSuppliers() // names fall back to ids; the form falls back to a text field
+  const suppliersQuery = useSuppliers({ page: 1, status: 'all' }) // only used to show supplier names; falls back to the id
   const acceptOrder = useAcceptOrder()
   const updateStatus = useUpdateOrderStatus()
 
   const openOrders = openQuery.data
   const myOrders = mineQuery.data?.orders
   const me = mineQuery.data?.accountId ?? null
-  const suppliers: Supplier[] = suppliersQuery.data ?? []
+  const suppliers: Supplier[] = suppliersOf(suppliersQuery.data)
   const loading = openQuery.isLoading || mineQuery.isLoading
   const loadFailure = openQuery.error ?? mineQuery.error
   const loadError = loadFailure ? describeOrderError(loadFailure, 'Could not load errands.') : null
@@ -94,10 +111,10 @@ export function ErrandsPage() {
   }, [])
 
   useEffect(() => {
-    if (notice?.kind !== 'ok') return
-    const t = window.setTimeout(() => setNotice(null), 5000)
+    if (flash?.kind !== 'ok') return
+    const t = window.setTimeout(() => setFlash(null), 5000)
     return () => window.clearTimeout(t)
-  }, [notice])
+  }, [flash])
 
   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? `Supplier ${id}`
 
@@ -119,14 +136,14 @@ export function ErrandsPage() {
 
   const visible = tab === 'browse' ? browse : tab === 'requests' ? requests : deliveries
 
-  // The mutations refresh the order queries themselves (see @/api/order).
+  // The mutations refresh the order queries themselves (see @/api/order/order).
   async function run(orderId: number, action: () => Promise<unknown>, success: string, failure: string) {
     setBusy((ids) => [...ids, orderId])
     try {
       await action()
-      setNotice({ kind: 'ok', text: success })
+      setFlash({ kind: 'ok', text: success })
     } catch (err) {
-      setNotice({ kind: 'error', text: describeOrderError(err, failure) })
+      setFlash({ kind: 'error', text: describeOrderError(err, failure) })
     } finally {
       setBusy((ids) => ids.filter((id) => id !== orderId))
     }
@@ -146,100 +163,85 @@ export function ErrandsPage() {
   const counts = { browse: browse.length, requests: requests.length, deliveries: deliveries.length }
 
   return (
-    <section className="errands" aria-labelledby="errands-title">
-      <header className="errands__header">
-        <div>
-          <h1 id="errands-title">Errands</h1>
-          <p className="errands__sub">Pick things up for others, or ask someone to pick something up for you.</p>
-        </div>
-        <button type="button" className="errands__btn errands__btn--primary" onClick={() => setShowForm(true)}>
-          + New errand
-        </button>
+    <div className="mx-auto grid w-full max-w-5xl grid-cols-1 content-start gap-6 p-4 sm:p-6">
+      <header className="grid gap-2">
+        <h1>Errands</h1>
+        <p className="opacity-70">Pick up errands for others and track the ones you have requested.</p>
       </header>
 
-      {notice && (
-        <div
-          className={`errands__notice errands__notice--${notice.kind}`}
-          role={notice.kind === 'error' ? 'alert' : 'status'}
-        >
-          <span>{notice.text}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)}>
+      {flash && (
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <Notice
+              tone={flash.kind === 'ok' ? 'success' : 'info'}
+              role={flash.kind === 'ok' ? 'status' : 'alert'}
+              title={flash.text}
+            />
+          </div>
+          <button type="button" className="ds-btn" aria-label="Dismiss" onClick={() => setFlash(null)}>
             ×
           </button>
         </div>
       )}
 
-      <div className="errands__tabs" role="tablist" aria-label="Errand views">
-        {(
-          [
-            ['browse', 'Browse open'],
-            ['requests', 'My requests'],
-            ['deliveries', 'My deliveries'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            id={`errands-tab-${key}`}
-            aria-selected={tab === key}
-            aria-controls="errands-panel"
-            className={`errands__tab${tab === key ? ' is-active' : ''}`}
-            onClick={() => setTab(key)}
-          >
-            {label} <span className="errands__count">{counts[key]}</span>
-          </button>
-        ))}
-      </div>
-
-      <div id="errands-panel" role="tabpanel" aria-labelledby={`errands-tab-${tab}`}>
-        {loading ? (
-          <p className="errands__empty">Loading errands…</p>
-        ) : loadError && visible.length === 0 ? (
-          <div className="errands__empty" role="alert">
-            <p>{loadError}</p>
-            <button type="button" className="errands__btn" onClick={reload}>
-              Try again
+      <div className="grid gap-4">
+        <div role="tablist" aria-label="Errand views" className="flex gap-1 overflow-x-auto border-b border-current/15">
+          {TABS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={`errands-tab-${key}`}
+              aria-selected={tab === key}
+              aria-controls="errands-panel"
+              onClick={() => setTab(key)}
+              className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 ${
+                tab === key ? 'border-current font-semibold' : 'border-transparent opacity-70 hover:opacity-100'
+              }`}
+            >
+              {label}
+              <span className="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-xs">{counts[key]}</span>
             </button>
-          </div>
-        ) : visible.length === 0 ? (
-          <p className="errands__empty">{emptyText(tab)}</p>
-        ) : (
-          <ul className="errands__list">
-            {visible.map((order) => (
-              <li key={order.id}>
-                <ErrandCard
-                  order={order}
-                  me={me}
-                  now={now}
-                  supplier={supplierName(order.supplier_id)}
-                  busy={busy.includes(order.id)}
-                  onAccept={() => void accept(order)}
-                  onStatus={(status, success) => void setStatus(order, status, success)}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-        {loadError && visible.length > 0 && (
-          <p className="errands__stale" role="status">
-            Showing the last loaded data: {loadError}
-          </p>
-        )}
-      </div>
+          ))}
+        </div>
 
-      {showForm && (
-        <CreateErrandDialog
-          suppliers={suppliers}
-          onClose={() => setShowForm(false)}
-          onCreated={() => {
-            setShowForm(false)
-            setNotice({ kind: 'ok', text: 'Errand posted. Couriers can now see it.' })
-            setTab('requests')
-          }}
-        />
-      )}
-    </section>
+        <div id="errands-panel" role="tabpanel" aria-labelledby={`errands-tab-${tab}`} className="grid gap-4">
+          {loading ? (
+            <p className="p-8 text-center opacity-70">Loading errands…</p>
+          ) : loadError && visible.length === 0 ? (
+            <div className="grid justify-items-center gap-3 p-8 text-center" role="alert">
+              <p>{loadError}</p>
+              <button type="button" className="ds-btn" onClick={reload}>
+                Try again
+              </button>
+            </div>
+          ) : visible.length === 0 ? (
+            <p className="p-8 text-center opacity-70">{emptyText(tab)}</p>
+          ) : (
+            <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
+              {visible.map((order) => (
+                <li key={order.id} className="min-w-0">
+                  <ErrandCard
+                    order={order}
+                    me={me}
+                    now={now}
+                    supplier={supplierName(order.supplier_id)}
+                    busy={busy.includes(order.id)}
+                    onAccept={() => void accept(order)}
+                    onStatus={(status, success) => void setStatus(order, status, success)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          {loadError && visible.length > 0 && (
+            <p className="text-sm text-amber-600 dark:text-amber-400" role="status">
+              Showing the last loaded data: {loadError}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -251,8 +253,8 @@ function sortActiveFirst(orders: Order[]): Order[] {
 }
 
 function emptyText(tab: Tab): string {
-  if (tab === 'browse') return 'No open errands right now. Check back soon, or post your own.'
-  if (tab === 'requests') return 'You have not requested anything yet. Use “New errand” to get started.'
+  if (tab === 'browse') return 'No open errands right now. Check back soon.'
+  if (tab === 'requests') return 'You have not requested anything yet. Use “Post an errand” to get started.'
   return 'You are not delivering anything. Accept an errand from “Browse open”.'
 }
 
@@ -270,32 +272,34 @@ interface CardProps {
   onStatus: (status: OrderStatus, success: string) => void
 }
 
+type Variant = 'primary' | 'plain'
+
+const VARIANT_CLASS: Record<Variant, string> = {
+  primary: 'ds-btn ds-btn--primary',
+  plain: 'ds-btn',
+}
+
 function ErrandCard({ order, me, now, supplier, busy, onAccept, onStatus }: CardProps) {
   const isRequester = me !== null && order.requester_id === me
   const isCourier = me !== null && order.courier_id === me
   const pastDue = order.status === 'Open' && new Date(order.needed_by_time).getTime() < now
-  const [firstItems, extra] = [order.item_lines.slice(0, 3), Math.max(0, order.item_lines.length - 3)]
+  const firstItems = order.item_lines.slice(0, 3)
+  const extra = Math.max(0, order.item_lines.length - 3)
 
   function confirmThen(message: string, fn: () => void) {
     if (window.confirm(message)) fn()
   }
 
   const actions: ReactNode[] = []
-  const button = (key: string, label: string, onClick: () => void, variant = '') =>
+  const button = (key: string, label: string, onClick: () => void, variant: Variant = 'plain') =>
     actions.push(
-      <button
-        key={key}
-        type="button"
-        className={`errands__btn ${variant}`.trim()}
-        disabled={busy}
-        onClick={onClick}
-      >
+      <button key={key} type="button" className={VARIANT_CLASS[variant]} disabled={busy} onClick={onClick}>
         {label}
       </button>,
     )
 
   if (order.status === 'Open' && !isRequester) {
-    button('accept', 'Accept errand', onAccept, 'errands__btn--primary')
+    button('accept', 'Accept errand', onAccept, 'primary')
   }
   if (isRequester) {
     if (order.status === 'Open' || order.status === 'Accepted') {
@@ -306,7 +310,7 @@ function ErrandCard({ order, me, now, supplier, busy, onAccept, onStatus }: Card
           confirmThen('Cancel this errand? Your reserved credits will be released.', () =>
             onStatus('Cancelled', 'Errand cancelled. Your credits are being released.'),
           ),
-        'errands__btn--danger',
+        'primary',
       )
     }
     if (pastDue) {
@@ -319,70 +323,83 @@ function ErrandCard({ order, me, now, supplier, busy, onAccept, onStatus }: Card
     if (order.status === 'Delivered') {
       button(
         'complete',
-        `Confirm delivery · pay ${order.credit_reward}`,
+        `Confirm delivery / Pay courier ${order.credit_reward} credits`,
         () =>
           confirmThen(`Confirm you received everything? ${order.credit_reward} credits go to your courier.`, () =>
             onStatus('Completed', 'Delivery confirmed. Credits are on their way to your courier.'),
           ),
-        'errands__btn--primary',
+        'primary',
       )
     }
   }
   if (isCourier) {
     if (order.status === 'Accepted') {
-      button('picked', 'Mark picked up', () => onStatus('PickedUp', 'Marked as picked up.'), 'errands__btn--primary')
+      button('picked', 'Mark picked up', () => onStatus('PickedUp', 'Marked as picked up.'), 'primary')
     }
     if (order.status === 'PickedUp') {
-      button('delivered', 'Mark delivered', () => onStatus('Delivered', 'Marked as delivered. Waiting for the requester to confirm.'), 'errands__btn--primary')
+      button(
+        'delivered',
+        'Mark delivered',
+        () => onStatus('Delivered', 'Marked as delivered. Waiting for the requester to confirm.'),
+        'primary',
+      )
     }
   }
 
   const note = statusNote(order, isRequester, isCourier)
+  const muted = order.status === 'Cancelled' || order.status === 'Expired'
 
   return (
-    <article className={`errand errand--${order.status.toLowerCase()}`} aria-busy={busy}>
-      <div className="errand__top">
-        <h2 className="errand__supplier">{supplier}</h2>
-        <span className={`errand__badge errand__badge--${order.status.toLowerCase()}`}>
+    <article
+      aria-busy={busy}
+      className={`ds-surface flex h-full flex-col gap-4 p-5 ${busy ? 'opacity-70' : muted ? 'opacity-80' : ''}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="wrap-anywhere">{supplier}</h2>
+        <span
+          className={`shrink-0 rounded-full border border-current px-3 py-0.5 text-xs font-semibold ${BADGE_TONE[order.status]}`}
+        >
           {STATUS_LABEL[order.status]}
         </span>
       </div>
 
-      <ul className="errand__items">
+      <ul className="m-0 grid list-disc gap-1 pl-5">
         {firstItems.map((line, i) => (
-          <li key={i}>{line}</li>
+          <li key={i} className="wrap-anywhere">
+            {line}
+          </li>
         ))}
-        {extra > 0 && <li className="errand__more">+{extra} more</li>}
+        {extra > 0 && <li className="list-none opacity-70">+{extra} more</li>}
       </ul>
 
-      <dl className="errand__meta">
-        <div>
-          <dt>Deliver to</dt>
-          <dd>{order.delivery_location}</dd>
-        </div>
-        <div>
-          <dt>Needed by</dt>
-          <dd>
-            {formatNeededBy(order.needed_by_time)}
-            {!TERMINAL.includes(order.status) && (
-              <span className={`errand__rel${pastDue ? ' is-late' : ''}`}> · {relativeTo(order.needed_by_time, now)}</span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Reward</dt>
-          <dd className="errand__reward">{order.credit_reward} credits</dd>
-        </div>
+      <dl className="m-0 grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2">
+        <dt className="ds-label">Deliver to</dt>
+        <dd className="m-0 wrap-anywhere">{order.delivery_location}</dd>
+
+        <dt className="ds-label">Needed by</dt>
+        <dd className="m-0">
+          {formatNeededBy(order.needed_by_time)}
+          {!TERMINAL.includes(order.status) && (
+            <span className={pastDue ? 'text-red-600 dark:text-red-400' : 'opacity-70'}>
+              {' '}
+              · {relativeTo(order.needed_by_time, now)}
+            </span>
+          )}
+        </dd>
+
+        <dt className="ds-label">Reward</dt>
+        <dd className="m-0 font-semibold">{order.credit_reward} credits</dd>
+
         {isCourier && !isRequester && (
-          <div>
-            <dt>Your role</dt>
-            <dd>Courier</dd>
-          </div>
+          <>
+            <dt className="ds-label">Your role</dt>
+            <dd className="m-0">Courier</dd>
+          </>
         )}
       </dl>
 
-      {note && <p className="errand__note">{note}</p>}
-      {actions.length > 0 && <div className="errand__actions">{actions}</div>}
+      {note && <p className="text-sm opacity-70">{note}</p>}
+      {actions.length > 0 && <div className="mt-auto flex flex-wrap gap-2">{actions}</div>}
     </article>
   )
 }
@@ -406,47 +423,4 @@ function statusNote(order: Order, isRequester: boolean, isCourier: boolean): str
     case 'Expired':
       return 'Expired. Reserved credits are released.'
   }
-}
-
-// ---------------------------------------------------------------------------
-// Quick-post dialog (the full form lives in components/ErrandForm)
-// ---------------------------------------------------------------------------
-
-interface DialogProps {
-  suppliers: Supplier[]
-  onClose: () => void
-  onCreated: () => void
-}
-
-function CreateErrandDialog({ suppliers, onClose, onCreated }: DialogProps) {
-  const ref = useRef<HTMLDialogElement>(null)
-  const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    const dialog = ref.current
-    if (dialog && !dialog.open) dialog.showModal()
-  }, [])
-
-  return (
-    <dialog
-      ref={ref}
-      className="errands__dialog"
-      aria-labelledby="errand-form-title"
-      onClose={onClose}
-      onCancel={(e) => {
-        if (submitting) e.preventDefault()
-      }}
-      onClick={(e) => {
-        if (e.target === ref.current && !submitting) ref.current?.close()
-      }}
-    >
-      <h2 id="errand-form-title">New errand</h2>
-      <ErrandForm
-        suppliers={suppliers}
-        onCreated={onCreated}
-        onCancel={() => ref.current?.close()}
-        onSubmittingChange={setSubmitting}
-      />
-    </dialog>
-  )
 }

@@ -37,6 +37,10 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             return await model.findOpenRequests();
         },
 
+        async getMyOrders(userId: string): Promise<Order[]> {
+            return await model.findByUser(userId);
+        },
+
         async getOrderById(orderId: number): Promise<Order> {
             const order = await model.findById(orderId);
             if (!order) {

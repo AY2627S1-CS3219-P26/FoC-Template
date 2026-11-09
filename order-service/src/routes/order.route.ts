@@ -12,6 +12,9 @@ router.post("/", OrderController.createOrder);
 // GET /orders/open - Browse open requests available for couriers[cite: 7]
 router.get("/open", OrderController.getOpenRequests);
 
+// GET /orders/mine - Orders I requested or am delivering (must stay above /:id)
+router.get("/mine", OrderController.getMyOrders);
+
 // GET /orders/:id - Get specific order details
 router.get("/:id", OrderController.getOrderById);
 

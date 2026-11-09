@@ -50,6 +50,17 @@ export const OrderController = {
         }
     },
 
+    // GET /orders/mine - orders the caller requested or is delivering, plus the caller's account id
+    async getMyOrders(_req: Request, res: Response): Promise<void> {
+        try {
+            const accountId = res.locals.accountId as string;
+            const orders = await OrderService.getMyOrders(accountId);
+            res.status(200).json({ data: orders, accountId });
+        } catch (error: any) {
+            res.status(500).json({ error: "Failed to fetch your orders" });
+        }
+    },
+
     // GET /orders/:id
     async getOrderById(req: Request, res: Response): Promise<void> {
         try {

@@ -1,11 +1,6 @@
 name: deploy recommendation-service
 
 on:
-  push:
-    branches: [dev]
-    paths:
-      - 'recommendation-service/**'
-      - '.github/workflows/deploy-recommendation-service.yml'
   workflow_dispatch:
 
 concurrency:

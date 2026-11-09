@@ -23,6 +23,12 @@ cancels it. Only Open orders appear in `GET /orders/open` and can be accepted.
 | GET | `/orders/:id` | Read an order |
 | POST | `/orders/:id/accept` | Assign the authenticated courier |
 | PATCH | `/orders/:id/status` | Change lifecycle status using `{ "status": "PickedUp" }`, for example |
+| GET | `/orders/mine` | Own errands as requester or courier, newest first, with history and allowed transitions |
+
+
+`GET /internal/orders/:id` answers `{ id, requesterId, courierId, status }` for other
+services, or 404. The gateway does not forward it, so only the compose network and the
+cluster reach it.
 
 Completed requests a credit transfer to the assigned courier. Cancelled and
 Expired request release to the requester. These use a transactional PostgreSQL

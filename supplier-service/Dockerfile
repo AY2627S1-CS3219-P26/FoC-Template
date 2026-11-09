@@ -11,6 +11,8 @@ RUN npm ci --omit=dev
 # Node runs the TypeScript directly, so there is nothing to compile.
 COPY supplier-service/src ./src
 COPY data/csv ./data/csv
+# The shrunk seed photos only, not the originals of several megabytes each.
+COPY data/images/resized ./data/images/resized
 
 # A default that can be overridden, so the same image runs anywhere.
 ENV SUPPLIER_SEED_CSV_PATH=/app/data/csv/supplier-seed-data.csv

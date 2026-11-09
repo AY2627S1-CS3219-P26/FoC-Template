@@ -52,11 +52,13 @@ docker compose up --build
 | The app (web-client and gateway) | <http://localhost:8080> |
 | user-service | <http://localhost:3001> |
 | supplier-service | <http://localhost:3002> |
-| credit-service | <http://localhost:3003> |
+| order-service | <http://localhost:3003> |
+| credit-service | <http://localhost:3004> |
+| recommendation-service | <http://localhost:3006> |
 | message-service | <http://localhost:3008> |
 | rag-service | <http://localhost:3080> |
 | Mailpit, catches every email locally | <http://localhost:8025> |
-| RabbitMQ management UI (user `relay`, password `change-me`) | <http://localhost:15672> |
+| RabbitMQ management UI (user `relay`, password `change-me`) | <http://localhost:15672> |origin/dev
 
 No `.env` is needed: every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me`. To override a value, copy `.env.example` to `.env`. The help assistant needs a Claude API key in `CLAUDE_API_KEY`; without it the rest of the system works as usual.
 

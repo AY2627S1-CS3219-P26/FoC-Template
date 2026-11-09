@@ -1,0 +1,6 @@
+Title: Getting help
+Questions: How do I contact support? Who can I talk to? Is there a help desk? What can this assistant do? Can you see my account? Can you do this for me?
+
+This assistant answers questions about how Friend on Campus works and how to do things in it. It cannot see your account, your errands or your balance, and it cannot make changes for you. The answers come from the help documents, so it may not know about something they do not cover.
+
+The app has no support email, phone number or help desk page at the moment. Administrators run the platform, but there is no form for contacting them yet.

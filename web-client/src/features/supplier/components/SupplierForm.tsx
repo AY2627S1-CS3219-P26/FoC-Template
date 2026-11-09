@@ -1,12 +1,23 @@
-import { useState } from 'react'
-import type { ReactNode, SubmitEvent } from 'react'
+import { MapPin } from 'lucide-react'
+import { lazy, Suspense, useRef, useState } from 'react'
+import type { ComponentType, ReactNode, SubmitEvent } from 'react'
 import { weekdays } from '@/api/supplier/types'
 import type { Supplier, SupplierInput, Weekday } from '@/api/supplier/types'
 import { Field } from '@/components/Field'
 import { FormError } from '@/components/FormError'
+import { LoadingState } from '@/components/LoadingState'
 import { SubmitButton } from '@/components/SubmitButton'
 import { TextField } from '@/components/TextField'
 import { fieldErrorsOf } from '@/lib/http'
+import type { LocationPickerProps, MapPoint } from './LocationPicker'
+import { MapUnavailable } from './MapUnavailable'
+
+// The map library is only downloaded when an administrator opens the map.
+const LocationPicker = lazy<ComponentType<LocationPickerProps>>(() =>
+  import('./LocationPicker')
+    .then((module) => ({ default: module.LocationPicker }))
+    .catch(() => ({ default: MapUnavailable })),
+)
 
 type DayValues = { opens: string; closes: string }
 
@@ -63,6 +74,14 @@ function coordinate(text: string): number | string | null {
   return Number.isFinite(value) ? value : trimmed
 }
 
+// Where the map opens: the coordinates in the fields, when they name a place on Earth. This only
+// places the map; the supplier-service still checks what is sent.
+function pointOf(latitude: string, longitude: string): MapPoint | null {
+  if (latitude.trim() === '' || longitude.trim() === '') return null
+  const point = { latitude: Number(latitude), longitude: Number(longitude) }
+  return Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180 ? point : null
+}
+
 // A day with both times blank is left out, which the supplier-service reads as closed all day.
 function inputOf(values: SupplierFormValues): { input: SupplierInput; sentDays: Weekday[] } {
   const sentDays = weekdays.filter((day) => values.hours[day].opens.trim() !== '' || values.hours[day].closes.trim() !== '')
@@ -102,6 +121,26 @@ export function SupplierForm({ supplier, onSubmit, pending, error, submitLabel, 
   // hours[0].opens. The days that were sent turn that position back into a weekday.
   const [sentDays, setSentDays] = useState<Weekday[]>([])
   const fieldErrors = fieldErrorsOf(error)
+  const [picking, setPicking] = useState(false)
+  const [filledFromMap, setFilledFromMap] = useState(false)
+  const pickButtonRef = useRef<HTMLButtonElement>(null)
+
+  function openPicker() {
+    setFilledFromMap(false)
+    setPicking(true)
+  }
+
+  // The map and its buttons go away, so the focus returns to the button that opened it.
+  function closePicker() {
+    setPicking(false)
+    pickButtonRef.current?.focus()
+  }
+
+  function applyMapPoint(point: MapPoint) {
+    setValues({ ...values, latitude: String(point.latitude), longitude: String(point.longitude) })
+    setFilledFromMap(true)
+    closePicker()
+  }
 
   function dayErrors(day: Weekday, part: keyof DayValues): string[] | undefined {
     const index = sentDays.indexOf(day)
@@ -125,6 +164,8 @@ export function SupplierForm({ supplier, onSubmit, pending, error, submitLabel, 
     event.preventDefault()
     const { input, sentDays } = inputOf(values)
     setSentDays(sentDays)
+    // "Save to keep them" has been done; the form's own notice says how it went.
+    setFilledFromMap(false)
     onSubmit(input)
   }
 
@@ -271,6 +312,27 @@ export function SupplierForm({ supplier, onSubmit, pending, error, submitLabel, 
             onChange={(value) => setText('longitude', value)}
             errors={fieldErrors.longitude}
           />
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          <button
+            ref={pickButtonRef}
+            type="button"
+            aria-expanded={picking}
+            className="ds-btn ds-btn--glass justify-self-start"
+            onClick={() => (picking ? closePicker() : openPicker())}
+          >
+            <MapPin aria-hidden="true" className="size-5 shrink-0" />
+            {picking ? 'Close the map' : 'Pick on map'}
+          </button>
+          {/* Always rendered, so screen readers announce the text when it appears. */}
+          <p role="status" className="text-muted empty:hidden">
+            {filledFromMap ? 'Latitude and longitude are filled in from the map. Save to keep them.' : ''}
+          </p>
+          {picking && (
+            <Suspense fallback={<LoadingState label="Loading map" rows={2} />}>
+              <LocationPicker start={pointOf(values.latitude, values.longitude)} onUse={applyMapPoint} onCancel={closePicker} />
+            </Suspense>
+          )}
         </div>
       </section>
 

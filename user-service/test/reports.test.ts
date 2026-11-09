@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReportModel, type ReportState } from "../src/models/report.model.ts";
 import { SessionModel } from "../src/models/session.model.ts";
 import { UserModel, type AccountState } from "../src/models/user.model.ts";
@@ -11,10 +11,32 @@ useTestDatabase();
 
 const REASON = "Took the food and never delivered it";
 
+// The order-service is replaced by the errands a test registers; anything else is unknown there.
+const errands = new Map<string, { requesterId: string; courierId: string | null }>();
+const orderService = vi.fn(async (url: string | URL) => {
+    const id = decodeURIComponent(new URL(String(url)).pathname.replace("/internal/orders/", ""));
+    const errand = errands.get(id);
+    return errand
+        ? Response.json({ id, status: "Delivered", ...errand })
+        : Response.json({ error: "ORDER_NOT_FOUND" }, { status: 404 });
+});
+
+function errand(id: string, requesterId: string, courierId: string | null) {
+    errands.set(id, { requesterId, courierId });
+}
+
+beforeEach(() => {
+    errands.clear();
+    orderService.mockClear();
+    vi.stubGlobal("fetch", orderService);
+});
+afterEach(() => vi.unstubAllGlobals());
+
 describe("POST /reports (F1.6.3)", () => {
     it("files a report on another account and errand as Open", async () => {
         const alice = await createUser({ username: "alice" });
         const bob = await createUser({ username: "bob" });
+        errand("42", alice, bob);
         const member = await loginAs("alice");
         const before = Date.now();
 
@@ -37,8 +59,10 @@ describe("POST /reports (F1.6.3)", () => {
     });
 
     it("lets the same reporter report the same account again on another errand", async () => {
-        await createUser({ username: "alice" });
+        const alice = await createUser({ username: "alice" });
         const bob = await createUser({ username: "bob" });
+        errand("42", alice, bob);
+        errand("43", bob, alice);
         const member = await loginAs("alice");
 
         await member.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }).expect(201);
@@ -81,34 +105,93 @@ describe("refused reports (F1.6.4)", () => {
     });
 
     it("name a second report by the same reporter on the same errand, even sent at once", async () => {
-        await createUser({ username: "alice" });
+        const alice = await createUser({ username: "alice" });
         const bob = await createUser({ username: "bob" });
-        const carol = await createUser({ username: "carol" });
+        errand("42", alice, bob);
         const member = await loginAs("alice");
 
         const results = await Promise.all([
             member.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }),
             member.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }),
         ]);
-        // On the same errand, naming another account counts as a repeat as well
-        const other = await member.post("/reports").send({ reportedId: carol, errandId: "42", reason: REASON }).expect(400);
 
         expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
-        expect(other.body.error.details.fields.errandId).toEqual(["has already been reported by you"]);
+        const refused = results.find((r) => r.status === 400)!;
+        expect(refused.body.error.details.fields.errandId).toEqual(["has already been reported by you"]);
         expect(await ReportModel.countDocuments()).toBe(1);
     });
 
-    it("do not stop another reporter on the same errand", async () => {
+    it("do not stop the other participant from reporting on the same errand", async () => {
+        const aliceId = await createUser({ username: "alice" });
+        const bobId = await createUser({ username: "bob" });
+        errand("42", aliceId, bobId);
+        const alice = await loginAs("alice");
+        const bob = await loginAs("bob");
+
+        await alice.post("/reports").send({ reportedId: bobId, errandId: "42", reason: REASON }).expect(201);
+        await bob.post("/reports").send({ reportedId: aliceId, errandId: "42", reason: REASON }).expect(201);
+
+        expect(await ReportModel.countDocuments()).toBe(2);
+    });
+});
+
+describe("reports checked against the errand (F1.6.3)", () => {
+    it("ask the order-service for the errand named in the report", async () => {
+        const alice = await createUser({ username: "alice" });
+        const bob = await createUser({ username: "bob" });
+        errand("42", bob, alice);
+        const member = await loginAs("alice");
+
+        await member.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }).expect(201);
+
+        expect(orderService).toHaveBeenCalledOnce();
+        expect(String(orderService.mock.lastCall?.[0])).toBe("http://localhost:3003/internal/orders/42");
+    });
+
+    it("name an errand the order-service does not know", async () => {
         await createUser({ username: "alice" });
         const bob = await createUser({ username: "bob" });
-        await createUser({ username: "carol" });
-        const alice = await loginAs("alice");
-        const carol = await loginAs("carol");
+        const member = await loginAs("alice");
 
-        await alice.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }).expect(201);
-        await carol.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }).expect(201);
+        const response = await member.post("/reports").send({ reportedId: bob, errandId: "404", reason: REASON }).expect(400);
 
-        expect(await ReportModel.countDocuments({ reportedId: bob })).toBe(2);
+        expect(response.body.error.details.fields.errandId).toEqual(["does not exist"]);
+        expect(await ReportModel.countDocuments()).toBe(0);
+    });
+
+    it("name an errand on which the two accounts were not requester and courier", async () => {
+        const alice = await createUser({ username: "alice" });
+        const bob = await createUser({ username: "bob" });
+        const carol = await createUser({ username: "carol" });
+        errand("41", alice, carol);
+        errand("42", carol, bob);
+        errand("43", alice, null);
+        const member = await loginAs("alice");
+
+        for (const errandId of ["41", "42", "43"]) {
+            const response = await member.post("/reports").send({ reportedId: bob, errandId, reason: REASON }).expect(400);
+            expect(response.body.error.details.fields.errandId).toEqual(["is not an errand between you and this account"]);
+        }
+        expect(await ReportModel.countDocuments()).toBe(0);
+    });
+
+    it("are refused with 503 when the order-service is down, slow or answers nonsense", async () => {
+        const alice = await createUser({ username: "alice" });
+        const bob = await createUser({ username: "bob" });
+        errand("42", alice, bob);
+        const member = await loginAs("alice");
+
+        for (const failure of [
+            async () => { throw new TypeError("fetch failed"); },
+            async () => { throw new DOMException("The operation timed out", "TimeoutError"); },
+            async () => new Response("Bad gateway", { status: 502 }),
+            async () => Response.json({ id: "42" }),
+        ]) {
+            orderService.mockImplementationOnce(failure);
+            const response = await member.post("/reports").send({ reportedId: bob, errandId: "42", reason: REASON }).expect(503);
+            expect(response.body.error.code).toBe("ORDER_SERVICE_UNAVAILABLE");
+        }
+        expect(await ReportModel.countDocuments()).toBe(0);
     });
 });
 
@@ -220,12 +303,13 @@ describe("deciding a report (F1.6.6, F1.6.7)", () => {
     // Alice reports bob through the API; the admin is logged in and ready to decide.
     async function openReport({ reportedState = "Active", reported = "bob" }: { reportedState?: AccountState; reported?: "bob" | "admin" } = {}) {
         const adminId = await createUser({ username: "admin", roles: ["member", "administrator"] });
-        await createUser({ username: "alice" });
+        const aliceId = await createUser({ username: "alice" });
         const bob = await createUser({ username: "bob" });
         const admin = await loginAs("admin");
         const alice = await loginAs("alice");
         const bobAgent = await loginAs("bob");
         const reportedId = reported === "admin" ? adminId : bob;
+        errand("42", aliceId, reportedId);
         const filed = await alice.post("/reports").send({ reportedId, errandId: "42", reason: REASON }).expect(201);
         if (reportedState !== "Active") await UserModel.updateOne({ _id: bob }, { $set: { state: reportedState } });
         return { admin, adminId, bob, bobAgent, reportId: filed.body.id as string };

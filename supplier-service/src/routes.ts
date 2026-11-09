@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { type Authorizer, type Operation } from './auth.ts'
 import { HttpError, notFound, validationFailed } from './errors.ts'
 import { evaluateAvailability, toLocalMoment, type LocalMoment } from './domain/availability.ts'
-import { parseAt, parseListQuery } from './domain/query.ts'
+import { MAX_PHOTO_BYTES, MAX_THUMBNAIL_BYTES, validatePhoto } from './domain/photo.ts'
+import { parseAt, parseFilterValuesQuery, parseListQuery } from './domain/query.ts'
 import { WEEKDAYS, type Supplier } from './domain/supplier.ts'
 import { formatClock } from './domain/time.ts'
 import { validateCreate, validatePatch } from './domain/validation.ts'
@@ -21,6 +22,9 @@ export interface RouteDeps {
 interface Params {
   id: string
 }
+
+// Base64 makes the two images a third larger, and the JSON around them needs a little room.
+const PHOTO_BODY_LIMIT = Math.ceil(((MAX_PHOTO_BYTES + MAX_THUMBNAIL_BYTES) * 4) / 3) + 4096
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -47,7 +51,17 @@ function present(supplier: Supplier, moment: LocalMoment) {
       closes: formatClock(h.closes),
     })),
     status: supplier.status,
+    // Paths on this service, like the Location header. The version in them changes with
+    // every new photo, so a browser may keep a photo it fetched through one for good.
+    photo: supplier.photoVersion
+      ? {
+          path: `/suppliers/${supplier.id}/photo?v=${supplier.photoVersion}`,
+          thumbnailPath: `/suppliers/${supplier.id}/photo?size=thumbnail&v=${supplier.photoVersion}`,
+        }
+      : null,
     availability: evaluateAvailability(supplier.hours, moment),
+    // Whole metres from the list's near point, or null.
+    distanceMeters: supplier.distanceMeters === null ? null : Math.round(supplier.distanceMeters),
     createdAt: supplier.createdAt.toISOString(),
     updatedAt: supplier.updatedAt.toISOString(),
   }
@@ -94,18 +108,61 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
 
     // Suppliers change rarely and are read constantly, so the same search is
     // answered from memory for a couple of seconds. The opening hours are
-    // evaluated below on every request, never cached.
-    const { items, total } = await deps.listCache.get(JSON.stringify(parsed.value), () =>
-      repository.listSuppliers(deps.db, parsed.value),
-    )
+    // evaluated below on every request, never cached. A list of favorites
+    // belongs to one account and changes at a tap, so it always comes fresh.
+    const filters = parsed.value
+    const accountId = filters.favorites ? request.actorId : null
     const moment = toLocalMoment(deps.now(), deps.timeZone)
-    return {
-      items: items.map((s) => present(s, moment)),
-      page: parsed.value.page,
-      pageSize: parsed.value.pageSize,
-      total,
-      totalPages: Math.ceil(total / parsed.value.pageSize),
+    const remembered = (key: object, load: () => Promise<{ items: Supplier[]; total: number }>) =>
+      filters.favorites ? load() : deps.listCache.get(JSON.stringify(key), load)
+
+    let found: { items: Supplier[]; total: number }
+    if (!filters.openNow) {
+      found = await remembered(filters, () => repository.listSuppliers(deps.db, filters, accountId))
+    } else {
+      // Open or closed is worked out in code (src/domain/availability.ts), which copes with hours
+      // past midnight and the end of the week, so the database cannot page by it. Every match is
+      // loaded, the open ones kept and the page cut here, which is quick for one campus. Only the
+      // stored rows may come from memory, never which of them are open.
+      const all = await remembered({ ...filters, openNow: false, page: 0, pageSize: 0 }, () =>
+        repository.listSuppliers(deps.db, filters, accountId, true),
+      )
+      const open = all.items.filter((s) => evaluateAvailability(s.hours, moment).open)
+      const start = (filters.page - 1) * filters.pageSize
+      found = { items: open.slice(start, start + filters.pageSize), total: open.length }
     }
+    return {
+      items: found.items.map((s) => present(s, moment)),
+      page: filters.page,
+      pageSize: filters.pageSize,
+      total: found.total,
+      totalPages: Math.ceil(found.total / filters.pageSize),
+    }
+  })
+
+  // Type, zone and building are free text, so a client cannot know which values exist. Not
+  // cached: one cheap query, asked once when a list page opens.
+  app.get('/suppliers/filters', { onRequest: requires('supplier.read') }, async (request) => {
+    const parsed = parseFilterValuesQuery(request.query as Record<string, unknown>)
+    if ('errors' in parsed) throw validationFailed(parsed.errors)
+    return repository.listFilterValues(deps.db, parsed.value)
+  })
+
+  // The caller's own favorites. The account comes from the session, so nobody can
+  // ask for another account's. A read, so its approval may come from the auth cache.
+  app.get('/suppliers/favorites', { onRequest: requires('supplier.read') }, async (request) => ({
+    supplierIds: await repository.listFavoriteIds(deps.db, request.actorId),
+  }))
+
+  app.put<{ Params: Params }>('/suppliers/:id/favorite', { onRequest: requires('supplier.favorite') }, async (request, reply) => {
+    if (!(await repository.addFavorite(deps.db, request.actorId, request.params.id))) throw notFound()
+    return reply.status(204).send()
+  })
+
+  // Removing a favorite that is not there changes nothing, so it answers the same.
+  app.delete<{ Params: Params }>('/suppliers/:id/favorite', { onRequest: requires('supplier.favorite') }, async (request, reply) => {
+    await repository.removeFavorite(deps.db, request.actorId, request.params.id)
+    return reply.status(204).send()
   })
 
   // Inactive suppliers stay retrievable here, for errands that already use them.
@@ -134,6 +191,44 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
       // What a new errand may use: not deactivated, and open at that time.
       orderable: supplier.status === 'Active' && availability.open,
     }
+  })
+
+  app.get<{ Params: Params }>('/suppliers/:id/photo', { onRequest: requires('supplier.read') }, async (request, reply) => {
+    const query = request.query as Record<string, unknown>
+    const size = query.size ?? 'photo'
+    if (size !== 'photo' && size !== 'thumbnail') {
+      throw validationFailed([{ field: 'size', message: 'must be photo or thumbnail' }])
+    }
+    const photo = await repository.getSupplierPhoto(deps.db, request.params.id, size)
+    if (!photo) throw new HttpError(404, 'NOT_FOUND', 'This supplier has no photo')
+
+    const etag = `"${photo.version}-${size}"`
+    // private: only a signed-in member may see it, so no shared cache may keep a copy.
+    reply.header('cache-control', query.v === photo.version ? 'private, max-age=31536000, immutable' : 'private, no-cache')
+    reply.header('etag', etag)
+    reply.header('x-content-type-options', 'nosniff')
+    if (request.headers['if-none-match'] === etag) return reply.status(304).send()
+    return reply.type(photo.type).send(photo.bytes)
+  })
+
+  app.put<{ Params: Params }>(
+    '/suppliers/:id/photo',
+    { onRequest: requires('supplier.update'), bodyLimit: PHOTO_BODY_LIMIT },
+    async (request) => {
+      const parsed = validatePhoto(request.body)
+      if ('errors' in parsed) throw validationFailed(parsed.errors)
+      const supplier = await repository.setSupplierPhoto(deps.db, request.params.id, parsed.value, request.actorId)
+      deps.listCache.clear()
+      if (!supplier) throw notFound()
+      return present(supplier, toLocalMoment(deps.now(), deps.timeZone))
+    },
+  )
+
+  app.delete<{ Params: Params }>('/suppliers/:id/photo', { onRequest: requires('supplier.update') }, async (request) => {
+    const supplier = await repository.removeSupplierPhoto(deps.db, request.params.id, request.actorId)
+    deps.listCache.clear()
+    if (!supplier) throw notFound()
+    return present(supplier, toLocalMoment(deps.now(), deps.timeZone))
   })
 
   app.post('/suppliers', { onRequest: requires('supplier.create') }, async (request, reply) => {

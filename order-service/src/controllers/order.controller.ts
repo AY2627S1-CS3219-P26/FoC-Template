@@ -1,124 +1,62 @@
-import { Request, Response } from "express";
-import { OrderService } from "../services/order.service.ts";
-import { CreateOrderSchema } from "../schemas/order.schema.ts";
+import type { NextFunction, Request, Response } from "express";
+import { createOrderService } from "../services/order.service.ts";
+import { OrderModel } from "../models/order.model.ts";
+import { createServiceClients } from "../services/clients.ts";
+import { StatusBody } from "../schemas/order.schema.ts";
+import { fieldErrorsOf, validationError } from "../util/validation.ts";
+import { AppError } from "../errors.ts";
+import { config } from "../config.ts";
 
+const OrderService = createOrderService(OrderModel, createServiceClients(config.SUPPLIER_SERVICE_URL, config.CREDIT_SERVICE_URL));
+
+// Express 4 does not pass a rejected promise to the error handler by itself.
+type Handler = (req: Request, res: Response) => Promise<void>;
+const handle = (handler: Handler) => (req: Request, res: Response, next: NextFunction) => {
+    handler(req, res).catch(next);
+};
+
+function orderIdOf(req: Request): number {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1 || id > 2_147_483_647) {
+        throw new AppError(404, "ORDER_NOT_FOUND", "No errand with this id");
+    }
+    return id;
+}
+
+// The auth middleware in front of these routes always sets res.locals.accountId.
 export const OrderController = {
     // POST /orders
-    async createOrder(req: Request, res: Response): Promise<void> {
-        try {
-            // Extract logged-in user ID (populated by authentication middleware)
-            const requesterId = (req as any).user?.id || req.headers["x-user-id"];
-            if (!requesterId) {
-                res.status(401).json({ error: "Unauthorized: Missing user identity" });
-                return;
-            }
-
-            // Validate payload with Zod
-            const validation = CreateOrderSchema.safeParse(req.body);
-            if (!validation.success) {
-                res.status(400).json({ error: "Invalid request payload", details: validation.error.format() });
-                return;
-            }
-
-            const order = await OrderService.createOrder(requesterId as string, validation.data);
-            res.status(201).json({ message: "Errand request created successfully", data: order });
-        } catch (error: any) {
-            res.status(500).json({ error: error.message || "Failed to create order" });
-        }
-    },
+    createOrder: handle(async (req, res) => {
+        const order = await OrderService.createOrder(res.locals.accountId, req.body, req.headers.cookie ?? "");
+        res.status(201).json({ data: order });
+    }),
 
     // GET /orders/open
-    async getOpenRequests(_req: Request, res: Response): Promise<void> {
-        try {
-            const orders = await OrderService.getOpenRequests();
-            res.status(200).json({ data: orders });
-        } catch (error: any) {
-            res.status(500).json({ error: "Failed to fetch open requests" });
-        }
-    },
+    getOpenRequests: handle(async (_req, res) => {
+        res.status(200).json({ data: await OrderService.getOpenRequests() });
+    }),
+
+    // GET /orders/mine
+    getMyOrders: handle(async (_req, res) => {
+        const accountId: string = res.locals.accountId;
+        res.status(200).json({ data: await OrderService.getMyOrders(accountId), accountId });
+    }),
 
     // GET /orders/:id
-    async getOrderById(req: Request, res: Response): Promise<void> {
-        try {
-            const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-            const orderId = parseInt(rawId ?? "", 10);
-            if (isNaN(orderId)) {
-                res.status(400).json({ error: "Invalid order ID" });
-                return;
-            }
-
-            const order = await OrderService.getOrderById(orderId);
-            res.status(200).json({ data: order });
-        } catch (error: any) {
-            if (error.message === "ORDER_NOT_FOUND") {
-                res.status(404).json({ error: "Order not found" });
-                return;
-            }
-            res.status(500).json({ error: "Failed to fetch order" });
-        }
-    },
+    getOrderById: handle(async (req, res) => {
+        res.status(200).json({ data: await OrderService.getOrderById(orderIdOf(req), res.locals.accountId) });
+    }),
 
     // POST /orders/:id/accept
-    async acceptOrder(req: Request, res: Response): Promise<void> {
-        try {
-            const courierId = (req as any).user?.id || req.headers["x-user-id"];
-            if (!courierId) {
-                res.status(401).json({ error: "Unauthorized: Missing courier identity" });
-                return;
-            }
-
-            const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-            const orderId = parseInt(rawId ?? "", 10);
-            if (isNaN(orderId)) {
-                res.status(400).json({ error: "Invalid order ID" });
-                return;
-            }
-
-            const updatedOrder = await OrderService.acceptOrder(orderId, courierId as string);
-            res.status(200).json({ message: "Order accepted successfully", data: updatedOrder });
-        } catch (error: any) {
-            switch (error.message) {
-                case "ORDER_NOT_FOUND":
-                    res.status(404).json({ error: "Order not found" });
-                    break;
-                case "REQUESTER_CANNOT_ACCEPT_OWN_ORDER":
-                    res.status(403).json({ error: "You cannot accept your own errand request" });
-                    break;
-                case "ORDER_NOT_AVAILABLE":
-                case "ORDER_ACCEPTANCE_FAILED":
-                    res.status(409).json({ error: "Order is no longer available or was already accepted by another courier" });
-                    break;
-                default:
-                    res.status(500).json({ error: "Failed to accept order" });
-            }
-        }
-    },
+    acceptOrder: handle(async (req, res) => {
+        res.status(200).json({ data: await OrderService.acceptOrder(orderIdOf(req), res.locals.accountId) });
+    }),
 
     // PATCH /orders/:id/status
-    async updateStatus(req: Request, res: Response): Promise<void> {
-        try {
-            const userId = (req as any).user?.id || req.headers["x-user-id"];
-            if (!userId) {
-                res.status(401).json({ error: "Unauthorized: Missing user identity" });
-                return;
-            }
-            const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-            const orderId = parseInt(rawId ?? "", 10);
-            const { status } = req.body;
-
-            if (isNaN(orderId) || !status) {
-                res.status(400).json({ error: "Order ID and status are required" });
-                return;
-            }
-
-            const updatedOrder = await OrderService.updateOrderStatus(orderId, userId as string, status);
-            res.status(200).json({ message: "Order status updated successfully", data: updatedOrder });
-        } catch (error: any) {
-            if (error.message === "UNAUTHORIZED_STATUS_UPDATE") {
-                res.status(403).json({ error: "You are not authorized to update this order" });
-                return;
-            }
-            res.status(500).json({ error: error.message || "Failed to update order status" });
-        }
-    }
+    updateStatus: handle(async (req, res) => {
+        const orderId = orderIdOf(req);
+        const parsed = StatusBody.safeParse(req.body);
+        if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
+        res.status(200).json({ data: await OrderService.updateOrderStatus(orderId, res.locals.accountId, parsed.data.status) });
+    }),
 };

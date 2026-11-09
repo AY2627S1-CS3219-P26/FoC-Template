@@ -7,6 +7,7 @@ const EnvSchema = z.object({
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     MONGO_URL: z.string().min(1),
     BROKER_URL: z.string().min(1),
+    ORDER_SERVICE_URL: z.url().default("http://localhost:3003"),
 
     OTP_SECRET: z.string().min(32, "must be at least 32 characters"),
     SMTP_HOST: z.string().min(1),

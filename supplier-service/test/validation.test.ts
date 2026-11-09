@@ -228,6 +228,10 @@ describe('parseListQuery', () => {
       zone: null,
       building: null,
       status: 'Active',
+      favorites: false,
+      openNow: false,
+      near: null,
+      sort: 'name',
       page: 1,
       pageSize: 20,
     })

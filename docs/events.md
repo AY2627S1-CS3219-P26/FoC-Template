@@ -124,8 +124,21 @@ To try a consumer by hand, open the management UI, pick the queue under "Queues 
 | Producer | user-service |
 | When | An account becomes Active by verifying its email (F1.1.5), or the first administrator is created (F1.5.6). Accounts that were already Active before announcements existed are announced once at start-up. |
 | `data` | `accountId`: the account's id in the user-service (UUID) |
-| Consumers | credit-service, queue `credit-service.accounts`: creates the credit account with 50 credits (F4.1.1 to F4.1.3) |
+| Consumers | credit-service, queue `credit-service.accounts`: creates the credit account with 50 credits (F4.1.1 to F4.1.3). message-service, queue `message-service.messages`: sends the account its welcome message. |
 | Repetition | Repeated with the same `eventId` until the broker has stored it in a queue (F1.1.7). Until `credit-service.accounts` exists, announcements wait in the user-service. |
-| Duplicates | Possible. Consumers deduplicate by `accountId`: one credit account per account. |
+| Duplicates | Possible. Consumers deduplicate by `accountId`: one credit account and one welcome message per account. |
 | Order | Does not matter. There is exactly one such event per account. |
 | Requirements | F1.1.7, F4.1.1 to F4.1.3, N7.1 |
+
+### `order.errand.completed`, `order.errand.cancelled`, `order.errand.expired`
+
+| | |
+| --- | --- |
+| Producer | order-service |
+| When | An errand enters Completed, Cancelled or Expired (F3.4.1 to F3.4.3). A failed or interrupted creation becomes Rejected, which also sends `order.errand.cancelled`, so any reservation is released. |
+| `data` | `errandRef`: the order id as a string. Completed also carries `courierId`: the courier's user-service account id. |
+| Consumer | credit-service, queue `credit-service.orders`: transfers the reserved reward on Completed, releases it on Cancelled or Expired. |
+| Delivery | The order status and outbox event are written in one PostgreSQL statement. The relay retries every second with the same event id until RabbitMQ confirms routing. |
+| Duplicates | Credit-service's existing transfer/release transactions claim an active reservation once, by `errandRef`. Repeated terminal status requests produce no new event. |
+| Failed creation | Pending and Rejected orders are no errands and never appear in any list. Pending orders left by a crash are rejected after one minute. Credit-service closes the reference even when release arrives before reservation, so a late reserve cannot lock credits for a cancelled order. |
+| Order | Each order has one terminal event. |

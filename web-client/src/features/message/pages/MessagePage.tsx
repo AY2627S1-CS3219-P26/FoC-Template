@@ -4,12 +4,18 @@ import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { MessageCard } from '../components/MessageCard'
+import { RagCard } from '../../rag/components/RagCard'
 
 export function MessagePage() {
   const conversations = useConversations()
 
   return (
-    <Page title="Messages" subtitle="Your conversations">
+    <Page title="Messages" subtitle="Your conversations with people and AI">
+
+      <h2>AI</h2>
+      <ul className="ds-surface ds-rows"><RagCard /></ul>
+
+      <h2>People</h2>
       <QueryView
         query={conversations}
         loadingLabel="Loading conversations"

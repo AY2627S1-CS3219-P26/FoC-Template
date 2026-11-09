@@ -60,9 +60,9 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             return await model.findOpenRequests();
         },
 
-        async getMyOrders(userId: string): Promise<Order[]> {
-            return await model.findByUser(userId);
-        },
+        // async getMyOrders(userId: string): Promise<Order[]> {
+        //     return await model.findByUser(userId);
+        // },
 
         async getOrderById(orderId: number): Promise<Order> {
             const order = await model.findById(orderId);
@@ -90,7 +90,7 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             return updatedOrder;
         },
 
-            async getMyOrders(accountId: string) {
+        async getMyOrders(accountId: string) {
             const orders = await model.findByParticipant(accountId);
             return orders.map((order) => ({
                 ...order,

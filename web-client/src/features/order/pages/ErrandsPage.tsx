@@ -13,14 +13,6 @@ import { useSuppliers } from '@/api/supplier/suppliers'
 import type { Supplier } from '@/api/supplier/types'
 import { Notice } from '@/components/Notice'
 
-/*
- * Errands page: browse open errands (courier), track the errands I requested,
- * and manage the ones I am delivering.
- *
- * The order-service owns every lifecycle rule. This page only shows the actions
- * that make sense for the viewer and surfaces whatever the service answers.
- */
-
 type Tab = 'browse' | 'requests' | 'deliveries'
 type Flash = { kind: 'ok' | 'error'; text: string }
 
@@ -54,10 +46,6 @@ const TABS = [
   ['deliveries', 'My deliveries'],
 ] as const
 
-// ---------------------------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------------------------
-
 const dateFmt = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',
   day: 'numeric',
@@ -78,10 +66,6 @@ function relativeTo(iso: string, now: number): string {
     abs < 60 ? `${abs} min` : abs < 60 * 48 ? `${Math.round(abs / 60)} h` : `${Math.round(abs / 1440)} d`
   return diffMin >= 0 ? `in ${span}` : `${span} overdue`
 }
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 export function ErrandsPage() {
   const [tab, setTab] = useState<Tab>('browse')

@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { MessageCard } from '../components/MessageCard'
-import { RagCard } from '../../rag/components/RagCard'
+import { RagCard } from '../components/RagCard'
 
 export function MessagePage() {
   const conversations = useConversations()

@@ -1,6 +1,5 @@
 
 import { request } from '@/lib/http'
-import type { Message } from '../message/types';
 
 
 export interface queryResponse {
@@ -9,15 +8,16 @@ export interface queryResponse {
 }
 
 
-export async function postPrompt(prompt: string, messages: Message[]) {
+export async function postPrompt(prompt: string, conversations: string[]) {
     try {
         const body = {
             query: prompt,
-            conversations: messages.map((m) => m.content)
+            conversations
         }
         const method = 'POST';
         return await request<queryResponse>('rag', '/query/', { method, body })
-    } catch (e) {
-
+    } catch {
+        // The composer shows its own fallback answer when there is no response.
+        return undefined
     }
 }

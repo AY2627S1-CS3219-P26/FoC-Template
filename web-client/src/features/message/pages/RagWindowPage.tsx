@@ -3,10 +3,10 @@
 import { useCurrentUser } from '@/api/user/session'
 
 import { Page } from '@/components/Page'
-import { BackToMessages } from '@/features/message/components/BackToMessages'
+import { BackToMessages } from '../components/BackToMessages'
 import type { Message } from '@/api/message/types'
 
-import { MessageList } from '@/features/message/components/MessageList'
+import { MessageList } from '../components/MessageList'
 import { useState } from 'react'
 import { RagComposer } from '../components/RagComposer'
 

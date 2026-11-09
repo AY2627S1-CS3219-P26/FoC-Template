@@ -33,6 +33,7 @@ export function MessageList({
 
   return (
     <div className={reserveComposerSpace ? 'grid grid-cols-1 gap-3 pb-40' : 'grid grid-cols-1 gap-3'}>
+      <p>{JSON.stringify(messages)}</p>
       {hasEarlier && (
         <button
           type="button"

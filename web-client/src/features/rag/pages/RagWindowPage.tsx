@@ -1,4 +1,4 @@
-import { useParams } from 'react-router'
+
 
 import { useCurrentUser } from '@/api/user/session'
 
@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { RagComposer } from '../components/RagComposer'
 
 export function RagWindowPage() {
-  const { id = '' } = useParams()
+
   const user = useCurrentUser()
   const [messages, setMessages] = useState<Message[]>([])
 
@@ -36,7 +36,7 @@ export function RagWindowPage() {
 
 
 
-      <RagComposer messages={messages} senderId={id} addMessage={addMessage} />
+      <RagComposer messages={messages} senderId={user.id} addMessage={addMessage} />
     </Page>
   )
 }

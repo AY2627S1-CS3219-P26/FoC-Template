@@ -41,8 +41,8 @@ export function RagComposer({ messages, senderId, addMessage }: MessageComposerP
             receiverId: RAG_ID,
             content: text,
             status: "read",
-            createdAt: Date.toString(),
-            updatedAt: Date.toString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         }
 
 
@@ -59,8 +59,8 @@ export function RagComposer({ messages, senderId, addMessage }: MessageComposerP
             receiverId: senderId,
             content: data?.response || "Unable to get a answer",
             status: "read",
-            createdAt: Date.toString(),
-            updatedAt: Date.toString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         }
         addMessage(ragMessage)
 
@@ -71,6 +71,7 @@ export function RagComposer({ messages, senderId, addMessage }: MessageComposerP
     return (
 
         <div className="fixed inset-x-0 bottom-24 z-10 lg:bottom-0 lg:left-64">
+
             <form
                 noValidate
                 onSubmit={handleSubmit}

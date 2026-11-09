@@ -1,6 +1,7 @@
 import { creditRoutes } from '@/features/credit/routes'
 import { messageRoutes } from '@/features/message/routes'
 import { orderRoutes } from '@/features/order/routes'
+import { ragRoutes } from '@/features/rag/routes'
 import { supplierRoutes } from '@/features/supplier/routes'
 import { userRoutes } from '@/features/user/routes'
 import type { FeatureRoutes } from '@/lib/routing'

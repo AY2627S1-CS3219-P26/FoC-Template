@@ -96,6 +96,7 @@ describe('supplier API', { skip }, () => {
       const { id } = await create()
       for (const [method, url] of [
         ['GET', '/suppliers'],
+        ['GET', '/suppliers/filters'],
         ['GET', `/suppliers/${id}`],
         ['GET', `/suppliers/${id}/availability`],
         ['POST', '/suppliers'],
@@ -417,6 +418,45 @@ describe('supplier API', { skip }, () => {
     })
   })
 
+  describe('filter values', () => {
+    // Which of two spellings is kept depends on the database collation, so only the words are compared.
+    const lower = (values: string[]) => values.map((v) => v.toLowerCase())
+
+    it('offers each type, zone and building of the Active suppliers once, ignoring case', async () => {
+      await create({ name: 'A', type: 'Food', zone: 'Central', building: 'COM3' })
+      await create({ name: 'B', type: 'food', zone: 'central', building: 'Central Library' })
+      await create({ name: 'C', type: 'Printing', zone: 'Computing', building: 'COM3' })
+      const { id } = await create({ name: 'D', type: 'Laundry', zone: 'Residences', building: 'PGP' })
+      await call('DELETE', `/suppliers/${id}`, 'admin-token')
+
+      const response = await call('GET', '/suppliers/filters', 'member-token')
+      assert.equal(response.status, 200)
+      assert.deepEqual(lower(response.body.types), ['food', 'printing'])
+      assert.deepEqual(lower(response.body.zones), ['central', 'computing'])
+      assert.deepEqual(response.body.buildings, ['Central Library', 'COM3'])
+    })
+
+    it('takes the same status as the list', async () => {
+      await create({ name: 'A', type: 'Food' })
+      const { id } = await create({ name: 'D', type: 'Laundry' })
+      await call('DELETE', `/suppliers/${id}`, 'admin-token')
+
+      assert.deepEqual((await call('GET', '/suppliers/filters?status=Inactive', 'member-token')).body.types, ['Laundry'])
+      assert.deepEqual((await call('GET', '/suppliers/filters?status=all', 'member-token')).body.types, ['Food', 'Laundry'])
+    })
+
+    it('offers empty lists when there is no supplier', async () => {
+      const response = await call('GET', '/suppliers/filters', 'member-token')
+      assert.deepEqual(response.body, { types: [], zones: [], buildings: [] })
+    })
+
+    it('answers 400 to an unknown status', async () => {
+      const response = await call('GET', '/suppliers/filters?status=gone', 'member-token')
+      assert.equal(response.status, 400)
+      assert.deepEqual(response.body.error.fields.map((f: { field: string }) => f.field), ['status'])
+    })
+  })
+
   describe('read cache', () => {
     let cached: FastifyInstance
 
@@ -549,6 +589,12 @@ describe('supplier API', { skip }, () => {
       assert.equal((await search('?type=Shopping')).total, 3)
       assert.equal((await search('?zone=central')).total, 6)
       assert.equal((await search('?building=com2')).total, 2)
+    })
+
+    it('offers the types and zones the seed data uses', async () => {
+      const { types, zones } = await search('/filters')
+      assert.deepEqual(types, ['Food', 'Food/Coffee', 'Printing', 'Shopping'])
+      assert.deepEqual(zones, ['Business', 'Central', 'Computing', 'Engineering', 'Medicine', 'Residences', 'Science'])
     })
 
     it('combines filters and keywords', async () => {

@@ -40,11 +40,34 @@ export type Supplier = {
   updatedAt: string
 }
 
+// The supplier-service matches type, zone and building ignoring case.
 export type SupplierFilters = {
   q?: string
+  type?: string
+  zone?: string
+  building?: string
   // The supplier-service lists only Active suppliers unless told otherwise.
   status?: SupplierStatus | 'all'
   page: number
+  // 1 to 20. The supplier-service uses 20 when none is given.
+  pageSize?: number
+}
+
+// GET /suppliers/filters: every type, zone and building in use by suppliers of that status.
+export type SupplierFilterValues = {
+  types: string[]
+  zones: string[]
+  buildings: string[]
+}
+
+// GET /suppliers/:id/availability. orderable is true only when the supplier is Active and open at `at`,
+// which is what a new errand needs (F3.1.3).
+export type SupplierAvailabilityCheck = SupplierAvailability & {
+  supplierId: string
+  at: string
+  timezone: string
+  status: SupplierStatus
+  orderable: boolean
 }
 
 // The body of a create or update. Numbers and times are sent as the user typed them when they

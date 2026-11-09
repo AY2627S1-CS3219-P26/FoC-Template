@@ -128,6 +128,24 @@ export async function listSuppliers(
   return { items, total: count.rows[0].total as number }
 }
 
+export interface FilterValues {
+  types: string[]
+  zones: string[]
+  buildings: string[]
+}
+
+// The list filters ignore case, so two spellings that differ only in case are offered once.
+export async function listFilterValues(db: Db, status: ListFilters['status']): Promise<FilterValues> {
+  const where = status === 'all' ? '' : 'WHERE status = $1'
+  const distinct = (column: string) =>
+    `ARRAY(SELECT min(${column}) FROM suppliers ${where} GROUP BY lower(${column}) ORDER BY lower(${column}))`
+  const result = await db.query(
+    `SELECT ${distinct('type')} AS types, ${distinct('zone')} AS zones, ${distinct('building')} AS buildings`,
+    status === 'all' ? [] : [status],
+  )
+  return result.rows[0] as FilterValues
+}
+
 async function insertHours(db: Db, supplierId: string, hours: DayHours[]): Promise<void> {
   await db.query(
     `INSERT INTO supplier_hours (supplier_id, weekday, opens_minute, closes_minute)

@@ -25,7 +25,7 @@ variable "ssh_public_key" {
 variable "github_repository" {
   description = "Repository whose workflows may start, stop and restart the instance."
   type        = string
-  default     = "AY2627S1-CS3219-P26/FoC-Template"
+  default     = "AY2627S1-CS3219-P26/Relay"
 }
 
 variable "github_branches" {

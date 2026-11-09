@@ -9,9 +9,9 @@ import { QueryView } from '@/components/QueryView'
 import type { SelectOption } from '@/components/SelectField'
 import { SelectField } from "@/components/SelectField"
 import { TextField } from '@/components/TextField'
-import { AvailabilityText } from '@/features/supplier/components/AvailabilityText'
-import { OpenBadge } from '@/features/supplier/components/OpenBadge'
-import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
+import { AvailabilityText } from './AvailabilityText'
+import { OpenBadge } from './OpenBadge'
+import { SupplierThumbnail } from './SupplierThumbnail'
 
 type PickUpListProps = {
     selectedId?: string
@@ -57,7 +57,7 @@ export function PickUpList({ selectedId, onSelect, onClose}: PickUpListProps) {
     }
 
     return (
-        <dialog ref={ref} onClose={onClose} onClick={(event) => { if (event.target == ref.current) ref.current?.close}}
+        <dialog ref={ref} onClose={onClose} onClick={(event) => { if (event.target === ref.current) ref.current?.close() }}
             className="m-0 h-dvh max-h-none w-dvw max-w-none bg-backdrop p-0 text-ink backdrop:bg-[rgb(0_0_0/0.4)] sm:m-auto sm:h-auto sm:max-h-[85dvh] sm:w-full sm:max-w-2xl sm:rounded-panel">
             <div className="flex h-dvh flex-col sm:h-auto sm:max-h-[85dvh] p-5">
                 <header className="flex items-center justify-between gap-3">

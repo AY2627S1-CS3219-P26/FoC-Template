@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   describeOrderError,
-  suppliersOf,
   useAcceptOrder,
   useMyOrders,
   useOpenOrders,
   useUpdateOrderStatus,
 } from '@/api/order/order'
-import type { Order, OrderStatus } from '@/api/order/order'
+import type { MyOrder, Order, OrderStatus } from '@/api/order/order'
 import { useSuppliers } from '@/api/supplier/suppliers'
 import type { Supplier } from '@/api/supplier/types'
 import { Notice } from '@/components/Notice'
@@ -38,6 +37,23 @@ const BADGE_TONE: Record<OrderStatus, string> = {
   Completed: 'bg-success-surface text-success',
   Cancelled: 'bg-neutral-surface text-neutral',
   Expired: 'bg-neutral-surface text-neutral',
+}
+
+// How each step the order-service allows is offered. Which steps a card shows comes from the
+// service (allowed_transitions), never from the client.
+const ACTIONS: Partial<Record<OrderStatus, { label: (order: Order) => string; success: string; confirm?: (order: Order) => string }>> = {
+  Cancelled: {
+    label: () => 'Cancel request',
+    confirm: () => 'Cancel this errand? Your reserved credits will be released.',
+    success: 'Errand cancelled. Your credits are being released.',
+  },
+  PickedUp: { label: () => 'Mark picked up', success: 'Marked as picked up.' },
+  Delivered: { label: () => 'Mark delivered', success: 'Marked as delivered. Waiting for the requester to confirm.' },
+  Completed: {
+    label: (order) => `Confirm delivery / Pay courier ${order.credit_reward} credits`,
+    confirm: (order) => `Confirm you received everything? ${order.credit_reward} credits go to your courier.`,
+    success: 'Delivery confirmed. Credits are on their way to your courier.',
+  },
 }
 
 const TABS = [
@@ -82,7 +98,7 @@ export function ErrandsPage() {
   const openOrders = openQuery.data
   const myOrders = mineQuery.data?.orders
   const me = mineQuery.data?.accountId ?? null
-  const suppliers: Supplier[] = suppliersOf(suppliersQuery.data)
+  const suppliers: Supplier[] = suppliersQuery.data?.items ?? []
   const loading = openQuery.isLoading || mineQuery.isLoading
   const loadFailure = openQuery.error ?? mineQuery.error
   const loadError = loadFailure ? describeOrderError(loadFailure, 'Could not load errands.') : null
@@ -118,7 +134,7 @@ export function ErrandsPage() {
     [openOrders],
   )
 
-  const visible = tab === 'browse' ? browse : tab === 'requests' ? requests : deliveries
+  const visible: (Order | MyOrder)[] = tab === 'browse' ? browse : tab === 'requests' ? requests : deliveries
 
   // The mutations refresh the order queries themselves (see @/api/order/order).
   async function run(orderId: number, action: () => Promise<unknown>, success: string, failure: string) {
@@ -208,6 +224,7 @@ export function ErrandsPage() {
                   <ErrandCard
                     order={order}
                     me={me}
+                    allowed={'allowed_transitions' in order ? order.allowed_transitions : []}
                     now={now}
                     supplier={supplierName(order.supplier_id)}
                     busy={busy.includes(order.id)}
@@ -229,8 +246,8 @@ export function ErrandsPage() {
   )
 }
 
-function sortActiveFirst(orders: Order[]): Order[] {
-  const rank = (o: Order) => (TERMINAL.includes(o.status) ? 1 : 0)
+function sortActiveFirst(orders: MyOrder[]): MyOrder[] {
+  const rank = (o: MyOrder) => (TERMINAL.includes(o.status) ? 1 : 0)
   return [...orders].sort(
     (a, b) => rank(a) - rank(b) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   )
@@ -249,6 +266,7 @@ function emptyText(tab: Tab): string {
 interface CardProps {
   order: Order
   me: string | null
+  allowed: OrderStatus[]
   now: number
   supplier: string
   busy: boolean
@@ -263,7 +281,7 @@ const VARIANT_CLASS: Record<Variant, string> = {
   plain: 'ds-btn',
 }
 
-function ErrandCard({ order, me, now, supplier, busy, onAccept, onStatus }: CardProps) {
+function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatus }: CardProps) {
   const isRequester = me !== null && order.requester_id === me
   const isCourier = me !== null && order.courier_id === me
   const pastDue = order.status === 'Open' && new Date(order.needed_by_time).getTime() < now
@@ -285,49 +303,12 @@ function ErrandCard({ order, me, now, supplier, busy, onAccept, onStatus }: Card
   if (order.status === 'Open' && !isRequester) {
     button('accept', 'Accept errand', onAccept, 'primary')
   }
-  if (isRequester) {
-    if (order.status === 'Open' || order.status === 'Accepted') {
-      button(
-        'cancel',
-        'Cancel request',
-        () =>
-          confirmThen('Cancel this errand? Your reserved credits will be released.', () =>
-            onStatus('Cancelled', 'Errand cancelled. Your credits are being released.'),
-          ),
-        'primary',
-      )
-    }
-    if (pastDue) {
-      button('expire', 'Mark expired', () =>
-        confirmThen('Mark this errand as expired? Your reserved credits will be released.', () =>
-          onStatus('Expired', 'Errand marked expired. Your credits are being released.'),
-        ),
-      )
-    }
-    if (order.status === 'Delivered') {
-      button(
-        'complete',
-        `Confirm delivery / Pay courier ${order.credit_reward} credits`,
-        () =>
-          confirmThen(`Confirm you received everything? ${order.credit_reward} credits go to your courier.`, () =>
-            onStatus('Completed', 'Delivery confirmed. Credits are on their way to your courier.'),
-          ),
-        'primary',
-      )
-    }
-  }
-  if (isCourier) {
-    if (order.status === 'Accepted') {
-      button('picked', 'Mark picked up', () => onStatus('PickedUp', 'Marked as picked up.'), 'primary')
-    }
-    if (order.status === 'PickedUp') {
-      button(
-        'delivered',
-        'Mark delivered',
-        () => onStatus('Delivered', 'Marked as delivered. Waiting for the requester to confirm.'),
-        'primary',
-      )
-    }
+  for (const status of allowed) {
+    const action = ACTIONS[status]
+    if (!action) continue
+    const { confirm } = action
+    const change = () => onStatus(status, action.success)
+    button(status, action.label(order), confirm ? () => confirmThen(confirm(order), change) : change, 'primary')
   }
 
   const note = statusNote(order, isRequester, isCourier)

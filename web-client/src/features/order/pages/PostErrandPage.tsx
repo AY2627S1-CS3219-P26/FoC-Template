@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { useSuppliers } from '@/api/supplier/suppliers'
+import type { SubmitEvent } from 'react'
 import { useRecommendation } from '@/api/recommendation/recommendations'
 import { useCreateOrder } from '@/api/order/order'
 import { Notice } from '@/components/Notice'
 import { SubmitButton } from '@/components/SubmitButton'
 import { Page } from '@/components/Page'
 import type { Supplier } from '@/api/supplier/types'
-import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
+import { SupplierThumbnail } from '../components/SupplierThumbnail'
 import { PickUpList } from '../components/PickupList'
-// import { SelectField } from '@/components/SelectField'
 import { TextField } from '@/components/TextField'
 import { ApiError, fieldErrorsOf } from '@/lib/http'
 import { FormError } from '@/components/FormError'
@@ -25,17 +24,11 @@ function defaultNeededBy(now = new Date()): string {
 }
 
 export function PostErrandPage() {
-  const suppliers = useSuppliers({ page: 1 })
-
-  console.log("suppliers")
-  console.log(suppliers)
-
   const recommend = useRecommendation()
   const create = useCreateOrder()
   const ERRANDS_PATH = '/errands'
   const fieldErrors = fieldErrorsOf(create.error)
 
-  
   const [supplier, setSupplier] = useState<Supplier | null>(null)
   const supplierId = supplier?.id ?? ''
   const [location, setLocation] = useState('')
@@ -43,13 +36,7 @@ export function PostErrandPage() {
   const [itemsText, setItemsText] = useState('')
   const [credits, setCredits] = useState('')
   const [posted, setPosted] = useState(false)
-  const [timeError, setTimeError] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
-
-  // const supplierOptions = [
-  //   { value: '', label: 'Select a supplier' },
-  //   ...(suppliers.data?.items ?? []).map((s) => ({ value: s.id, label: s.name })),
-  // ]
 
   function suggest() {
     const items = itemsText
@@ -62,11 +49,8 @@ export function PostErrandPage() {
     )
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-
-    console.log(fieldErrors)
-
     if (create.isPending) return
 
     const items = itemsText
@@ -74,14 +58,8 @@ export function PostErrandPage() {
       .map((item) => item.trim())
       .filter(Boolean)
 
+    // The order-service decides whether the time is valid and in the future, and names the field if not.
     const when = new Date(neededBy)
-
-    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
-      setTimeError('Choose a needed-by time in the future.')
-      return
-    }
-    setTimeError(null)
-
     create.mutate({
       supplierId,
       deliveryLocation: location.trim(),
@@ -104,7 +82,6 @@ export function PostErrandPage() {
     setItemsText('')
     setCredits('')
     setPosted(false)
-    setTimeError(null)
 
     create.reset()
     recommend.reset()
@@ -112,17 +89,10 @@ export function PostErrandPage() {
 
   const suggestion = recommend.data
 
-  const pastTimeFromService =
-    create.error instanceof ApiError && String(create.error.message).includes('NEEDED_BY_TIME_IN_PAST')
-
-  const neededByErrors = timeError
-    ? [timeError]
-    : (fieldErrors.neededByTime ?? (pastTimeFromService ? ['The needed-by time must be in the future.'] : undefined))
-
   return (
     <Page title="Post an errand" subtitle="Describe the errand and set the credits you'll offer">
       {!posted ? (
-        <form className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
+        <form noValidate className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
           <FormError error={create.error} fields={['supplierId', 'deliveryLocation', 'neededByTime', 'itemLines', 'creditReward']} />
           {/* Choose pick up */}
           <div className="grid gap-2">
@@ -154,8 +124,6 @@ export function PostErrandPage() {
             )}
             {fieldErrors.supplierId?.[0] && <p className='text-danger'>{fieldErrors.supplierId?.[0]}</p>}
           </div>
-          {/* <SelectField label="Supplier" name="supplierId" value={supplierId} onChange={setSupplierId} options={supplierOptions} errors={fieldErrors.supplierId}/> */}
-          
           <TextField
             label="Drop-off location"
             name="location"
@@ -164,7 +132,7 @@ export function PostErrandPage() {
             hint="Where the errand ends, e.g. COM3 or Kent Ridge MRT"
             errors={fieldErrors.deliveryLocation}
           />
-          <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} errors={neededByErrors}/>
+          <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} errors={fieldErrors.neededByTime}/>
           <TextField label="Items" name="items" value={itemsText} onChange={setItemsText} hint="Comma-separated, e.g. coffee, sandwich" errors={fieldErrors.itemLines}/>
 
           <div className="grid gap-2">
@@ -202,11 +170,6 @@ export function PostErrandPage() {
               </p>
             )}
           </div>
-
-          {/* <Notice tone="info" title="Posting isn't wired up yet">
-            Submitting the errand is handled by order-service and will connect here later. For now this page helps you decide the
-            credits to offer.
-          </Notice> */}
 
           <SubmitButton
             pending={create.isPending}

@@ -15,7 +15,7 @@ Live deployment: <https://relay.54-254-126-243.sslip.io> (only while the cloud i
 | Felix Soeren Haag | user-service, web-client, deployment (Kubernetes, AWS, CI/CD) |
 | William Kento Rasmussen | message-service (N2H), rag-service (N2H) |
 | Nguyen Viet Quang | supplier-service |
-| Dinh Khoat Hoang Long | credit-service |
+| Dinh Khoat Hoang Long | credit-service, recommendation-service (N2H) |
 | Truong Kim Mai | order-service |
 
 ---
@@ -28,6 +28,7 @@ Live deployment: <https://relay.54-254-126-243.sslip.io> (only while the cloud i
 | [`supplier-service`](supplier-service/README.md) | Catalogue of campus stores, facilities and landmarks | Node.js, TypeScript, Fastify | PostgreSQL |
 | [`order-service`](order-service/README.md) | Errand requests and their lifecycle | Node.js, TypeScript, Express | PostgreSQL |
 | [`credit-service`](credit-service/README.md) | Credit balances, reservations and transfers | Node.js, TypeScript, Express | MongoDB (replica set) |
+| [`recommendation-service`](recommendation-service/README.md) | Suggests a credit reward for a new errand from completed ones (N2H) | Node.js, TypeScript, Express | in-memory feature store |
 | [`message-service`](message-service/README.md) | Direct messages between accounts, live over Socket.IO (N2H) | Node.js, TypeScript, Express, Socket.IO | MongoDB |
 | [`rag-service`](rag-service/README.md) | Help assistant that answers from the help documents with Claude (N2H) | Python, FastAPI | in-memory FAISS index |
 | [`web-client`](web-client/README.md) | Browser app (React) and the gateway in front of every service (nginx) | React, Vite, nginx | none |

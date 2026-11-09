@@ -25,6 +25,8 @@ secrets:
     SUPPLIER_DB_PASSWORD: change-me
     ORDER_DB_PASSWORD: change-me
     MAILPIT_PASSWORD: change-me
+    # Empty on the laptop: the rag-service starts, but every question fails until a real key is set.
+    CLAUDE_API_KEY: ""
 
 ingress:
   # Empty answers every host name, so http://localhost:<port> works on the laptop.
@@ -64,6 +66,8 @@ services:
       COOKIE_SECURE: "false"
       ADMIN_EMAIL: admin@nus.edu.sg
       ADMIN_USERNAME: admin
+      # Checks that a reported pair really were requester and courier of the errand.
+      ORDER_SERVICE_URL: http://order-service:3000
 
   supplier-service:
     port: 3002
@@ -97,20 +101,60 @@ services:
       BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
 
   order-service:
-    # Off until the order-service image on dev is rebuilt with this branch's Dockerfile, which starts
-    # it through tsx. The image built before could not start (it ran plain node on tsx-style code).
-    enabled: false
-    port: 3003
+    port: 3000
     health: /health
     autoscaling: {max: 4}
     waitFor: [order-db:5432]
-    secretEnv: [ORDER_DB_PASSWORD]
+    secretEnv: [ORDER_DB_PASSWORD, BROKER_PASSWORD]
     env:
-      PORT: "3003"
+      PORT: "3000"
       NODE_ENV: production
       LOG_LEVEL: info
       DATABASE_URL: postgres://order_service:$(ORDER_DB_PASSWORD)@order-db:5432/orders
       USER_SERVICE_URL: http://user-service:3000
+      SUPPLIER_SERVICE_URL: http://supplier-service:3002
+      CREDIT_SERVICE_URL: http://credit-service:3002
+      BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
+
+  # No autoscaling: it keeps the feature store in memory, so a second instance would learn apart.
+  recommendation-service:
+    port: 3006
+    health: /health
+    secretEnv: [BROKER_PASSWORD]
+    env:
+      PORT: "3006"
+      LOG_LEVEL: info
+      USER_SERVICE_URL: http://user-service:3000
+      BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
+      FEATURE_STORE: memory
+
+  # No autoscaling: Socket.IO keeps each connection in the instance that accepted it.
+  message-service:
+    port: 3008
+    health: /health
+    waitFor: [message-db:27017]
+    secretEnv: [BROKER_PASSWORD]
+    env:
+      PORT: "3008"
+      LOG_LEVEL: info
+      MONGO_URL: mongodb://message-db:27017/message-service
+      USER_SERVICE_URL: http://user-service:3000
+      BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
+
+  # No autoscaling: every instance loads the embedding model, about 600 MB.
+  rag-service:
+    port: 3080
+    health: /health/
+    secretEnv: [CLAUDE_API_KEY]
+    env:
+      PORT: "3080"
+      USER_SERVICE_URL: http://user-service:3000
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1536Mi
 
   web-client:
     port: 8080
@@ -124,6 +168,8 @@ services:
       USER_SERVICE_URL: http://user-service.{{ .Release.Namespace }}.svc.cluster.local:3000
       SUPPLIER_SERVICE_URL: http://supplier-service.{{ .Release.Namespace }}.svc.cluster.local:3002
       CREDIT_SERVICE_URL: http://credit-service.{{ .Release.Namespace }}.svc.cluster.local:3002
+      ORDER_SERVICE_URL: http://order-service.{{ .Release.Namespace }}.svc.cluster.local:3000
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service.{{ .Release.Namespace }}.svc.cluster.local:3006
       MESSAGE_SERVICE_URL: http://message-service.{{ .Release.Namespace }}.svc.cluster.local:3008
       RAG_SERVICE_URL: http://rag-service.{{ .Release.Namespace }}.svc.cluster.local:3080
       # Mailpit is served under /mail/ on the same host, see the ingress.
@@ -195,6 +241,10 @@ databases:
     env:
       POSTGRES_USER: order_service
       POSTGRES_DB: orders
+
+  message-db:
+    kind: mongo
+    size: 1Gi
 
 databaseKinds:
   mongo:

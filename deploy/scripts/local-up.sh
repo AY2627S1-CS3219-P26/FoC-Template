@@ -15,12 +15,11 @@ CLUSTER=relay
 CONTEXT="k3d-$CLUSTER"
 PORT="${RELAY_LOCAL_PORT:-8081}"
 # Our services in the chart. A new service needs an entry here and in values.yaml.
-SERVICES=(user-service supplier-service credit-service order-service web-client)
+SERVICES=(user-service supplier-service credit-service order-service recommendation-service message-service rag-service web-client)
 
 # Directory docker builds a service from when compose.yaml does not build it (yet).
 build_context() {
   case "$1" in
-    order-service) echo . ;; # its Dockerfile copies from order-service/
     *) echo "$1" ;;
   esac
 }

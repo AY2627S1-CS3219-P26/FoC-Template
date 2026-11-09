@@ -34,6 +34,11 @@ for key in "${SECRET_KEYS[@]}"; do
   grep -q "^$key=" "$SECRETS_FILE" || echo "$key=$(openssl rand -hex 16)" >> "$SECRETS_FILE"
 done
 
+# A key from Anthropic cannot be made up. Without it the rag-service still starts, but every
+# question fails, so the line is added empty and filled in by hand.
+grep -q "^CLAUDE_API_KEY=" "$SECRETS_FILE" || echo "CLAUDE_API_KEY=" >> "$SECRETS_FILE"
+grep -q "^CLAUDE_API_KEY=." "$SECRETS_FILE" || echo "Warning: CLAUDE_API_KEY in $SECRETS_FILE is empty, the help assistant cannot answer" >&2
+
 host="$(terraform -chdir=deploy/terraform output -raw hostname)"
 
 # cert-manager gets the HTTPS certificate from Let's Encrypt and renews it. The chart's

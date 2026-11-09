@@ -147,6 +147,9 @@ jobs:
           - service: order-service
             context: .
             dockerfile: order-service/Dockerfile
+          - service: recommendation-service
+            context: recommendation-service
+            dockerfile: recommendation-service/Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4

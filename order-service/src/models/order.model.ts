@@ -32,6 +32,10 @@ export interface OrderTransition {
     occurred_at: Date;
 }
 
+export interface OrderWithHistory extends Order {
+    transitions: OrderTransition[];
+}
+
 export interface CreateOrderData {
     requesterId: string;
     supplierId: string;
@@ -79,6 +83,24 @@ export const OrderModel = {
             SELECT from_status, to_status, actor, occurred_at FROM order_transitions
             WHERE order_id = $1 ORDER BY occurred_at, id;
         `, [orderId]);
+        return result.rows;
+    },
+
+    // Pending orders are still waiting for their credit reservation and are not errands yet.
+    async findByParticipant(accountId: string): Promise<OrderWithHistory[]> {
+        const result: QueryResult<OrderWithHistory> = await pool.query(`
+            SELECT o.*, COALESCE(t.transitions, '[]'::json) AS transitions
+            FROM orders o
+            LEFT JOIN LATERAL (
+                SELECT json_agg(json_build_object(
+                    'from_status', from_status, 'to_status', to_status,
+                    'actor', actor, 'occurred_at', occurred_at
+                ) ORDER BY occurred_at, id) AS transitions
+                FROM order_transitions WHERE order_id = o.id
+            ) t ON true
+            WHERE (o.requester_id = $1 OR o.courier_id = $1) AND o.status <> 'Pending'
+            ORDER BY o.created_at DESC, o.id DESC;
+        `, [accountId]);
         return result.rows;
     },
 

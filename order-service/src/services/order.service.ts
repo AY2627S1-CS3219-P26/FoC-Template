@@ -4,6 +4,27 @@ import type { createServiceClients } from "./clients.ts";
 
 export const SYSTEM_ACTOR = "system";
 
+export type Role = "requester" | "courier";
+
+// The transitions a participant may instruct, by current state. Open to Accepted goes through
+// acceptOrder because it also assigns the courier; Open to Expired is only done by the system.
+const USER_TRANSITIONS: Partial<Record<OrderStatus, { to: OrderStatus; by: Role }[]>> = {
+    Open: [{ to: "Cancelled", by: "requester" }],
+    Accepted: [{ to: "PickedUp", by: "courier" }, { to: "Cancelled", by: "requester" }],
+    PickedUp: [{ to: "Delivered", by: "courier" }],
+    Delivered: [{ to: "Completed", by: "requester" }],
+};
+
+function participantOf(order: Order, role: Role): string | null {
+    return role === "requester" ? order.requester_id : order.courier_id;
+}
+
+export function allowedTransitions(order: Order, accountId: string): OrderStatus[] {
+    return (USER_TRANSITIONS[order.status] ?? [])
+        .filter((rule) => participantOf(order, rule.by) === accountId)
+        .map((rule) => rule.to);
+}
+
 export function createOrderService(model: typeof OrderModel, clients: ReturnType<typeof createServiceClients>) {
     return {
         async createOrder(requesterId: string, input: CreateOrderInput, cookie: string): Promise<Order> {
@@ -65,29 +86,28 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             return updatedOrder;
         },
 
+            async getMyOrders(accountId: string) {
+            const orders = await model.findByParticipant(accountId);
+            return orders.map((order) => ({
+                ...order,
+                role: (order.requester_id === accountId ? "requester" : "courier") as Role,
+                allowed_transitions: allowedTransitions(order, accountId),
+            }));
+        },
+
         async updateOrderStatus(orderId: number, userId: string, newStatus: OrderStatus): Promise<Order> {
             const order = await model.findById(orderId);
             if (!order) throw new Error("ORDER_NOT_FOUND");
 
-            if (["PickedUp", "Delivered"].includes(newStatus) && order.courier_id !== userId) {
-                throw new Error("UNAUTHORIZED_COURIER_ACTION");
+            // A repeated confirmation or cancellation answers with the unchanged errand.
+            if (order.status === newStatus && ["Completed", "Cancelled"].includes(newStatus) && order.requester_id === userId) {
+                return order;
             }
-            if (["Completed", "Cancelled", "Expired"].includes(newStatus) && order.requester_id !== userId) {
-                throw new Error("UNAUTHORIZED_REQUESTER_ACTION");
-            }
-            if (["Completed", "Cancelled", "Expired"].includes(newStatus) && order.status === newStatus) return order;
 
-            // Acceptance has its own atomic operation, which also assigns the courier.
             const current = order.status;
-            const isValidTransition =
-                (current === "Open" && ["Cancelled", "Expired"].includes(newStatus)) ||
-                (current === "Accepted" && ["PickedUp", "Cancelled"].includes(newStatus)) ||
-                (current === "PickedUp" && newStatus === "Delivered") ||
-                (current === "Delivered" && newStatus === "Completed");
-
-            if (!isValidTransition) {
-                throw new Error("INVALID_STATE_TRANSITION");
-            }
+            const rule = USER_TRANSITIONS[current]?.find((candidate) => candidate.to === newStatus);
+            if (!rule) throw new Error("INVALID_STATE_TRANSITION");
+            if (participantOf(order, rule.by) !== userId) throw new Error("UNAUTHORIZED_ACTION");
 
             const updated = await model.updateStatus(orderId, newStatus, current, userId);
             if (!updated) throw new Error("STATUS_UPDATE_FAILED");

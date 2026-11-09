@@ -9,13 +9,22 @@ import { ApiError } from '@/lib/http'
 
 const pct = (n: number) => `${n >= 0 ? '+' : ''}${Math.round(n * 100)}%`
 
+// datetime-local expects "YYYY-MM-DDTHH:mm" in the browser's time. The default is the first
+// full hour at least an hour from now, so on most days it is today.
+function defaultNeededBy(now = new Date()): string {
+  const at = new Date(now.getTime() + 60 * 60 * 1000)
+  if (at.getMinutes() || at.getSeconds() || at.getMilliseconds()) at.setHours(at.getHours() + 1, 0, 0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`
+}
+
 export function PostErrandPage() {
   const suppliers = useSuppliers({ page: 1 })
   const recommend = useRecommendation()
 
   const [supplierId, setSupplierId] = useState('')
   const [location, setLocation] = useState('')
-  const [neededBy, setNeededBy] = useState('')
+  const [neededBy, setNeededBy] = useState(defaultNeededBy)
   const [itemsText, setItemsText] = useState('')
   const [credits, setCredits] = useState('')
 

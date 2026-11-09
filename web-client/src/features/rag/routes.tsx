@@ -1,5 +1,5 @@
 import type { FeatureRoutes } from "@/lib/routing";
-import { RagWindowPage } from "./pages/ragWindowPage";
+import { RagWindowPage } from "./pages/RagWindowPage";
 
 
 export const ragRoutes: FeatureRoutes = {

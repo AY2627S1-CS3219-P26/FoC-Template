@@ -14,7 +14,7 @@ Work in the folder you were asked to work in. Do not change another service to m
 
 Host ports in `compose.yaml`: user-service 3001, supplier-service 3002, order-service 3003, credit-service 3004, message-service 3008. Inside the compose network services reach each other by service name, for example `http://user-service:3000`. The message-service also listens on 3008 inside the network (`http://message-service:3008`).
 
-`compose.yaml` has two networks. Every service joins `edge`, where the web client reaches it, and `backend`, where its database lives. Databases and infrastructure such as Mailpit join only `backend`, so the web client cannot reach them. Publish host ports on `127.0.0.1` only (`"127.0.0.1:3003:3000"`); 8080 for the web client is the one port open to the network.
+`compose.yaml` has two networks. Every service joins `edge`, where the web client reaches it, and `backend`, where its database lives. Databases and infrastructure such as Mailpit join only `backend`, so the web client cannot reach them. Publish host ports on `127.0.0.1` only (`"127.0.0.1:3005:3000"`); 8080 for the web client is the one port open to the network.
 
 ## Authentication and authorization
 
@@ -47,6 +47,8 @@ The full workflow is in `docs/workflow.md`. The parts that matter when you touch
 - Every change belongs to a Linear issue (`REL-<n>`). Requirement issues carry the requirement id from the D1 backlog in their title, for example `F3.3.1 ...`. Check the backlog before changing behaviour and name the requirement in the pull request.
 - Branch off `dev`, never off `main`. Name the branch `<type>/rel-<n>-<short-description>` with type `feat`, `fix` or `chore`, for example `feat/rel-42-reserve-credits`. The `rel-<n>` part links the branch to the Linear issue.
 - Commit messages: `<type>: <short description>` with type `feat`, `fix`, `chore`, `docs`, `refactor` or `test`.
+- Do not add anyone as a commit co-author. Never include `Co-authored-by` trailers or AI attribution trailers in commit messages.
+- Preserve the user's configured Git author name and email. Before committing, check the complete commit message for co-author or AI attribution trailers and remove them.
 - Pull requests target `dev`, use the same title format, and fill in the template (Linear issue and requirement id).
 
 Individual contribution is graded, so keep commits attributable to the person who did the work.

@@ -32,6 +32,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MONGO_URL: mongodb://user-db:27017/user-service
       BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
+      ORDER_SERVICE_URL: http://order-service:3000
       OTP_SECRET: ${OTP_SECRET:-dev-only-otp-secret-do-not-use-in-production}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -203,9 +204,8 @@ services:
       MONGO_URL: mongodb://credit-db:27017/credit-service?directConnection=true
       USER_SERVICE_URL: http://user-service:3000
       BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
-    # Host 3003 because supplier-service already uses 3002 on the host; the app listens on 3002 inside.
     ports:
-      - "3003:3002"
+      - "127.0.0.1:3004:3002"
     networks:
       - edge
       - backend
@@ -229,6 +229,26 @@ services:
       timeout: 5s
       retries: 20
       start_period: 15s
+    restart: unless-stopped
+
+  order-service:
+    build: ./order-service
+    environment:
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://${ORDER_DB_USER:-order_service}:${ORDER_DB_PASSWORD:-change-me}@order-db:5432/${ORDER_DB_NAME:-orders}
+      USER_SERVICE_URL: http://user-service:3000
+      SUPPLIER_SERVICE_URL: http://supplier-service:${SUPPLIER_SERVICE_PORT:-3002}
+      CREDIT_SERVICE_URL: http://credit-service:3002
+      BROKER_URL: amqp://${BROKER_USER:-relay}:${BROKER_PASSWORD:-change-me}@broker:5672
+    ports:
+      - "127.0.0.1:3003:3000"
+    networks:
+      - edge
+      - backend
+    depends_on:
+      order-db:
+        condition: service_healthy
     restart: unless-stopped
 
   recommendation-service:
@@ -275,6 +295,7 @@ services:
       RECOMMENDATION_SERVICE_URL: http://recommendation-service:3006
       MESSAGE_SERVICE_URL: http://message-service:3008
       # Locally every email lands in Mailpit, so the verify page links to it. Set it to empty to hide the hint.
+      ORDER_SERVICE_URL: http://order-service:3000
       DEV_MAILBOX_URL: ${DEV_MAILBOX_URL-http://localhost:8025}
     ports:
       - "8080:8080"

@@ -63,6 +63,7 @@ describe('requests that are settled before the database', () => {
 
   const ROUTES = [
     ['GET', '/suppliers'],
+    ['GET', '/suppliers/filters'],
     ['GET', `/suppliers/${ID}`],
     ['GET', `/suppliers/${ID}/availability`],
     ['POST', '/suppliers'],
@@ -100,7 +101,7 @@ describe('requests that are settled before the database', () => {
   })
 
   it('answers 403 to a member on every route that changes a supplier', async () => {
-    for (const [method, url] of ROUTES.slice(3)) {
+    for (const [method, url] of ROUTES.slice(4)) {
       const response = await call(method, url, 'member-token', method === 'DELETE' ? undefined : VALID_SUPPLIER)
       assert.equal(response.status, 403, `${method} ${url}`)
       assert.equal(response.body.error.code, 'FORBIDDEN')

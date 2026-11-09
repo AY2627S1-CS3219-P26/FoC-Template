@@ -28,6 +28,10 @@ export const getOne: RequestHandler = async (req, res) => {
     res.status(200).json(await getUser(targetId(req)));
 };
 
+export const getName: RequestHandler = async (req, res) => {
+    res.status(200).json((await getUser(targetId(req))).username);
+};
+
 export const update: RequestHandler = async (req, res) => {
     res.status(200).json(await updateProfile(targetId(req), req.body));
 };

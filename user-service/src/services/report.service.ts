@@ -6,6 +6,7 @@ import { ReportModel, toFiledReport, type Report } from "../models/report.model.
 import { UserModel, type AccountSummary } from "../models/user.model.ts";
 import { DecisionBody, ListReportsQuery, ReportBody } from "../schemas/reports.schemas.ts";
 import { accountSummaries, applyStateChange } from "./user.service.ts";
+import { findErrandParticipants } from "../lib/orders.ts";
 
 function notFound(): AppError {
     return new AppError(404, "REPORT_NOT_FOUND", "No report with this id");
@@ -22,6 +23,14 @@ export async function fileReport(reporterId: string, input: unknown) {
     }
     if (!(await UserModel.exists({ _id: reportedId }))) {
         throw validationError({ reportedId: ["does not exist"] });
+    }
+
+    // One of the two must have been the requester and the other the courier, in either order.
+    const errand = await findErrandParticipants(errandId);
+    if (!errand) throw validationError({ errandId: ["does not exist"] });
+    const pair = [errand.requesterId, errand.courierId];
+    if (!pair.includes(reporterId) || !pair.includes(reportedId)) {
+        throw validationError({ errandId: ["is not an errand between you and this account"] });
     }
 
     try {

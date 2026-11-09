@@ -1,9 +1,8 @@
 import { creditRoutes } from '@/features/credit/routes'
 import { orderRoutes } from '@/features/order/routes'
-import { recommendationRoutes } from '@/features/recommendation/routes'
 import { supplierRoutes } from '@/features/supplier/routes'
 import { userRoutes } from '@/features/user/routes'
 import type { FeatureRoutes } from '@/lib/routing'
 
 // The routes of every feature. A new feature is registered here once, by the platform owner.
-export const features: FeatureRoutes[] = [userRoutes, orderRoutes, supplierRoutes, creditRoutes, recommendationRoutes]
+export const features: FeatureRoutes[] = [userRoutes, orderRoutes, supplierRoutes, creditRoutes]

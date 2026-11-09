@@ -7,6 +7,8 @@ export type Operation =
   | 'supplier.create'
   | 'supplier.update'
   | 'supplier.deactivate'
+  // Adding or removing one of your own favorites. It changes no supplier.
+  | 'supplier.favorite'
 
 export type Role = 'member' | 'administrator'
 
@@ -18,6 +20,7 @@ const ROLE_FOR: Record<Operation, Role> = {
   'supplier.create': 'administrator',
   'supplier.update': 'administrator',
   'supplier.deactivate': 'administrator',
+  'supplier.favorite': 'member',
 }
 
 // The cookie the user-service sets when someone logs in.

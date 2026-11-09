@@ -118,8 +118,9 @@ jobs:
   publish:
     name: publish ${{ matrix.service }}
     needs: [user-service, web-client, compose]
-    # Runs after a merge into main, also when the jobs above were skipped because nothing changed.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled()
+    # Runs after a merge into dev or main, also when the jobs above were skipped because nothing changed.
+    # dev publishes too, so the cloud deployment can run the current integration state.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main') && !failure() && !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -128,7 +129,6 @@ jobs:
       # One image failing to build does not hold back the others.
       fail-fast: false
       matrix:
-        # order-service and credit-service get an entry here once their Dockerfile is filled in.
         include:
           - service: user-service
             context: user-service
@@ -140,6 +140,13 @@ jobs:
           - service: web-client
             context: web-client
             dockerfile: web-client/Dockerfile
+          - service: credit-service
+            context: credit-service
+            dockerfile: credit-service/Dockerfile
+          # Built from the repository root, like the supplier-service.
+          - service: order-service
+            context: .
+            dockerfile: order-service/Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -152,9 +159,11 @@ jobs:
         id: meta
         with:
           images: ghcr.io/ay2627s1-cs3219-p26/${{ matrix.service }}
+          # Every image carries its commit SHA and its branch name (dev or main); main also gets latest.
           tags: |
             type=sha
-            type=raw,value=latest
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
       - uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}

@@ -50,7 +50,7 @@ export const OrderController = {
         }
     },
 
-    // GET /orders/mine - orders the caller requested or is delivering, plus the caller's account id
+    // GET /orders/mine
     async getMyOrders(_req: Request, res: Response): Promise<void> {
         try {
             const accountId = res.locals.accountId as string;

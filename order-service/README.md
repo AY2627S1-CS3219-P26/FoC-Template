@@ -3,7 +3,7 @@
 Owns errand creation and lifecycle state. Uses Node 24, Express and PostgreSQL.
 
 From the repository root, run `docker compose up --build`. The service is at
-`http://localhost:3005`, credit-service is at `http://localhost:3004`, and the
+`http://localhost:3003`, credit-service is at `http://localhost:3004`, and the
 browser gateway forwards `/api/order/orders` to this service. `GET /health` is public.
 The order tables are created on startup; existing data is preserved.
 
@@ -23,6 +23,12 @@ cancels it. Only Open orders appear in `GET /orders/open` and can be accepted.
 | GET | `/orders/:id` | Read an order |
 | POST | `/orders/:id/accept` | Assign the authenticated courier |
 | PATCH | `/orders/:id/status` | Change lifecycle status using `{ "status": "PickedUp" }`, for example |
+| GET | `/orders/mine` | Own errands as requester or courier, newest first, with history and allowed transitions |
+
+
+`GET /internal/orders/:id` answers `{ id, requesterId, courierId, status }` for other
+services, or 404. The gateway does not forward it, so only the compose network and the
+cluster reach it.
 
 Completed requests a credit transfer to the assigned courier. Cancelled and
 Expired request release to the requester. These use a transactional PostgreSQL
@@ -34,8 +40,8 @@ See [the event catalog](../docs/events.md). The broker publisher follows
 A release closes its errand reference in credit-service even if it arrives before
 reservation. A Pending order left by a crash is cancelled after one minute. Creation
 is not an atomic transaction across PostgreSQL and MongoDB: recovery is eventual,
-and retrying a POST creates another order. Automatic expiry scheduling is not
-implemented; changing an order to Expired triggers release.
+and retrying a POST creates another order. An Open order that nobody accepted by its needed-by time is set to Expired
+automatically, which releases its reward. Users cannot set Expired themselves.
 
 For local development, run the dependencies in Compose, set the variables in
 the root `.env.example`, then run `npm ci` and `npm run dev` in `order-service`.

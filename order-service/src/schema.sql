@@ -21,3 +21,16 @@ CREATE TABLE IF NOT EXISTS order_outbox (
 );
 
 CREATE INDEX IF NOT EXISTS order_outbox_pending ON order_outbox (occurred_at) WHERE sent_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS order_transitions (
+    id BIGSERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders (id),
+    from_status TEXT NOT NULL,
+    to_status TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS order_transitions_by_order ON order_transitions (order_id, occurred_at, id);
+
+CREATE INDEX IF NOT EXISTS orders_open_by_needed_by ON orders (needed_by_time) WHERE status = 'Open';

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createOrderService } from "../src/services/order.service.ts";
+import { allowedTransitions, createOrderService } from "../src/services/order.service.ts";
 import { createServiceClients } from "../src/services/clients.ts";
 
 const input = {
@@ -11,16 +11,23 @@ const input = {
 function setup() {
     let order: any;
     const effects: string[] = [];
+    const transitions: string[][] = [];
     const model: any = {
         async create(data: any) {
             order = { id: 42, requester_id: data.requesterId, courier_id: null,
-                status: "Pending", credit_reward: data.creditReward };
+                status: "Pending", credit_reward: data.creditReward, needed_by_time: new Date(data.neededByTime) };
             return { ...order };
         },
         async findById() { return order ? { ...order } : null; },
-        async updateStatus(_id: number, status: string, expected: string) {
+        async acceptOrder(_id: number, courierId: string) {
+            order.status = "Accepted";
+            order.courier_id = courierId;
+            return { ...order };
+        },
+        async updateStatus(_id: number, status: string, expected: string, actor: string) {
             if (order.status !== expected) return null;
             order.status = status;
+            transitions.push([expected, status, actor]);
             if (["Completed", "Cancelled", "Expired"].includes(status)) effects.push(status);
             return { ...order };
         },
@@ -32,7 +39,7 @@ function setup() {
             effects.push("reserve");
         },
     };
-    return { service: createOrderService(model, clients), model, clients, effects, order: () => order };
+    return { service: createOrderService(model, clients), model, clients, effects, transitions, order: () => order };
 }
 
 test("creation validates supplier and reserves credits before making an order Open", async () => {
@@ -40,6 +47,7 @@ test("creation validates supplier and reserves credits before making an order Op
     const order = await ctx.service.createOrder("requester", input, "relay_session=valid");
     assert.equal(order.status, "Open");
     assert.deepEqual(ctx.effects, ["supplier", "reserve"]);
+    assert.deepEqual(ctx.transitions, [["Pending", "Open", "requester"]]);
 });
 
 test("supplier rejection creates no order or credit reservation", async () => {
@@ -56,6 +64,7 @@ test("credit rejection cancels the pending order and schedules release", async (
     await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), /CREDIT_RESERVATION_FAILED/);
     assert.equal(ctx.order().status, "Cancelled");
     assert.deepEqual(ctx.effects, ["supplier", "Cancelled"]);
+    assert.deepEqual(ctx.transitions, [["Pending", "Cancelled", "system"]]);
 });
 
 test("completion and cancellation use the persisted lifecycle, and repeated completion is safe", async () => {
@@ -67,6 +76,8 @@ test("completion and cancellation use the persisted lifecycle, and repeated comp
     assert.equal((await ctx.service.updateOrderStatus(42, "requester", "Completed")).status, "Completed");
     assert.equal((await ctx.service.updateOrderStatus(42, "requester", "Completed")).status, "Completed");
     assert.deepEqual(ctx.effects, ["supplier", "reserve", "Completed"]);
+    // The refused and the repeated request leave no record.
+    assert.deepEqual(ctx.transitions, [["Pending", "Open", "requester"], ["Delivered", "Completed", "requester"]]);
 });
 
 test("an unrelated user cannot cancel, and status PATCH cannot bypass courier acceptance", async () => {
@@ -75,6 +86,62 @@ test("an unrelated user cannot cancel, and status PATCH cannot bypass courier ac
     await assert.rejects(ctx.service.updateOrderStatus(42, "stranger", "Cancelled"), /UNAUTHORIZED/);
     await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Accepted"), /INVALID_STATE_TRANSITION/);
     assert.equal(ctx.order().status, "Open");
+});
+
+test("each participant may only instruct the transitions of their role, and nobody may expire an errand", async () => {
+    const ctx = setup();
+    await ctx.service.createOrder("requester", input, "relay_session=valid");
+    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Expired"), /INVALID_STATE_TRANSITION/);
+    ctx.order().status = "Accepted";
+    ctx.order().courier_id = "courier";
+    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "PickedUp"), /UNAUTHORIZED/);
+    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Cancelled"), /UNAUTHORIZED/);
+    assert.equal((await ctx.service.updateOrderStatus(42, "courier", "PickedUp")).status, "PickedUp");
+    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Completed"), /INVALID_STATE_TRANSITION/);
+});
+
+test("an errand can be accepted until its needed-by time, not after", async () => {
+    const ctx = setup();
+    await ctx.service.createOrder("requester", input, "relay_session=valid");
+    ctx.order().needed_by_time = new Date(Date.now() - 1000);
+    await assert.rejects(ctx.service.acceptOrder(42, "courier"), /ORDER_NOT_AVAILABLE/);
+    assert.equal(ctx.order().status, "Open");
+    ctx.order().needed_by_time = new Date(Date.now() + 60_000);
+    assert.equal((await ctx.service.acceptOrder(42, "courier")).status, "Accepted");
+});
+
+test("allowed transitions follow the state machine for requester and courier", () => {
+    const order = (status: string) => ({ status, requester_id: "requester", courier_id: status === "Open" ? null : "courier" }) as any;
+    const expected: Record<string, [string[], string[]]> = {
+        Open: [["Cancelled"], []],
+        Accepted: [["Cancelled"], ["PickedUp"]],
+        PickedUp: [[], ["Delivered"]],
+        Delivered: [["Completed"], []],
+        Completed: [[], []], Cancelled: [[], []], Expired: [[], []],
+    };
+    for (const [status, [requester, courier]] of Object.entries(expected)) {
+        assert.deepEqual(allowedTransitions(order(status), "requester"), requester, `${status} as requester`);
+        assert.deepEqual(allowedTransitions(order(status), "courier"), courier, `${status} as courier`);
+        assert.deepEqual(allowedTransitions(order(status), "stranger"), [], `${status} as stranger`);
+    }
+});
+
+test("own errands carry the account's role and the transitions it may instruct", async () => {
+    const ctx = setup();
+    const transitions = [{ from_status: "Open", to_status: "Accepted", actor: "courier", occurred_at: "2026-11-09T04:00:00.000Z" }];
+    ctx.model.findByParticipant = async (accountId: string) => {
+        assert.equal(accountId, "courier");
+        return [
+            { id: 2, status: "PickedUp", requester_id: "requester", courier_id: "courier", transitions },
+            { id: 1, status: "Open", requester_id: "courier", courier_id: null, transitions: [] },
+        ];
+    };
+    const mine = await ctx.service.getMyOrders("courier");
+    assert.deepEqual(mine.map((order) => [order.id, order.role, order.allowed_transitions]), [
+        [2, "courier", ["Delivered"]],
+        [1, "requester", ["Cancelled"]],
+    ]);
+    assert.deepEqual(mine[0].transitions, transitions);
 });
 
 test("HTTP clients use the supplier availability and credit reservation contracts with the session cookie", async () => {

@@ -12,7 +12,8 @@ router.post("/", OrderController.createOrder);
 // GET /orders/open - Browse open requests available for couriers[cite: 7]
 router.get("/open", OrderController.getOpenRequests);
 
-// GET /orders/mine - Orders I requested or am delivering (must stay above /:id)
+// GET /orders/mine - Errands of the logged-in account as requester or courier, newest first.
+// Registered before /:id, which would otherwise take "mine" as an id.
 router.get("/mine", OrderController.getMyOrders);
 
 // GET /orders/:id - Get specific order details

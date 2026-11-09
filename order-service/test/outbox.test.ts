@@ -21,3 +21,12 @@ test("an outbox failure leaves the event pending, and a retry preserves its iden
         { eventId: "e-42", type: "order.errand.completed", occurredAt: "2026-10-23T04:00:00.000Z", data: { errandRef: "42", courierId: "courier" } },
     ]);
 });
+
+test("each relay pass first expires the errands nobody accepted by their needed-by time", async () => {
+    const queries: string[] = [];
+    const db = { async query(sql: string) { queries.push(sql); return { rows: [] }; } };
+    await relayOutbox(db, async () => {});
+    assert.match(queries[0], /SET status = 'Expired'[\s\S]*status = 'Open' AND needed_by_time <= now\(\)/);
+    assert.match(queries[0], /'Open', 'Expired', 'system'/);
+    assert.match(queries[0], /'order\.errand\.expired'/);
+});

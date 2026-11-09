@@ -124,9 +124,9 @@ To try a consumer by hand, open the management UI, pick the queue under "Queues 
 | Producer | user-service |
 | When | An account becomes Active by verifying its email (F1.1.5), or the first administrator is created (F1.5.6). Accounts that were already Active before announcements existed are announced once at start-up. |
 | `data` | `accountId`: the account's id in the user-service (UUID) |
-| Consumers | credit-service, queue `credit-service.accounts`: creates the credit account with 50 credits (F4.1.1 to F4.1.3) |
+| Consumers | credit-service, queue `credit-service.accounts`: creates the credit account with 50 credits (F4.1.1 to F4.1.3). message-service, queue `message-service.messages`: sends the account its welcome message. |
 | Repetition | Repeated with the same `eventId` until the broker has stored it in a queue (F1.1.7). Until `credit-service.accounts` exists, announcements wait in the user-service. |
-| Duplicates | Possible. Consumers deduplicate by `accountId`: one credit account per account. |
+| Duplicates | Possible. Consumers deduplicate by `accountId`: one credit account and one welcome message per account. |
 | Order | Does not matter. There is exactly one such event per account. |
 | Requirements | F1.1.7, F4.1.1 to F4.1.3, N7.1 |
 

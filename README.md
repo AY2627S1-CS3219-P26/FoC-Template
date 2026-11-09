@@ -29,7 +29,7 @@ Requires only Docker. From the repository root:
 | web-client (the app in the browser) | http://localhost:8080 |
 | user-service | http://localhost:3001 |
 | supplier-service | http://localhost:3002 |
-| order-service | http://localhost:3005 |
+| order-service | http://localhost:3003 |
 | credit-service | http://localhost:3004 |
 | Mailpit (local email inbox) | http://localhost:8025 |
 | RabbitMQ management UI (user `relay`, password `change-me`) | http://localhost:15672 |

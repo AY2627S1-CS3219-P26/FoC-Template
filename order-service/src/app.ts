@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import orderRoutes from "./routes/order.route.ts";
 import { logger } from "./lib/logger.ts";
+import { createInternalRouter } from "./controllers/internal.controller.ts";
+import { OrderModel } from "./models/order.model.ts";
 
 export function createApp(): Express {
     const app = express();
@@ -20,6 +22,7 @@ export function createApp(): Express {
 
     // Routes
     app.use("/orders", orderRoutes);
+    app.use("/internal", createInternalRouter(OrderModel.findById));
 
     // Global Error Handler (prevents leaking raw error messages in 500 responses)
     app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

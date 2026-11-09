@@ -1,0 +1,4 @@
+Title: Getting around the app
+Questions: Where do I find things? Where is the menu? What pages are there? Where is the navigation on my phone? What is the first page after login?
+
+After you log in you start on the Errands page. The main menu has four entries: Errands, Post an errand, Wallet and Profile. On a large screen the menu is in the sidebar on the left, with your credit balance and the Log out button at the bottom of the sidebar. On a phone or small window the menu is a bar floating at the bottom of the screen, where Post an errand is shortened to Post, and Log out is at the bottom of the Profile page. The app works in a browser on desktop and mobile.

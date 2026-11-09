@@ -9,7 +9,8 @@ export type OrderStatus =
     | "Delivered"
     | "Completed"
     | "Cancelled"
-    | "Expired";
+    | "Expired"
+    | "Rejected";
 
 export interface Order {
     id: number;
@@ -72,14 +73,6 @@ export const OrderModel = {
         return result.rows;
     },
 
-    async findByUser(userId: string): Promise<Order[]> {
-        const result: QueryResult<Order> = await pool.query(
-            `SELECT * FROM orders WHERE requester_id = $1 OR courier_id = $1 ORDER BY created_at DESC;`,
-            [userId],
-        );
-        return result.rows;
-    },
-
     async findById(id: number): Promise<Order | null> {
         const result: QueryResult<Order> = await pool.query(`SELECT * FROM orders WHERE id = $1;`, [id]);
         return result.rows[0] || null;
@@ -94,7 +87,7 @@ export const OrderModel = {
         return result.rows;
     },
 
-    // Pending orders are still waiting for their credit reservation and are not errands yet.
+    // Pending and Rejected orders are not errands, see isErrand in the order service.
     async findByParticipant(accountId: string): Promise<OrderWithHistory[]> {
         const result: QueryResult<OrderWithHistory> = await pool.query(`
             SELECT o.*, COALESCE(t.transitions, '[]'::json) AS transitions
@@ -106,7 +99,7 @@ export const OrderModel = {
                 ) ORDER BY occurred_at, id) AS transitions
                 FROM order_transitions WHERE order_id = o.id
             ) t ON true
-            WHERE (o.requester_id = $1 OR o.courier_id = $1) AND o.status <> 'Pending'
+            WHERE (o.requester_id = $1 OR o.courier_id = $1) AND o.status NOT IN ('Pending', 'Rejected')
             ORDER BY o.created_at DESC, o.id DESC;
         `, [accountId]);
         return result.rows;
@@ -143,7 +136,7 @@ export const OrderModel = {
                 SELECT id, $3, status, $4 FROM updated
             ), queued AS (
                 INSERT INTO order_outbox (type, data)
-                SELECT 'order.errand.' || lower(status),
+                SELECT CASE status WHEN 'Rejected' THEN 'order.errand.cancelled' ELSE 'order.errand.' || lower(status) END,
                     jsonb_build_object(
                         'errandRef', id::text,
                         'courierId', courier_id,
@@ -152,7 +145,7 @@ export const OrderModel = {
                         'creditReward', credit_reward,
                         'itemCount', coalesce(array_length(item_lines, 1), 0)
                     )
-                FROM updated WHERE status IN ('Completed', 'Cancelled', 'Expired')
+                FROM updated WHERE status IN ('Completed', 'Cancelled', 'Expired', 'Rejected')
             )
             SELECT * FROM updated;
         `;

@@ -6,7 +6,7 @@ export function createRequireAuth(userServiceUrl: string, request: typeof fetch 
             .map((part) => part.trim()).find((part) => part.startsWith("relay_session="))
             ?.slice("relay_session=".length);
         if (!token) {
-            res.status(401).json({ error: "A session is required" });
+            res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "A session is required" } });
             return;
         }
         try {
@@ -25,6 +25,6 @@ export function createRequireAuth(userServiceUrl: string, request: typeof fetch 
         } catch {
             // A failed authorization request is a refusal, as in the other services.
         }
-        res.status(403).json({ error: "Access denied by User Service" });
+        res.status(403).json({ error: { code: "FORBIDDEN", message: "Access denied by User Service" } });
     };
 }

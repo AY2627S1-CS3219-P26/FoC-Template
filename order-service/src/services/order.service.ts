@@ -1,9 +1,7 @@
 import type { OrderModel, Order, OrderStatus } from "../models/order.model.ts";
-import type { CreateOrderInput } from "../schemas/order.schema.ts";
 import { CreateOrderSchema } from "../schemas/order.schema.ts";
-import { fieldErrorsOf, createError } from "../util/validation.ts";
+import { fieldErrorsOf, validationError, type FieldErrors } from "../util/validation.ts";
 import { AppError } from "../errors.ts";
-import type { FieldErrors } from "../util/validation.ts";
 import type { createServiceClients } from "./clients.ts";
 
 export const SYSTEM_ACTOR = "system";
@@ -29,79 +27,83 @@ export function allowedTransitions(order: Order, accountId: string): OrderStatus
         .map((rule) => rule.to);
 }
 
+// Pending waits for its credit reservation and Rejected never got one, so neither is an errand.
+export function isErrand(order: Order): boolean {
+    return order.status !== "Pending" && order.status !== "Rejected";
+}
+
+function notFound(): AppError {
+    return new AppError(404, "ORDER_NOT_FOUND", "No errand with this id");
+}
+
+function notOpen(): AppError {
+    return new AppError(409, "ORDER_NOT_AVAILABLE", "This errand is no longer open");
+}
+
 export function createOrderService(model: typeof OrderModel, clients: ReturnType<typeof createServiceClients>) {
+    async function findErrand(orderId: number): Promise<Order> {
+        const order = await model.findById(orderId);
+        if (!order || !isErrand(order)) throw notFound();
+        return order;
+    }
+
     return {
-        async createOrder(requesterId: string, input: CreateOrderInput, cookie: string): Promise<Order> {
-            const parsed = CreateOrderSchema.safeParse(input);
-        
-            console.log(parsed.success)
+        async createOrder(requesterId: string, body: unknown, cookie: string): Promise<Order> {
+            const raw = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+            const parsed = CreateOrderSchema.safeParse(raw);
+            const fields: FieldErrors = parsed.success ? {} : fieldErrorsOf(parsed.error);
 
-            if (!parsed.success) {
-                throw createError(fieldErrorsOf(parsed.error));
+            // The supplier is only asked once both values it needs are valid, so a refusal
+            // still names every field that is wrong.
+            if (!fields.neededByTime && new Date(String(raw.neededByTime)) <= new Date()) {
+                fields.neededByTime = ["must be in the future"];
             }
-
-            const validInput = parsed.data;
-
-            // Validate needed-by time is not in the past
-            const neededTime = new Date(input.neededByTime);
-            if (neededTime <= new Date()) {
-                throw createError({ neededByTime: ["Needed-by time must be in the future."] });
-                //throw new Error("NEEDED_BY_TIME_IN_PAST");
+            if (!fields.supplierId && !fields.neededByTime) {
+                const supplier = await clients.supplierAvailability(String(raw.supplierId).trim(), String(raw.neededByTime), cookie);
+                if (!supplier) fields.supplierId = ["does not exist"];
+                else if (!supplier.active) fields.supplierId = ["is inactive"];
+                else if (!supplier.open) fields.supplierId = ["is closed at the needed-by time"];
             }
+            if (!parsed.success || Object.keys(fields).length > 0) throw validationError(fields);
 
-            await clients.checkSupplier(input.supplierId, input.neededByTime, cookie);
-            const newOrder = await model.create({
-                requesterId,
-                supplierId: input.supplierId,
-                deliveryLocation: input.deliveryLocation,
-                neededByTime: input.neededByTime,
-                itemLines: input.itemLines,
-                creditReward: input.creditReward,
-            });
+            const input = parsed.data;
+            const newOrder = await model.create({ requesterId, ...input });
             try {
                 await clients.reserve(requesterId, String(newOrder.id), input.creditReward, cookie);
-                const opened = await model.updateStatus(newOrder.id, "Open", "Pending", requesterId);
-                if (!opened) throw new Error("ORDER_CREATION_FAILED");
-                return opened;
             } catch (error) {
-                // A timed-out reservation may still succeed remotely. The durable release uses
-                // the same errand reference and is retried without storing the session cookie.
-                await model.updateStatus(newOrder.id, "Cancelled", "Pending", SYSTEM_ACTOR);
+                // A timed-out reservation may still succeed remotely. Rejected queues a release under
+                // the same errand reference, which credit-service applies even if it arrives first.
+                await model.updateStatus(newOrder.id, "Rejected", "Pending", SYSTEM_ACTOR);
                 throw error;
             }
+            const opened = await model.updateStatus(newOrder.id, "Open", "Pending", requesterId);
+            if (!opened) throw new AppError(409, "ORDER_CREATION_FAILED", "The errand could not be opened, try again");
+            return opened;
         },
 
         async getOpenRequests(): Promise<Order[]> {
             return await model.findOpenRequests();
         },
 
-        // async getMyOrders(userId: string): Promise<Order[]> {
-        //     return await model.findByUser(userId);
-        // },
-
-        async getOrderById(orderId: number): Promise<Order> {
-            const order = await model.findById(orderId);
-            if (!order) {
-                throw new Error("ORDER_NOT_FOUND");
-            }
-            return order;
+        // Anyone may look at an Open errand, since couriers browse them. Once it is taken, only
+        // its requester and courier see it, and everyone else is told it does not exist.
+        async getOrderById(orderId: number, accountId: string) {
+            const order = await findErrand(orderId);
+            const participant = order.requester_id === accountId || order.courier_id === accountId;
+            if (!participant && order.status !== "Open") throw notFound();
+            return { ...order, allowed_transitions: allowedTransitions(order, accountId) };
         },
 
         async acceptOrder(orderId: number, courierId: string): Promise<Order> {
-            const order = await model.findById(orderId);
-            if (!order) throw new Error("ORDER_NOT_FOUND");
-
+            const order = await findErrand(orderId);
             if (order.requester_id === courierId) {
-                throw new Error("REQUESTER_CANNOT_ACCEPT_OWN_ORDER");
+                throw new AppError(403, "OWN_ERRAND", "You cannot accept your own errand");
             }
+            if (order.status !== "Open" || new Date(order.needed_by_time) <= new Date()) throw notOpen();
 
-            if (order.status !== "Open" || new Date(order.needed_by_time) <= new Date()) {
-                throw new Error("ORDER_NOT_AVAILABLE");
-            }
-
+            // Of simultaneous acceptances only one matches the conditional update.
             const updatedOrder = await model.acceptOrder(orderId, courierId);
-            if (!updatedOrder) throw new Error("ORDER_ACCEPTANCE_FAILED");
-
+            if (!updatedOrder) throw notOpen();
             return updatedOrder;
         },
 
@@ -115,8 +117,7 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
         },
 
         async updateOrderStatus(orderId: number, userId: string, newStatus: OrderStatus): Promise<Order> {
-            const order = await model.findById(orderId);
-            if (!order) throw new Error("ORDER_NOT_FOUND");
+            const order = await findErrand(orderId);
 
             // A repeated confirmation or cancellation answers with the unchanged errand.
             if (order.status === newStatus && ["Completed", "Cancelled"].includes(newStatus) && order.requester_id === userId) {
@@ -125,12 +126,15 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
 
             const current = order.status;
             const rule = USER_TRANSITIONS[current]?.find((candidate) => candidate.to === newStatus);
-            if (!rule) throw new Error("INVALID_STATE_TRANSITION");
-            if (participantOf(order, rule.by) !== userId) throw new Error("UNAUTHORIZED_ACTION");
+            if (!rule) {
+                throw new AppError(409, "INVALID_STATE_TRANSITION", `An errand that is ${current} cannot become ${newStatus}`);
+            }
+            if (participantOf(order, rule.by) !== userId) {
+                throw new AppError(403, "NOT_ALLOWED", `Only the ${rule.by} can make this errand ${newStatus}`);
+            }
 
             const updated = await model.updateStatus(orderId, newStatus, current, userId);
-            if (!updated) throw new Error("STATUS_UPDATE_FAILED");
-
+            if (!updated) throw new AppError(409, "STATE_CHANGED", "The errand changed in the meantime, reload it");
             return updated;
         }
     };

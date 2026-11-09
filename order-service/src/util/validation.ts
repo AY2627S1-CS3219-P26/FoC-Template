@@ -18,6 +18,6 @@ export function fieldErrorsOf(error: z.ZodError): FieldErrors {
     return fields;
 }
 
-export function createError(fields: FieldErrors): AppError {
-    return new AppError(400, "CREATE_FAILED", "One or more fields are invalid", { fields });
+export function validationError(fields: FieldErrors): AppError {
+    return new AppError(400, "VALIDATION_FAILED", "One or more fields are invalid", { fields });
 }

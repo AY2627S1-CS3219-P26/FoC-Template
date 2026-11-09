@@ -8,6 +8,7 @@ const orders: Record<number, any> = {
     42: { id: 42, requester_id: "requester", courier_id: "courier", status: "Delivered" },
     43: { id: 43, requester_id: "requester", courier_id: null, status: "Open" },
     44: { id: 44, requester_id: "requester", courier_id: null, status: "Pending" },
+    45: { id: 45, requester_id: "requester", courier_id: null, status: "Rejected" },
 };
 
 async function withServer(run: (base: string, asked: number[]) => Promise<void>) {
@@ -34,13 +35,13 @@ test("an errand answers with its id, requester, courier and state", async () => 
     });
 });
 
-test("an unknown, malformed or still pending errand is not found", async () => {
+test("an unknown, malformed, pending or rejected errand is not found", async () => {
     await withServer(async (base, asked) => {
-        for (const id of ["7", "44", "abc", "1.5", "99999999999"]) {
+        for (const id of ["7", "44", "45", "abc", "1.5", "99999999999"]) {
             const response = await fetch(`${base}/internal/orders/${id}`);
             assert.equal(response.status, 404, id);
             assert.deepEqual(await response.json(), { error: "ORDER_NOT_FOUND" });
         }
-        assert.deepEqual(asked, [7, 44], "only ids that fit the orders table reach the database");
+        assert.deepEqual(asked, [7, 44, 45], "only ids that fit the orders table reach the database");
     });
 });

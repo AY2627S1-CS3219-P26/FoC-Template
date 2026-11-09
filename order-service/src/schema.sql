@@ -7,10 +7,15 @@ CREATE TABLE IF NOT EXISTS orders (
     needed_by_time TIMESTAMPTZ NOT NULL,
     item_lines TEXT[] NOT NULL,
     credit_reward INTEGER NOT NULL CHECK (credit_reward BETWEEN 1 AND 50),
-    status TEXT NOT NULL CHECK (status IN ('Pending', 'Open', 'Accepted', 'PickedUp', 'Delivered', 'Completed', 'Cancelled', 'Expired')),
+    status TEXT NOT NULL CHECK (status IN ('Pending', 'Open', 'Accepted', 'PickedUp', 'Delivered', 'Completed', 'Cancelled', 'Expired', 'Rejected')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Databases created before Rejected existed keep the old check, so it is replaced on every start.
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+    CHECK (status IN ('Pending', 'Open', 'Accepted', 'PickedUp', 'Delivered', 'Completed', 'Cancelled', 'Expired', 'Rejected'));
 
 CREATE TABLE IF NOT EXISTS order_outbox (
     event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,6 +24,9 @@ CREATE TABLE IF NOT EXISTS order_outbox (
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     sent_at TIMESTAMPTZ
 );
+
+-- Several instances relay at once; an instance claims a batch until this time so no other one sends it too.
+ALTER TABLE order_outbox ADD COLUMN IF NOT EXISTS claimed_until TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS order_outbox_pending ON order_outbox (occurred_at) WHERE sent_at IS NULL;
 

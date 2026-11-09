@@ -28,18 +28,29 @@ function setup() {
             if (order.status !== expected) return null;
             order.status = status;
             transitions.push([expected, status, actor]);
-            if (["Completed", "Cancelled", "Expired"].includes(status)) effects.push(status);
+            if (["Completed", "Cancelled", "Expired", "Rejected"].includes(status)) effects.push(status);
             return { ...order };
         },
     };
     const clients = {
-        async checkSupplier(_supplier: string, _at: string, _cookie: string) { effects.push("supplier"); },
+        async supplierAvailability(_supplier: string, _at: string, _cookie: string) {
+            effects.push("supplier");
+            return { active: true, open: true } as { active: boolean; open: boolean } | null;
+        },
         async reserve(_user: string, ref: string, amount: number, cookie: string) {
             assert.equal(ref, "42"); assert.equal(amount, 5); assert.equal(cookie, "relay_session=valid");
             effects.push("reserve");
         },
     };
     return { service: createOrderService(model, clients), model, clients, effects, transitions, order: () => order };
+}
+
+async function openErrand(status = "Open", courier: string | null = null) {
+    const ctx = setup();
+    await ctx.service.createOrder("requester", input, "relay_session=valid");
+    ctx.order().status = status;
+    ctx.order().courier_id = courier;
+    return ctx;
 }
 
 test("creation validates supplier and reserves credits before making an order Open", async () => {
@@ -50,29 +61,62 @@ test("creation validates supplier and reserves credits before making an order Op
     assert.deepEqual(ctx.transitions, [["Pending", "Open", "requester"]]);
 });
 
-test("supplier rejection creates no order or credit reservation", async () => {
+test("a refused submission names every invalid field at once and creates nothing", async () => {
     const ctx = setup();
-    ctx.clients.checkSupplier = async () => { throw new Error("SUPPLIER_UNAVAILABLE"); };
-    await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), /SUPPLIER_UNAVAILABLE/);
+    const body = { supplierId: "supplier-1", deliveryLocation: "x", neededByTime: "2020-01-01T00:00:00.000Z", itemLines: [], creditReward: 51 };
+    await assert.rejects(ctx.service.createOrder("requester", body, "relay_session=valid"), {
+        status: 400,
+        code: "VALIDATION_FAILED",
+        details: { fields: {
+            deliveryLocation: ["must be at least 2 characters"],
+            itemLines: ["needs at least 1 item"],
+            creditReward: ["must be between 1 and 50"],
+            neededByTime: ["must be in the future"],
+        } },
+    });
     assert.equal(ctx.order(), undefined);
-    assert.deepEqual(ctx.effects, []);
+    assert.deepEqual(ctx.effects, [], "the supplier is not asked about a time in the past");
 });
 
-test("credit rejection cancels the pending order and schedules release", async () => {
+test("an unknown, inactive or closed supplier is a field error next to the other ones", async () => {
+    for (const [answer, message] of [
+        [null, "does not exist"],
+        [{ active: false, open: true }, "is inactive"],
+        [{ active: true, open: false }, "is closed at the needed-by time"],
+    ] as const) {
+        const ctx = setup();
+        ctx.clients.supplierAvailability = async () => answer;
+        await assert.rejects(ctx.service.createOrder("requester", { ...input, creditReward: 0 }, "relay_session=valid"), {
+            status: 400,
+            details: { fields: { creditReward: ["must be between 1 and 50"], supplierId: [message] } },
+        });
+        assert.equal(ctx.order(), undefined);
+    }
+});
+
+test("a failed supplier lookup refuses the errand without creating it", async () => {
     const ctx = setup();
-    ctx.clients.reserve = async () => { throw new Error("CREDIT_RESERVATION_FAILED"); };
-    await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), /CREDIT_RESERVATION_FAILED/);
-    assert.equal(ctx.order().status, "Cancelled");
-    assert.deepEqual(ctx.effects, ["supplier", "Cancelled"]);
-    assert.deepEqual(ctx.transitions, [["Pending", "Cancelled", "system"]]);
+    ctx.clients.supplierAvailability = async () => { throw Object.assign(new Error("down"), { status: 503 }); };
+    await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), { status: 503 });
+    assert.equal(ctx.order(), undefined);
+});
+
+test("a refused or timed-out reservation leaves a Rejected order, which is no errand, and queues a release", async () => {
+    const ctx = setup();
+    const refusal = Object.assign(new Error("Your available credits do not cover this reward"), { status: 409, code: "INSUFFICIENT_CREDITS" });
+    ctx.clients.reserve = async () => { throw refusal; };
+    await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), refusal);
+    assert.equal(ctx.order().status, "Rejected");
+    assert.deepEqual(ctx.effects, ["supplier", "Rejected"]);
+    assert.deepEqual(ctx.transitions, [["Pending", "Rejected", "system"]]);
+    await assert.rejects(ctx.service.getOrderById(42, "requester"), { status: 404 });
+    await assert.rejects(ctx.service.acceptOrder(42, "courier"), { status: 404 });
+    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Cancelled"), { status: 404 });
 });
 
 test("completion and cancellation use the persisted lifecycle, and repeated completion is safe", async () => {
-    const ctx = setup();
-    await ctx.service.createOrder("requester", input, "relay_session=valid");
-    ctx.order().status = "Delivered";
-    ctx.order().courier_id = "courier";
-    await assert.rejects(ctx.service.updateOrderStatus(42, "stranger", "Completed"), /UNAUTHORIZED/);
+    const ctx = await openErrand("Delivered", "courier");
+    await assert.rejects(ctx.service.updateOrderStatus(42, "stranger", "Completed"), { status: 403, code: "NOT_ALLOWED" });
     assert.equal((await ctx.service.updateOrderStatus(42, "requester", "Completed")).status, "Completed");
     assert.equal((await ctx.service.updateOrderStatus(42, "requester", "Completed")).status, "Completed");
     assert.deepEqual(ctx.effects, ["supplier", "reserve", "Completed"]);
@@ -81,33 +125,48 @@ test("completion and cancellation use the persisted lifecycle, and repeated comp
 });
 
 test("an unrelated user cannot cancel, and status PATCH cannot bypass courier acceptance", async () => {
-    const ctx = setup();
-    await ctx.service.createOrder("requester", input, "relay_session=valid");
-    await assert.rejects(ctx.service.updateOrderStatus(42, "stranger", "Cancelled"), /UNAUTHORIZED/);
-    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Accepted"), /INVALID_STATE_TRANSITION/);
+    const ctx = await openErrand();
+    await assert.rejects(ctx.service.updateOrderStatus(42, "stranger", "Cancelled"), { status: 403 });
+    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Accepted"), { status: 409, code: "INVALID_STATE_TRANSITION" });
     assert.equal(ctx.order().status, "Open");
 });
 
 test("each participant may only instruct the transitions of their role, and nobody may expire an errand", async () => {
-    const ctx = setup();
-    await ctx.service.createOrder("requester", input, "relay_session=valid");
-    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Expired"), /INVALID_STATE_TRANSITION/);
+    const ctx = await openErrand();
+    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "Expired"), { code: "INVALID_STATE_TRANSITION" });
     ctx.order().status = "Accepted";
     ctx.order().courier_id = "courier";
-    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "PickedUp"), /UNAUTHORIZED/);
-    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Cancelled"), /UNAUTHORIZED/);
+    await assert.rejects(ctx.service.updateOrderStatus(42, "requester", "PickedUp"), { code: "NOT_ALLOWED" });
+    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Cancelled"), { code: "NOT_ALLOWED" });
     assert.equal((await ctx.service.updateOrderStatus(42, "courier", "PickedUp")).status, "PickedUp");
-    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Completed"), /INVALID_STATE_TRANSITION/);
+    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "Completed"), { code: "INVALID_STATE_TRANSITION" });
 });
 
-test("an errand can be accepted until its needed-by time, not after", async () => {
-    const ctx = setup();
-    await ctx.service.createOrder("requester", input, "relay_session=valid");
+test("a change that lost a race is reported as a conflict", async () => {
+    const ctx = await openErrand("Accepted", "courier");
+    ctx.model.updateStatus = async () => null;
+    await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "PickedUp"), { status: 409, code: "STATE_CHANGED" });
+});
+
+test("an errand can be accepted until its needed-by time, not after, and never by its requester", async () => {
+    const ctx = await openErrand();
+    await assert.rejects(ctx.service.acceptOrder(42, "requester"), { status: 403, code: "OWN_ERRAND" });
     ctx.order().needed_by_time = new Date(Date.now() - 1000);
-    await assert.rejects(ctx.service.acceptOrder(42, "courier"), /ORDER_NOT_AVAILABLE/);
+    await assert.rejects(ctx.service.acceptOrder(42, "courier"), { status: 409, code: "ORDER_NOT_AVAILABLE" });
     assert.equal(ctx.order().status, "Open");
     ctx.order().needed_by_time = new Date(Date.now() + 60_000);
     assert.equal((await ctx.service.acceptOrder(42, "courier")).status, "Accepted");
+});
+
+test("an Open errand is visible to everyone, a taken one only to its requester and courier", async () => {
+    const ctx = await openErrand();
+    assert.deepEqual((await ctx.service.getOrderById(42, "stranger")).allowed_transitions, []);
+    assert.deepEqual((await ctx.service.getOrderById(42, "requester")).allowed_transitions, ["Cancelled"]);
+    ctx.order().status = "Accepted";
+    ctx.order().courier_id = "courier";
+    await assert.rejects(ctx.service.getOrderById(42, "stranger"), { status: 404 });
+    assert.deepEqual((await ctx.service.getOrderById(42, "courier")).allowed_transitions, ["PickedUp"]);
+    assert.deepEqual((await ctx.service.getOrderById(42, "requester")).allowed_transitions, ["Cancelled"]);
 });
 
 test("allowed transitions follow the state machine for requester and courier", () => {
@@ -148,9 +207,9 @@ test("HTTP clients use the supplier availability and credit reservation contract
     const calls: { url: URL; init: RequestInit }[] = [];
     const clients = createServiceClients("http://supplier:3002", "http://credit:3002", async (url, init) => {
         calls.push({ url: new URL(String(url)), init: init! });
-        return new Response(calls.length === 1 ? JSON.stringify({ orderable: true }) : "Credits reserved");
+        return new Response(calls.length === 1 ? JSON.stringify({ status: "Active", open: true, orderable: true }) : "Credits reserved");
     });
-    await clients.checkSupplier("supplier/1", input.neededByTime, "relay_session=valid");
+    assert.deepEqual(await clients.supplierAvailability("supplier/1", input.neededByTime, "relay_session=valid"), { active: true, open: true });
     await clients.reserve("requester", "42", 5, "relay_session=valid");
     assert.equal(calls[0].url.pathname, "/suppliers/supplier%2F1/availability");
     assert.equal(calls[0].url.searchParams.get("at"), "2099-10-23T04:00:00.000Z");
@@ -161,19 +220,40 @@ test("HTTP clients use the supplier availability and credit reservation contract
     assert.equal(new Headers(calls[1].init.headers).get("cookie"), "relay_session=valid");
 });
 
-test("supplier closed, missing, malformed and failed answers all prevent an order", async () => {
-    for (const response of [
-        new Response(JSON.stringify({ orderable: false })), new Response("{}"),
-        new Response("missing", { status: 404 }), new Response("down", { status: 503 }),
-    ]) {
-        const clients = createServiceClients("http://supplier", "http://credit", async () => response);
-        await assert.rejects(clients.checkSupplier("s1", input.neededByTime, "relay_session=valid"));
+test("the supplier answer tells missing, inactive and closed apart, and anything unclear is unavailable", async () => {
+    const answer = (response: Response) =>
+        createServiceClients("http://supplier", "http://credit", async () => response).supplierAvailability("s1", input.neededByTime, "c");
+    assert.equal(await answer(new Response("missing", { status: 404 })), null);
+    assert.deepEqual(await answer(Response.json({ status: "Inactive", open: true })), { active: false, open: true });
+    assert.deepEqual(await answer(Response.json({ status: "Active", open: false })), { active: true, open: false });
+    for (const response of [new Response("{}"), new Response("down", { status: 503 })]) {
+        await assert.rejects(answer(response), { status: 503, code: "SUPPLIER_SERVICE_UNAVAILABLE" });
     }
+    const down = createServiceClients("http://supplier", "http://credit", async () => { throw new TypeError("fetch failed"); });
+    await assert.rejects(down.supplierAvailability("s1", input.neededByTime, "c"), { status: 503 });
 });
 
-test("a refused credit reservation is a conflict and a network failure is unavailable", async () => {
-    const clients = createServiceClients("http://supplier", "http://credit", async () => new Response("Insufficient available credits", { status: 400 }));
-    await assert.rejects(clients.reserve("requester", "42", 5, "relay_session=valid"), { status: 409 });
-    const down = createServiceClients("http://supplier", "http://credit", async () => { throw new Error("connection refused"); });
-    await assert.rejects(down.reserve("requester", "42", 5, "relay_session=valid"), { status: 503 });
+test("a refused reservation names its reason, and a failure or timeout is unavailable", async () => {
+    const reserve = (reply: () => Promise<Response>) =>
+        createServiceClients("http://supplier", "http://credit", reply).reserve("requester", "42", 5, "c");
+    await assert.rejects(reserve(async () => new Response("Insufficient available credits", { status: 400 })), { status: 409, code: "INSUFFICIENT_CREDITS" });
+    await assert.rejects(reserve(async () => new Response("Errand reference is closed", { status: 400 })),
+        { status: 409, code: "CREDIT_RESERVATION_REFUSED", message: "Errand reference is closed" });
+    await assert.rejects(reserve(async () => { throw new TypeError("fetch failed"); }), { status: 503, code: "CREDIT_SERVICE_UNAVAILABLE" });
+    await assert.rejects(reserve(async () => { throw new DOMException("The operation timed out", "TimeoutError"); }),
+        { status: 503, code: "CREDIT_SERVICE_TIMEOUT" });
+});
+
+test("the reservation waits 5 seconds for the credit service", async () => {
+    let signal: AbortSignal | undefined;
+    const clients = createServiceClients("http://supplier", "http://credit", async (_url, init) => {
+        signal = init?.signal ?? undefined;
+        return new Response("Credits reserved");
+    });
+    const started = Date.now();
+    await clients.reserve("requester", "42", 5, "c");
+    assert.ok(signal && !signal.aborted);
+    // AbortSignal.timeout keeps no public duration, so check it is still alive well after 2 seconds would have passed.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    assert.equal(signal.aborted, false, `aborted after ${Date.now() - started} ms`);
 });

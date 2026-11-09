@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Order } from "../models/order.model.ts";
+import { isErrand } from "../services/order.service.ts";
 
 type FindOrder = (id: number) => Promise<Order | null>;
 
@@ -13,8 +14,7 @@ export function createInternalRouter(findOrder: FindOrder): Router {
             // Postgres integer ids end at 2^31 - 1; anything else cannot name an errand.
             const id = /^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : NaN;
             const order = id <= 2_147_483_647 ? await findOrder(id) : null;
-            // A Pending order is still waiting for its credit reservation and is not an errand yet.
-            if (!order || order.status === "Pending") {
+            if (!order || !isErrand(order)) {
                 res.status(404).json({ error: "ORDER_NOT_FOUND" });
                 return;
             }

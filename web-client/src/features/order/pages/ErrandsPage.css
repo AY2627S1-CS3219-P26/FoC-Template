@@ -1,0 +1,217 @@
+/* Scoped to the Errands page. Override the variables below to match your theme. */
+.errands {
+  --e-bg: #ffffff;
+  --e-surface: #f6f7f9;
+  --e-text: #14171f;
+  --e-muted: #5f6675;
+  --e-border: #dde1e8;
+  --e-accent: #2f5bea;
+  --e-accent-text: #ffffff;
+  --e-danger: #c42b2b;
+  --e-ok: #1b7f4b;
+  --e-warn: #a85d00;
+
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+  color: var(--e-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .errands {
+    --e-bg: #12151b;
+    --e-surface: #1b1f28;
+    --e-text: #eceff4;
+    --e-muted: #9aa3b5;
+    --e-border: #2c3240;
+    --e-accent: #6b8cff;
+    --e-accent-text: #0b1020;
+    --e-danger: #ff7b7b;
+    --e-ok: #4cc58a;
+    --e-warn: #f0b255;
+  }
+}
+
+.errands h1 { margin: 0; font-size: 1.6rem; }
+.errands__sub { margin: 4px 0 0; color: var(--e-muted); }
+
+.errands__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+/* Buttons */
+.errands__btn {
+  font: inherit;
+  padding: 10px 14px;
+  min-height: 44px; /* comfortable tap target on mobile */
+  border-radius: 10px;
+  border: 1px solid var(--e-border);
+  background: var(--e-surface);
+  color: var(--e-text);
+  cursor: pointer;
+}
+.errands__btn:hover:not(:disabled) { border-color: var(--e-muted); }
+.errands__btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.errands__btn--primary { background: var(--e-accent); border-color: var(--e-accent); color: var(--e-accent-text); }
+.errands__btn--danger { color: var(--e-danger); border-color: var(--e-danger); background: transparent; }
+.errands__btn--ghost { background: transparent; }
+.errands :focus-visible { outline: 2px solid var(--e-accent); outline-offset: 2px; }
+
+/* Notice */
+.errands__notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.errands__notice--ok { color: var(--e-ok); border-color: var(--e-ok); }
+.errands__notice--error { color: var(--e-danger); border-color: var(--e-danger); }
+.errands__notice button { background: none; border: 0; color: inherit; font-size: 1.3rem; cursor: pointer; min-width: 32px; min-height: 32px; }
+
+/* Tabs */
+.errands__tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--e-border);
+  margin-bottom: 16px;
+}
+.errands__tab {
+  font: inherit;
+  white-space: nowrap;
+  padding: 10px 14px;
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: var(--e-muted);
+  cursor: pointer;
+}
+.errands__tab.is-active { color: var(--e-text); border-bottom-color: var(--e-accent); font-weight: 600; }
+.errands__count {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--e-surface);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.errands__empty { padding: 32px 8px; text-align: center; color: var(--e-muted); }
+.errands__stale { color: var(--e-warn); font-size: 0.9rem; }
+
+/* List: one column on phones, two on wider screens */
+.errands__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 720px) {
+  .errands { padding: 24px; }
+  .errands__list { grid-template-columns: 1fr 1fr; }
+}
+
+/* Card */
+.errand {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid var(--e-border);
+  border-radius: 14px;
+  background: var(--e-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.errand[aria-busy='true'] { opacity: 0.7; }
+.errand--cancelled, .errand--expired { opacity: 0.8; }
+.errand__top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.errand__supplier { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.errand__badge {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--e-surface);
+  border: 1px solid var(--e-border);
+}
+.errand__badge--open { color: var(--e-accent); border-color: var(--e-accent); }
+.errand__badge--accepted, .errand__badge--pickedup, .errand__badge--delivered { color: var(--e-warn); border-color: var(--e-warn); }
+.errand__badge--completed { color: var(--e-ok); border-color: var(--e-ok); }
+.errand__badge--cancelled, .errand__badge--expired { color: var(--e-danger); border-color: var(--e-danger); }
+
+.errand__items { margin: 0; padding-left: 18px; }
+.errand__items li { overflow-wrap: anywhere; }
+.errand__more { color: var(--e-muted); list-style: none; margin-left: -18px; }
+
+.errand__meta { margin: 0; display: grid; gap: 6px; }
+.errand__meta > div { display: flex; gap: 8px; }
+.errand__meta dt { flex: 0 0 5.5em; color: var(--e-muted); }
+.errand__meta dd { margin: 0; overflow-wrap: anywhere; }
+.errand__reward { font-weight: 600; }
+.errand__rel { color: var(--e-muted); }
+.errand__rel.is-late { color: var(--e-danger); }
+.errand__note { margin: 0; color: var(--e-muted); font-size: 0.92rem; }
+.errand__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.errand__actions .errands__btn { flex: 1 1 auto; }
+
+/* Dialog + form */
+.errands__dialog {
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 20px;
+  border: 1px solid var(--e-border);
+  border-radius: 16px;
+  background: var(--e-bg);
+  color: var(--e-text);
+}
+.errands__dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.errands__dialog h2 { margin-top: 0; }
+
+.errands .field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; padding: 0; border: 0; min-width: 0; }
+.errands .field > span, .errands .field > legend { font-weight: 600; padding: 0; }
+.errands .field input, .errands .field select {
+  font: inherit; /* 16px+ stops iOS from zooming on focus */
+  font-size: max(16px, 1rem);
+  padding: 10px 12px;
+  min-height: 44px;
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--e-border);
+  background: var(--e-surface);
+  color: var(--e-text);
+}
+.errands .field__row { display: flex; gap: 8px; margin-bottom: 8px; }
+.errands .field__row input { flex: 1; }
+.errands .field__hint { color: var(--e-muted); }
+.errands .field__error, .errands__formerror { color: var(--e-danger); }
+.errands__formerror { margin: 0 0 12px; }
+.errands__dialogactions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Post an errand page */
+.errands__postcard {
+  max-width: 560px;
+  padding: 20px;
+  border: 1px solid var(--e-border);
+  border-radius: 14px;
+  background: var(--e-bg);
+}
+.errands__success { text-align: center; padding: 12px 0; }
+.errands__success h2 { margin-top: 0; }
+.errands__success .errands__dialogactions { justify-content: center; flex-wrap: wrap; }
+.errands a.errands__btn { display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }

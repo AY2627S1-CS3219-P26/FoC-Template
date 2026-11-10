@@ -105,6 +105,15 @@ export function useUpdateOrderStatus() {
   })
 }
 
+export function useOrder(id: number) {
+  return useQuery({
+    queryKey: ['order', 'detail', id],
+    queryFn: async ({ signal }) => (await request<{ data: Order }>('order', `/orders/${id}`, { signal })).data,
+    enabled: id > 0,
+    refetchInterval: POLL_MS,
+  })
+}
+
 // ---- Error helpers ----------------------------------------------------------
 
 /** The order-service sends a readable reason with every error, so that is what the student sees. */

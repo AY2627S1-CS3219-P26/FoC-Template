@@ -40,8 +40,7 @@ const BADGE_TONE: Record<OrderStatus, string> = {
   Expired: 'bg-neutral-surface text-neutral',
 }
 
-// How each step the order-service allows is offered. Which steps a card shows comes from the
-// service (allowed_transitions), never from the client.
+// The states
 const ACTIONS: Partial<Record<OrderStatus, { label: (order: Order) => string; success: string; confirm?: (order: Order) => string }>> = {
   Cancelled: {
     label: () => 'Cancel request',
@@ -137,7 +136,7 @@ export function ErrandsPage() {
 
   const visible: (Order | MyOrder)[] = tab === 'browse' ? browse : tab === 'requests' ? requests : deliveries
 
-  // The mutations refresh the order queries themselves (see @/api/order/order).
+  // ensure the errand is busy as actions are being processed, buttons are greyed out from this
   async function run(orderId: number, action: () => Promise<unknown>, success: string, failure: string) {
     setBusy((ids) => [...ids, orderId])
     try {

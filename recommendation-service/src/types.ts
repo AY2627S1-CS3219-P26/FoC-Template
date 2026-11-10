@@ -3,6 +3,7 @@ export type RecommendationRequest = {
     location: string;
     neededBy: string;
     items: string[];
+    distance?: number;
 };
 
 export type RecommendationResponse = {

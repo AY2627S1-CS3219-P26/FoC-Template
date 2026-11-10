@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { MessageCircle } from 'lucide-react'
 import { Link } from 'react-router'
 import {
   describeOrderError,
@@ -41,8 +42,7 @@ const BADGE_TONE: Record<OrderStatus, string> = {
   Expired: 'bg-neutral-surface text-neutral',
 }
 
-// How each step the order-service allows is offered. Which steps a card shows comes from the
-// service (allowed_transitions), never from the client.
+// The states
 const ACTIONS: Partial<Record<OrderStatus, { label: (order: Order) => string; success: string; confirm?: (order: Order) => string }>> = {
   Cancelled: {
     label: () => 'Cancel request',
@@ -138,7 +138,7 @@ export function ErrandsPage() {
 
   const visible: (Order | MyOrder)[] = tab === 'browse' ? browse : tab === 'requests' ? requests : deliveries
 
-  // The mutations refresh the order queries themselves (see @/api/order/order).
+  // ensure the errand is busy as actions are being processed, buttons are greyed out from this
   async function run(orderId: number, action: () => Promise<unknown>, success: string, failure: string) {
     setBusy((ids) => [...ids, orderId])
     try {
@@ -356,6 +356,13 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
         <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
           View details
         </Link>
+        {/* The chat lives on the errand page; the message-service decides whether it still takes messages. */}
+        {order.courier_id && (isRequester || isCourier) && !TERMINAL.includes(order.status) && (
+          <Link to={`/errands/${order.id}#chat`} className="ds-btn ds-btn--glass">
+            <MessageCircle aria-hidden="true" />
+            Chat
+          </Link>
+        )}
         {actions}
       </div>
     </article>

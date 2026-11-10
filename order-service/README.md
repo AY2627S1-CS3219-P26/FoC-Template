@@ -21,12 +21,27 @@ the reservation is confirmed. When the credit service refuses (`INSUFFICIENT_CRE
 no errand: no endpoint shows it, and retrying the POST is safe. Only Open orders appear
 in `GET /orders/open` and can be accepted.
 
+**Walking route (nice-to-have).** The drop-off needs both the address typed by the
+requester (`deliveryLocation`) and the point picked on the map (`deliveryLatitude`,
+`deliveryLongitude`). The web client measures the walk as soon as the supplier and the
+point are chosen, to show it before posting. Creation then
+measures it again from the same supplier-service endpoint (`POST /suppliers/{id}/route`,
+the point in the body so no access log keeps it), so a client cannot store a distance
+of its own. The errand stores both ends and the walk: `pickup_latitude`,
+`pickup_longitude`, `delivery_latitude`, `delivery_longitude`, `route_metres`,
+`route_seconds` (the metres at the supplier-service's walking speed of 1.3 m/s) and
+`route_estimated`, true when the point is off the walking map and the walk is a
+straight-line estimate. The route is an extra, so when it cannot be measured, for
+example because the supplier has no map location or the supplier-service does not
+answer within 2 seconds, the errand is still created and the route columns stay null.
+Errands from before have null in all seven columns.
+
 Every error is `{ "error": { "code", "message", "details" } }`, the shape the web
 client reads.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/orders` | Create with `supplierId`, `deliveryLocation`, `neededByTime`, `itemLines`, `creditReward` |
+| POST | `/orders` | Create with `supplierId`, `deliveryLocation`, `deliveryLatitude`, `deliveryLongitude`, `neededByTime`, `itemLines`, `creditReward` |
 | GET | `/orders/open` | Browse open orders |
 | GET | `/orders/:id` | Read an errand with the caller's `allowed_transitions`. An Open errand is visible to every member, any other only to its requester and courier |
 | POST | `/orders/:id/accept` | Assign the authenticated courier |
@@ -54,8 +69,9 @@ automatically, which releases its reward. Users cannot set Expired themselves.
 
 For local development, run the dependencies in Compose, set the variables in
 the root `.env.example`, then run `npm ci` and `npm run dev` in `order-service`.
-Run the focused tests from the repository root:
+Run the type check and the tests in `order-service`:
 
 ```sh
-node --experimental-test-module-mocks --test order-service/test/*.test.ts credit-service/test/*.test.ts
+npm run typecheck
+npm test
 ```

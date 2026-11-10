@@ -8,7 +8,10 @@ import type {
   SupplierFilterValues,
   SupplierInput,
   SupplierStatus,
+  WalkingRoute,
 } from './types'
+
+type Point = { latitude: number; longitude: number }
 
 // Every key starts with the service name, and a list key holds all of its filters.
 export const supplierKeys = {
@@ -18,6 +21,7 @@ export const supplierKeys = {
   favorites: ['supplier', 'favorites'] as const,
   detail: (id: string) => ['supplier', 'detail', id] as const,
   availability: (id: string, at: string | undefined) => ['supplier', 'availability', id, at] as const,
+  route: (id: string, to: Point | null) => ['supplier', 'route', id, to?.latitude, to?.longitude] as const,
 }
 
 export function useSuppliers(filters: SupplierFilters) {
@@ -54,6 +58,18 @@ export function useSupplierAvailability(id: string, at?: string) {
       request<SupplierAvailabilityCheck>('supplier', `/suppliers/${id}/availability`, { query: { at }, signal }),
     // Nothing to ask until a supplier is chosen.
     enabled: id !== '',
+  })
+}
+
+// The walk from the supplier to `to`. It is a POST so that the point stays out of the URL and every
+// access log, but it changes nothing, so it is cached like a read.
+export function useWalkingRoute(id: string, to: Point | null) {
+  return useQuery({
+    queryKey: supplierKeys.route(id, to),
+    queryFn: ({ signal }) =>
+      request<WalkingRoute>('supplier', `/suppliers/${id}/route`, { method: 'POST', body: { to }, signal }),
+    // Nothing to measure until both ends are chosen.
+    enabled: id !== '' && to !== null,
   })
 }
 

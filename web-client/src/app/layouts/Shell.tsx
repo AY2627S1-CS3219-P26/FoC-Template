@@ -27,8 +27,9 @@ export function Shell({ label, nav, mobileHeader, mobileTabBar, sidebarFooter }:
         {sidebarFooter && <div className="mt-auto grid grid-cols-1 gap-3">{sidebarFooter}</div>}
       </aside>
       {mobileHeader && <div className="lg:hidden">{mobileHeader}</div>}
-      {/* With a tab bar, the bottom padding keeps the last content above it on phones. */}
-      <main id="main" className={mobileTabBar ? 'min-w-0 flex-1 pb-28 lg:pb-0' : 'min-w-0 flex-1'}>
+      {/* With a tab bar, the bottom padding keeps the last content above it on phones, and above the
+          assistant button in the bottom right corner from lg, where the tab bar is gone. */}
+      <main id="main" className={mobileTabBar ? 'min-w-0 flex-1 pb-28' : 'min-w-0 flex-1'}>
         <Outlet />
       </main>
       {mobileTabBar && <div className="fixed inset-x-4 bottom-4 z-20 mx-auto max-w-md lg:hidden">{mobileTabBar}</div>}

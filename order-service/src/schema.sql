@@ -12,6 +12,17 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Where the walk starts (the supplier) and ends (the drop-off point picked on the map), and the walk
+-- the supplier-service measured between them when the errand was created. Errands from before have
+-- none, and the route stays empty when the supplier-service could not measure it.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_latitude DOUBLE PRECISION;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_longitude DOUBLE PRECISION;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_latitude DOUBLE PRECISION;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_longitude DOUBLE PRECISION;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS route_metres INTEGER;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS route_seconds INTEGER;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS route_estimated BOOLEAN;
+
 -- Databases created before Rejected existed keep the old check, so it is replaced on every start.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
 ALTER TABLE orders ADD CONSTRAINT orders_status_check

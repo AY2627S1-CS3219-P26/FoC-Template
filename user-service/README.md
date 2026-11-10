@@ -20,6 +20,7 @@ From the repository root, `docker compose up --build` starts the service on http
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Outgoing email |
 | `COOKIE_SECURE` | Send the session cookie over HTTPS only (default true, false in compose for local HTTP) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME` | First administrator, created at start-up when none exists (F1.5.6) |
+| `SEED_DEMO_STUDENTS`, `SEED_DEMO_PASSWORD` | When `true`, creates the Active demo students `alice.tan`, `ben.lim`, `chloe.ng` and `daniel.koh` (`<username>@u.nus.edu`) at start-up, all with this password and announced like verified accounts. Existing accounts are left as they are. Off by default; on in `compose.yaml` and the cloud |
 
 ## API
 
@@ -158,3 +159,18 @@ export function requireRole(role: "member" | "administrator"): RequestHandler {
 ```
 
 Inside the compose network the service is reachable as `http://user-service:3000`. Put that address in your service's configuration, not in code.
+
+## Declaration of AI-assisted work
+
+**Tool:** Claude Code (Claude Opus and Sonnet models).
+
+**How Claude was used:**
+
+- **Explain:** Claude was used to explain Express, Mongoose, sessions and email verification while the first version of the service was built by hand for D2.
+- **Generate:** Claude was used to write the code for the later features (account states, reports, user search), one step at a time from a step-by-step plan. Every step was tested and committed by hand.
+- **Debug and test:** Claude was used to find bugs and to write the tests in `test/` and the Postman collection.
+- **Document:** Claude was used to help word this README.
+
+**Decisions:** The service's responsibilities, its API and the authorization contract were decided by the team, not by Claude. Where Claude suggested options, the choice was made by the team. The choices are recorded in `docs/decisions/0001-server-side-sessions.md`.
+
+**Review:** All AI-written code was reviewed, run and tested before it was committed. The rules given to the agent are in `AGENTS.md`.

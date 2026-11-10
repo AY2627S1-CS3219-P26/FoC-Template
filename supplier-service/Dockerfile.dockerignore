@@ -3,5 +3,6 @@
 !supplier-service/package.json
 !supplier-service/package-lock.json
 !supplier-service/src
+!supplier-service/map
 !data/csv
 !data/images/resized

@@ -1,8 +1,12 @@
-import { useState } from 'react'
-import type { SubmitEvent } from 'react'
+import { MapPin } from 'lucide-react'
+import { lazy, Suspense, useState } from 'react'
+import type { ComponentType, SubmitEvent } from 'react'
 import { useRecommendation } from '@/api/recommendation/recommendations'
 import { useCreateOrder } from '@/api/order/order'
+import { useWalkingRoute } from '@/api/supplier/suppliers'
+import { LoadingState } from '@/components/LoadingState'
 import { Notice } from '@/components/Notice'
+import { QueryView } from '@/components/QueryView'
 import { SubmitButton } from '@/components/SubmitButton'
 import { Page } from '@/components/Page'
 import type { Supplier } from '@/api/supplier/types'
@@ -11,8 +15,16 @@ import { PickUpList } from '../components/PickupList'
 import { TextField } from '@/components/TextField'
 import { ApiError, fieldErrorsOf } from '@/lib/http'
 import { FormError } from '@/components/FormError'
+import type { DropOffPickerProps, MapPoint } from '../components/DropOffPicker'
+import { MapUnavailable } from '../components/MapUnavailable'
+import { WalkSummary } from '../components/WalkSummary'
 
-const pct = (n: number) => `${n >= 0 ? '+' : ''}${Math.round(n * 100)}%`
+// The map library is only downloaded when the requester opens the map.
+const DropOffPicker = lazy<ComponentType<DropOffPickerProps>>(() =>
+  import('../components/DropOffPicker')
+    .then((module) => ({ default: module.DropOffPicker }))
+    .catch(() => ({ default: MapUnavailable })),
+)
 
 // datetime-local expects "YYYY-MM-DDTHH:mm" in the browser's time. The default is the first
 // full hour at least an hour from now, so on most days it is today.
@@ -32,11 +44,21 @@ export function PostErrandPage() {
   const [supplier, setSupplier] = useState<Supplier | null>(null)
   const supplierId = supplier?.id ?? ''
   const [location, setLocation] = useState('')
+  const [dropOff, setDropOff] = useState<MapPoint | null>(null)
+  const [pickingDropOff, setPickingDropOff] = useState(false)
+  const dropOffError = fieldErrors.deliveryLatitude?.[0] ?? fieldErrors.deliveryLongitude?.[0]
   const [neededBy, setNeededBy] = useState(defaultNeededBy)
   const [itemsText, setItemsText] = useState('')
   const [credits, setCredits] = useState('')
   const [posted, setPosted] = useState(false)
   const [picking, setPicking] = useState(false)
+
+  // Measured as soon as both ends are chosen, so the walk shows before posting.
+  const walk = useWalkingRoute(supplierId, dropOff)
+  const pickup =
+    supplier && supplier.latitude !== null && supplier.longitude !== null
+      ? { latitude: supplier.latitude, longitude: supplier.longitude }
+      : null
 
   function suggest() {
     const items = itemsText
@@ -45,7 +67,12 @@ export function PostErrandPage() {
       .filter(Boolean)
     recommend.mutate(
       { supplierId, location, neededBy: neededBy ? new Date(neededBy).toISOString() : '', items },
-      { onSuccess: (data) => setCredits(String(data.recommendedCredits)) },
+      {
+        onSuccess: (data) => {
+          setCredits(String(data.recommendedCredits))
+          console.log('recommendation factors', data.features)
+        },
+      },
     )
   }
 
@@ -63,6 +90,8 @@ export function PostErrandPage() {
     create.mutate({
       supplierId,
       deliveryLocation: location.trim(),
+      deliveryLatitude: dropOff?.latitude,
+      deliveryLongitude: dropOff?.longitude,
       neededByTime: Number.isNaN(when.getTime())
         ? neededBy
         : when.toISOString(),
@@ -78,6 +107,8 @@ export function PostErrandPage() {
   function resetForm() {
     setSupplier(null)
     setLocation('')
+    setDropOff(null)
+    setPickingDropOff(false)
     setNeededBy(defaultNeededBy())
     setItemsText('')
     setCredits('')
@@ -93,7 +124,10 @@ export function PostErrandPage() {
     <Page title="Post an errand" subtitle="Describe the errand and set the credits you'll offer">
       {!posted ? (
         <form noValidate className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
-          <FormError error={create.error} fields={['supplierId', 'deliveryLocation', 'neededByTime', 'itemLines', 'creditReward']} />
+          <FormError
+            error={create.error}
+            fields={['supplierId', 'deliveryLocation', 'deliveryLatitude', 'deliveryLongitude', 'neededByTime', 'itemLines', 'creditReward']}
+          />
           {/* Choose pick up */}
           <div className="grid gap-2">
             <span>
@@ -132,6 +166,45 @@ export function PostErrandPage() {
             hint="Where the errand ends, e.g. COM3 or Kent Ridge MRT"
             errors={fieldErrors.deliveryLocation}
           />
+          {/* The point next to the typed address, so the walk can be measured and routed. */}
+          <div className="grid grid-cols-1 gap-2">
+            <span id="dropoff-point-label">Drop-off point on the map</span>
+            <p role="status" className="nums-tabular wrap-anywhere text-muted">
+              {dropOff ? `Marked: ${dropOff.latitude}, ${dropOff.longitude}` : 'Not picked yet'}
+            </p>
+            <button
+              type="button"
+              aria-describedby="dropoff-point-label"
+              aria-expanded={pickingDropOff}
+              className="ds-btn ds-btn--glass justify-self-start"
+              onClick={() => setPickingDropOff(!pickingDropOff)}
+            >
+              <MapPin aria-hidden="true" className="size-5 shrink-0" />
+              {pickingDropOff ? 'Close the map' : dropOff ? 'Change on map' : 'Pick on map'}
+            </button>
+            {dropOffError && <p className="text-danger">Drop-off point {dropOffError}</p>}
+            {pickingDropOff && (
+              <Suspense fallback={<LoadingState label="Loading map" rows={2} />}>
+                <DropOffPicker
+                  start={dropOff}
+                  pickup={pickup}
+                  onUse={(point) => {
+                    setDropOff(point)
+                    setPickingDropOff(false)
+                  }}
+                  onCancel={() => setPickingDropOff(false)}
+                />
+              </Suspense>
+            )}
+          </div>
+          {supplier && dropOff && (
+            <div className="grid grid-cols-1 gap-2">
+              <span>Walk from the pickup</span>
+              <QueryView query={walk} loadingLabel="Measuring the walk">
+                {(route) => <WalkSummary walk={route} />}
+              </QueryView>
+            </div>
+          )}
           <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} errors={fieldErrors.neededByTime}/>
           <TextField label="Items" name="items" value={itemsText} onChange={setItemsText} hint="Comma-separated, e.g. coffee, sandwich" errors={fieldErrors.itemLines}/>
 
@@ -156,12 +229,6 @@ export function PostErrandPage() {
                   Suggested <span className="font-medium text-default">{suggestion.recommendedCredits}</span>{' '}
                   {suggestion.basis === 'formula' ? 'from the market rate' : '(default for a new supplier)'}
                 </p>
-                {suggestion.basis === 'formula' && (
-                  <p className="text-xs text-muted">
-                    Items {pct(suggestion.features.itemFactor)} · Urgency {pct(suggestion.features.urgencyFactor)} · Distance{' '}
-                    {pct(suggestion.features.distanceFactor)}
-                  </p>
-                )}
               </div>
             )}
             {recommend.isError && (

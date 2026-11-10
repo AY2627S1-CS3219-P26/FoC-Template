@@ -92,6 +92,16 @@ export type SupplierAvailabilityCheck = SupplierAvailability & {
   orderable: boolean
 }
 
+// POST /suppliers/:id/route. The walk from the supplier (from) to a point. seconds is the metres at the
+// supplier-service's walking speed, and estimated is true when the point is off its walking map.
+export type WalkingRoute = {
+  from: { latitude: number; longitude: number }
+  metres: number
+  seconds: number
+  estimated: boolean
+  mapVersion: string | null
+}
+
 // The body of a create or update. Numbers and times are sent as the user typed them when they
 // do not read as one, so the supplier-service names the field it refuses (N5.4).
 export type SupplierInput = {

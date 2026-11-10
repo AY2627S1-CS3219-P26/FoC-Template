@@ -1,3 +1,4 @@
+import { createElement } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMyOrders, useOrder } from '@/api/order/order'
 import type { Order, OrderStatus } from '@/api/order/order'
@@ -5,7 +6,9 @@ import { useSupplier } from '@/api/supplier/suppliers'
 import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
-import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
+import { useErrandChatSlot } from '@/lib/errandChat'
+import { SupplierThumbnail } from '../components/SupplierThumbnail'
+import { WalkingRoute } from '../components/WalkingRoute'
 
 const ERRANDS_PATH = '/errands'
 
@@ -171,6 +174,15 @@ function Details({ order, role }: { order: Order; role: string | null }) {
           <dt className="ds-label">Deliver to</dt>
           <dd className="mt-1 wrap-anywhere">{order.delivery_location}</dd>
         </div>
+        {/* Errands posted before the drop-off point existed have no walk to show. */}
+        {typeof order.delivery_latitude === 'number' && (
+          <div className="min-w-0 sm:col-span-2">
+            <dt className="ds-label">Walk</dt>
+            <dd className="mt-1">
+              <WalkingRoute order={order} />
+            </dd>
+          </div>
+        )}
         <div className="min-w-0">
           <dt className="ds-label">Needed by</dt>
           <dd className="mt-1">{formatDateTime(order.needed_by_time)}</dd>
@@ -208,6 +220,35 @@ function Details({ order, role }: { order: Order; role: string | null }) {
       </dl>
     </section>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+// The chat itself comes from the message feature through the app (see @/lib/errandChat).
+// It is shown to the requester and the courier once there is a courier; the message-service still
+// decides who may read and write.
+function Chat({ order, role }: { order: Order; role: string | null }) {
+  const ErrandChat = useErrandChatSlot()
+  if (!ErrandChat || !role) return null
+
+  if (!order.courier_id) {
+    if (order.status !== 'Pending' && order.status !== 'Open') return null
+    return (
+      <p className="text-sm text-muted lg:col-span-2">
+        You can chat with your courier here once someone accepts this errand.
+      </p>
+    )
+  }
+
+  // The component is the same one on every render (it comes from the app, not from here), so
+  // createElement keeps its state; JSX would read to the linter as a component made during render.
+  return createElement(ErrandChat, {
+    orderId: String(order.id),
+    status: order.status,
+    title: role === 'Requester' ? 'Chat with your courier' : 'Chat with the requester',
+  })
 }
 
 export function ErrandDetailPage() {
@@ -248,6 +289,7 @@ export function ErrandDetailPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
             <Progress order={result} />
             <Details order={result} role={role} />
+            <Chat order={result} role={role} />
           </div>
         )}
       </QueryView>

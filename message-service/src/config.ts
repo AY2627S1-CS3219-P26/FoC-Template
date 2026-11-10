@@ -7,6 +7,7 @@ const EnvSchema = z.object({
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     MONGO_URL: z.string().min(1),
     USER_SERVICE_URL: z.url(),
+    ORDER_SERVICE_URL: z.url(),
     BROKER_URL: z.string().min(1),
 })
 

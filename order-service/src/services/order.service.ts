@@ -67,7 +67,14 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             if (!parsed.success || Object.keys(fields).length > 0) throw validationError(fields);
 
             const input = parsed.data;
-            const newOrder = await model.create({ requesterId, ...input });
+            // The browser showed this walk before posting, but the stored one is measured here, so a
+            // client cannot send a distance of its own.
+            const route = await clients.walkingRoute(
+                input.supplierId,
+                { latitude: input.deliveryLatitude, longitude: input.deliveryLongitude },
+                cookie,
+            );
+            const newOrder = await model.create({ requesterId, ...input, route });
             try {
                 await clients.reserve(requesterId, String(newOrder.id), input.creditReward, cookie);
             } catch (error) {

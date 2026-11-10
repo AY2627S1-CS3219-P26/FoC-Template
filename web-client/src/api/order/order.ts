@@ -24,12 +24,24 @@ export type Order = {
   status: OrderStatus
   created_at: string
   updated_at: string
+  // Both ends of the walk and the walk the order-service measured at creation, see "Walking route" in
+  // order-service/README.md. Null on older errands, and the route also when it could not be measured.
+  pickup_latitude: number | null
+  pickup_longitude: number | null
+  delivery_latitude: number | null
+  delivery_longitude: number | null
+  route_metres: number | null
+  route_seconds: number | null
+  route_estimated: boolean | null
 }
 
 // Mirrors CreateOrderSchema in order-service.
 export type CreateOrderInput = {
   supplierId: string
   deliveryLocation: string
+  // Undefined until a point is picked; the order-service then names the field.
+  deliveryLatitude?: number
+  deliveryLongitude?: number
   neededByTime: string // ISO timestamp
   itemLines: string[]
   creditReward: number

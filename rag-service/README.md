@@ -61,7 +61,7 @@ Needs a logged-in session in the `relay_session` cookie. From the browser the pa
 }
 ```
 
-`query` is required and holds 1 to 1000 characters. `conversation` is optional and holds the earlier turns, because the service stores nothing between requests. Each turn is `user` or `assistant` with at most 6000 characters, and only the last 10 turns are used.
+`query` is required and holds 1 to 1000 characters. `conversation` is optional and holds the earlier turns, because the service stores nothing between requests. Each turn is `user` or `assistant` with at most 6000 characters, and only the last 10 turns are used. If that cut would start with an answer, the turns before the next question are dropped too, because Claude expects a conversation to start with the user. Each account may ask 10 questions per minute.
 
 The answer is `200`:
 
@@ -77,6 +77,7 @@ Errors have the shape `{ "error": { "code": "...", "message": "..." } }`:
 | 400 | `INVALID_CONVERSATION` | A turn has another role, is not text or is too long. |
 | 401 | `UNAUTHENTICATED` | There is no session cookie. |
 | 403 | `FORBIDDEN` | The session is not valid, or the user-service could not be reached. |
+| 429 | `TOO_MANY_QUESTIONS` | The account asked more than 10 questions in the last minute. |
 | 500 | `ASSISTANT_FAILED` | The answer failed, for example because Claude could not be reached. The cause is in the service log. |
 
 A body with a missing or wrongly typed field gets FastAPI's own `422` response, which does not use this shape.
@@ -115,7 +116,7 @@ Browser -> web-client gateway -> auth middleware -> user-service (POST /internal
 - **Search:** `all-MiniLM-L6-v2` turns text into vectors on the CPU, and a FAISS `IndexFlatL2` finds the 2 closest documents. With this few documents, an exact search in memory is fast enough, so no database is needed. The index is built at startup, which takes a few seconds.
 - **Model in the image:** this makes the image self-contained, so startup needs no download and one image works locally and in the cloud. The cost is a larger image of about 2 GB.
 - **Login:** the user-service decides who may ask, as for every other service. The middleware checks every path that is not listed as public, so a new route is protected by default. It fails closed: if the user-service does not answer `authorized`, the request is refused.
-- **Cost limits:** everything in a request is sent to Claude, so the limits on `query`, `conversation` and `max_tokens` also limit what one request can cost.
+- **Cost limits:** everything in a request is sent to Claude, so the limits on `query`, `conversation` and `max_tokens` also limit what one request can cost. A limit of 10 questions per account and minute caps how many requests one account can send. The counts are kept in memory, which works because the service runs as one instance.
 - **No stored state:** the service keeps no conversations and no database. The client sends the earlier turns with each question.
 
 ### What is sent to Claude

@@ -38,3 +38,11 @@ test("normal case: a perfectly average errand returns the market rate", () => {
     assert.equal(result.basis, "formula");
     assert.equal(result.contributions.multiplier, 1);
 });
+
+test("a farther-than-average delivery raises the recommendation via the distance factor", () => {
+    const stats: SupplierStats = { completedCount: 10, avgReward: 20, avgItems: 2, avgDist: 10, ...base };
+    const result = recommendScore({ items: ["a", "b"], neededBy: farFuture(), distance: 20 }, stats);
+
+    assert.equal(result.contributions.distanceFactor, 0.3);
+    assert.equal(result.recommendedCredits, 26);
+});

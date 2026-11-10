@@ -7,6 +7,7 @@ import { parseAt, parseFilterValuesQuery, parseListQuery } from './domain/query.
 import { WEEKDAYS, type Supplier } from './domain/supplier.ts'
 import { formatClock } from './domain/time.ts'
 import { validateCreate, validatePatch } from './domain/validation.ts'
+import { parseRouteRequest, walkingRoute, type WalkMap } from './domain/walking.ts'
 import type { TtlCache } from './cache.ts'
 import type { Pool } from './db.ts'
 import * as repository from './repository.ts'
@@ -17,6 +18,8 @@ export interface RouteDeps {
   timeZone: string
   now: () => Date
   listCache: TtlCache<{ items: Supplier[]; total: number }>
+  // Null when the map could not be loaded; routes are then estimates.
+  walkMap: WalkMap | null
 }
 
 interface Params {
@@ -191,6 +194,22 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
       // What a new errand may use: not deactivated, and open at that time.
       orderable: supplier.status === 'Active' && availability.open,
     }
+  })
+
+  // The walk from the supplier to any point, for an errand's drop-off. POST, so that the point, which
+  // may be where a student lives, travels in the body and stays out of the gateway's access log. It
+  // is not logged here either, and nothing is stored.
+  app.post<{ Params: Params }>('/suppliers/:id/route', { onRequest: requires('supplier.read') }, async (request) => {
+    const parsed = parseRouteRequest(request.body)
+    if ('errors' in parsed) throw validationFailed(parsed.errors)
+    const supplier = await repository.getSupplier(deps.db, request.params.id)
+    if (!supplier) throw notFound()
+    if (supplier.latitude === null || supplier.longitude === null) {
+      throw new HttpError(422, 'NO_LOCATION', 'This supplier has no map location')
+    }
+    const from = { latitude: supplier.latitude, longitude: supplier.longitude }
+    // The start too, so that an errand can keep the point its walk was measured from.
+    return { from, ...walkingRoute(deps.walkMap, from, parsed.value) }
   })
 
   app.get<{ Params: Params }>('/suppliers/:id/photo', { onRequest: requires('supplier.read') }, async (request, reply) => {

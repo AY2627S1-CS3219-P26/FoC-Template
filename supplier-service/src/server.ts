@@ -4,6 +4,7 @@ import { buildApp } from './app.ts'
 import { loadConfig } from './config.ts'
 import { createPool, migrate } from './db.ts'
 import { requestForLog } from './logging.ts'
+import { loadWalkMap } from './map.ts'
 import { seedPhotosOnce } from './seed/photos.ts'
 import { seedIfEmpty } from './seed/seed.ts'
 
@@ -11,6 +12,8 @@ const config = loadConfig()
 const pool = createPool(config.databaseUrl, (error) =>
   app.log.error({ err: error }, 'An idle database connection failed'),
 )
+
+const walking = await loadWalkMap()
 
 const app = buildApp({
   db: pool,
@@ -21,7 +24,10 @@ const app = buildApp({
   timeZone: config.timeZone,
   readCacheSeconds: config.readCacheSeconds,
   logger: { level: config.logLevel, serializers: { req: requestForLog } },
+  walkMap: walking.map,
 })
+if (walking.map) app.log.info(walking.message)
+else app.log.error(walking.message)
 
 const applied = await migrate(pool, path.join(import.meta.dirname, 'migrations'))
 for (const file of applied) app.log.info(`Applied migration ${file}`)

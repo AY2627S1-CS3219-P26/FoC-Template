@@ -1,39 +1,23 @@
-# Supplier Service
+# supplier-service
 
-Owns the campus supplier catalogue: the stores, facilities and landmarks where
-errands can be picked up. It is a standalone HTTP API with its own PostgreSQL
-database. The web client and the Order Service call it, and it needs neither to
-run. Requirements F2.1 to F2.5 and N2 of the backlog.
+The campus supplier catalogue of Relay (Friend on Campus): the stores, facilities and landmarks where errands are picked up. It is a standalone HTTP API with its own PostgreSQL database. The web client and the order-service call it, and it needs neither to run. Requirements F2.1 to F2.5 and N2 of the backlog.
 
-Who may call what is decided by the user-service, the platform's single authority
-on who is logged in and what they may do.
+Before you change anything, read `AGENTS.md`. Who may do what is decided by the user-service, never here. For the milestone demo, see `DEMO.md`.
 
-For the milestone demo, see `DEMO.md`.
+## Stack
+
+TypeScript on Node 24, which runs the `.ts` files directly (no build step), Fastify 5, PostgreSQL 17 through `pg`. Tests use `node:test`, and `tsc` only checks types. Walking routes run on a map built from OpenStreetMap data that ships in the image.
 
 ## Running it
 
-You need Docker Desktop. From the repository root:
+| What | Command | Address |
+| --- | --- | --- |
+| Everything, in containers | `docker compose up --build` in the repository root | http://localhost:3002, or http://localhost:8080/api/supplier/suppliers through the gateway |
+| The service on your machine, with live reload | `docker compose up -d supplier-db user-service`, then `npm ci` and `npm run dev` in `supplier-service/` | http://localhost:3002 |
 
-```bash
-docker compose up --build
-```
+Compose has a default for every variable, so the containers need no `.env`. On your machine the service reads the root `.env`, so copy `.env.example` to `.env` first. If the container is running, stop it (`docker compose stop supplier-service`) so the port is free. The tables are created and the seed data is loaded on first start. The database is on `localhost:5433`.
 
-That starts the whole system: the user-service with its MongoDB and Mailpit, and
-the Supplier Service with its PostgreSQL database. No `.env` is needed, because
-`compose.yaml` has a development default for every variable. The tables are
-created and the seed data is loaded on first start.
-
-| Component | Address on your machine |
-| --- | --- |
-| supplier-service | <http://localhost:3002> |
-| user-service | <http://localhost:3001> |
-| Mailpit, the local inbox for the verification emails | <http://localhost:8025> |
-| the supplier database, for the tests and for looking around | `localhost:5433` |
-
-Every request needs a session, and the sessions come from the user-service. Log in
-as the first administrator, which the user-service creates at start-up (username
-`admin`, password `change-me` unless `ADMIN_PASSWORD` is set), keep the cookie it
-sets, and send it back:
+Every route except `/health` needs the `relay_session` cookie that the user-service sets. Log in as the first administrator (`admin`, password `change-me` unless `ADMIN_PASSWORD` is set):
 
 ```bash
 curl -s -c cookies.txt -X POST http://localhost:3001/auth/login \
@@ -41,501 +25,148 @@ curl -s -c cookies.txt -X POST http://localhost:3001/auth/login \
 curl -b cookies.txt "http://localhost:3002/suppliers?q=coffee"
 ```
 
-To work on the code instead, keep the databases and the user-service in Docker and
-run the service on your machine (Node 24):
-
-```bash
-docker compose up -d supplier-db user-service
-cd supplier-service
-npm install
-npm run dev
-```
-
-| Command | What it does |
+| Script | Does |
 | --- | --- |
-| `docker compose up --build` | run everything in containers |
-| `docker compose down -v` | stop, and delete the databases so the next start is fresh |
-| `npm run dev` | run the service on your machine and restart on file changes |
-| `npm run typecheck` | check the types |
-| `npm test` | run all tests, needs `docker compose up -d supplier-db` |
+| `npm run dev` | runs the service and restarts it on file changes |
+| `npm start` | runs the service |
+| `npm run typecheck` | checks the types |
+| `npm test` | runs all tests, see Tests |
 
-Every variable is listed in the repository's `.env.example`.
+## Why PostgreSQL
 
-## Database choice
+The backlog names every field (F2.1.1), so the data has a fixed shape and gains nothing from a document database. What it needs is what a relational database does well:
 
-**PostgreSQL.**
+- Filters, keyword search, sorting and paging with a total (F2.4) are `WHERE`, `ILIKE`, `ORDER BY`, `LIMIT` and `count(*)`.
+- The database enforces the rules itself: the status, the opening times, and coordinates as a pair.
+- Concurrent edits are serialized by a row lock, and a change that fails halfway is rolled back as a whole.
 
-The supplier data is structured and has a fixed shape. The backlog names every
-field (F2.1.1) and asks for a defined data model, so nothing here needs the
-flexible, schema-free documents that a document database is good at. What the
-service does need is the kind of thing a relational database is built for:
+The catalogue is small and mostly read. The 100 ms bound (N2.1.1) comes from one indexed query per read and the caches below, not from the choice of database.
 
-- **Filtering, keyword search, sorting and paging with a total count** (F2.4).
-  These are `WHERE`, `ILIKE`, `ORDER BY`, `LIMIT` and `count(*)`.
-- **Constraints the database enforces itself.** A supplier's status can only be
-  Active or Inactive, a supplier cannot open and close at the same minute, and
-  coordinates come as a pair. A bug in the service cannot store
-  a record that breaks these.
-- **Safe concurrent writes.** Two administrators editing one supplier are
-  serialized by a row lock, and a create or update that fails halfway is rolled
-  back as a whole.
-- **One database per service.** No other service reads these tables. They ask
-  the API.
+## Data
 
-The catalogue is small (tens to hundreds of rows) and mostly read. The 100 ms
-read bound (N2.1.1) and the 1000 concurrent clients (N2.2.1) are met by keeping
-each read to a single indexed query, not by the choice of database. If reads
-ever outgrow one database, PostgreSQL supports read replicas without changing
-the service.
-
-## Schema
-
-Two tables. `supplier_hours` belongs to a supplier and is deleted with it.
-
-```text
-suppliers
-  id            uuid, primary key, generated by the database
-  name          text, 1 to 120 characters
-  type          text, 1 to 60 characters, as in the seed file (Food, Food/Coffee, Shopping, Printing)
-  zone          text, campus zone (Central, Computing, ...)
-  building      text
-  address       text, the line shown to users
-  description   text, optional, how to find it
-  latitude      double, optional, set together with longitude
-  longitude     double, optional
-  phone         text, optional
-  email         text, optional
-  status        enum: Active | Inactive, default Active
-  created_at    timestamptz, set by the database
-  updated_at    timestamptz, set on every change
-  created_by    text, account id of the administrator, null when seeded
-  updated_by    text
-
-supplier_hours                     one row per weekday the supplier is open
-  supplier_id   uuid, references suppliers(id), on delete cascade
-  weekday       0 to 6, Monday is 0
-  opens_minute  0 to 1439, minutes after local midnight
-  closes_minute 1 to 1440, 1440 means midnight at the end of the day
-  primary key (supplier_id, weekday)
-```
-
-A weekday with no row is closed all day. Storing times as minutes lets 24:00 be
-represented exactly. A `closes_minute` lower than `opens_minute` means the window
-runs past midnight, so 11:00 to 02:00 is opens 660, closes 120. The SQL is in
-`src/migrations/001_create_suppliers.sql`, with the constraints and indexes.
-
-### The metadata of a supplier, and how it is stored and queried
-
-| Metadata | Stored as | Queried by |
-| --- | --- | --- |
-| Name | `suppliers.name` | keyword search, sort order |
-| Type | `suppliers.type` | filter `type`, keyword search |
-| Location | `zone`, `building`, `address`, and the coordinates | filters `zone` and `building`, keyword search |
-| Opening hours | `supplier_hours` rows | evaluated in code into open or closed |
-| Status | `suppliers.status` | filter `status`, default Active |
-
-The type is free text on purpose. It starts as the types in the seed file, taken
-exactly as written (Food, Food/Coffee, Shopping and Printing), and an
-administrator may introduce a new one. Nothing is grouped: `Food/Coffee` is a
-type of its own, and filtering by `Food` does not include it.
-
-Whether a supplier is open is not stored. It is worked out from the hours, at
-request time, on the campus clock (`SUPPLIER_TIMEZONE`, Singapore by default).
-The rule is open from the opening minute up to but not including the closing
-minute, and it copes with hours that run past midnight, past Sunday night, and
-days that join up (`src/domain/availability.ts`).
-
-## Query patterns
-
-| Need | Request |
+| Table | Holds |
 | --- | --- |
-| One supplier by id | `GET /suppliers/{id}` |
-| Browse, paged, sorted by name | `GET /suppliers?page=2` |
-| Keyword search | `GET /suppliers?q=coffee` |
-| By type or location | `GET /suppliers?type=Printing`, `?type=Food/Coffee`, `?zone=Central`, `?building=COM2` |
-| Combined | `GET /suppliers?zone=Central&type=Food/Coffee&q=roaster` |
-| Deactivated suppliers | `GET /suppliers?status=Inactive` or `?status=all` |
-| Which types, zones and buildings exist | `GET /suppliers/filters` |
-| Open at this moment | `GET /suppliers?openNow=true` |
-| Nearest first | `GET /suppliers?sort=distance&near=1.297,103.776` |
-| Your own favorites | `GET /suppliers?favorites=true` |
-| Is it open at a given time | `GET /suppliers/{id}/availability?at=2026-10-01T12:00:00%2B08:00` |
+| `suppliers` | name, type, zone, building, address, and optional description, coordinates, phone and email. Status `Active` or `Inactive`. Who created and last changed it. |
+| `supplier_hours` | one row per open weekday (Monday is 0), with times as minutes after midnight. A weekday without a row is closed. A closing time before the opening time runs past midnight. |
+| `supplier_photos` | one photo and a square thumbnail per supplier, kept apart so that lists never read them |
+| `supplier_favorites` | the favorites of each account, keyed by the `accountId` that the user-service returns |
+| `seed_runs` | which one-time seed steps have run |
+
+The SQL is in `src/migrations/`. The service applies new files at start-up.
+
+Type, zone and building are free text. An administrator can add a new type, and `Food/Coffee` is a type of its own, not part of `Food`. Whether a supplier is open is never stored. It is worked out on every request from the hours, on the campus clock (`SUPPLIER_TIMEZONE`), in `src/domain/availability.ts`.
 
 ## API
 
-All routes except `/health` need a session: the `relay_session` cookie that the
-user-service sets when someone logs in. Request and response bodies are JSON.
+Bodies are JSON. Through the gateway, every path starts with `/api/supplier`.
 
 | Method and path | Who | What |
 | --- | --- | --- |
 | `GET /health` | anyone | 200 when the database answers, 503 when not |
-| `GET /suppliers` | any member | search and list, see below |
-| `GET /suppliers/filters` | any member | the types, zones and buildings in use, for filter menus |
-| `GET /suppliers/{id}` | any member | one supplier, including an Inactive one |
-| `GET /suppliers/{id}/availability` | any member | open or closed at a time, and whether a new errand may use it |
+| `GET /suppliers` | member | search and list, see below |
+| `GET /suppliers/filters` | member | the types, zones and buildings in use, for filter menus |
+| `GET /suppliers/{id}` | member | one supplier, also an Inactive one |
+| `GET /suppliers/{id}/availability` | member | open or closed at a time, and whether a new errand may use it |
+| `POST /suppliers/{id}/route` | member | the walk from the supplier to a point, such as an errand's drop-off |
+| `GET /suppliers/favorites` | member | the ids of your own favorites |
+| `PUT`, `DELETE /suppliers/{id}/favorite` | member | add or remove a favorite, 204 |
+| `GET /suppliers/{id}/photo` | member | the photo, or `?size=thumbnail` |
+| `PUT`, `DELETE /suppliers/{id}/photo` | administrator | add, replace or remove the photo |
 | `POST /suppliers` | administrator | create, 201 with a `Location` header |
 | `PATCH /suppliers/{id}` | administrator | change any field except `id` and `createdAt` |
-| `DELETE /suppliers/{id}` | administrator | deactivate: sets status Inactive, the record stays |
-| `GET /suppliers/favorites` | any member | the ids of your own favorite suppliers |
-| `PUT /suppliers/{id}/favorite` | any member | add a supplier to your favorites, 204 |
-| `DELETE /suppliers/{id}/favorite` | any member | remove it, 204 |
-| `GET /suppliers/{id}/photo` | any member | the photo, or `?size=thumbnail` for the small copy |
-| `PUT /suppliers/{id}/photo` | administrator | add or replace the photo |
-| `DELETE /suppliers/{id}/photo` | administrator | remove the photo |
-| `POST /suppliers/{id}/route` | any member | the walk from the supplier to a point, such as an errand's drop-off |
+| `DELETE /suppliers/{id}` | administrator | deactivate: the status becomes Inactive and the record stays |
 
-**List.** `q` (keywords, every word must match the name, type, building,
-zone or address), `type`, `zone`, `building`, `status` (`Active`
-by default, `Inactive`, or `all`), `favorites` (`true` for only your own),
-`openNow` (`true` for only those open at this moment), `near`
-(`latitude,longitude` to measure from), `sort` (`name` by default, or `distance`,
-which needs `near`), `page` (from 1) and `pageSize` (1 to 20, default 20). Results
-are sorted by name, ignoring case, unless sorted by distance, where suppliers
-without coordinates come last. With `near`, every supplier has `distanceMeters`.
+**Search.** `GET /suppliers` takes `q` (every word must match the name, type, building, zone or address), `type`, `zone`, `building`, `status` (`Active` by default, `Inactive` or `all`), `favorites=true`, `openNow=true`, `near=latitude,longitude` (fills in `distanceMeters`), `sort` (`name` by default, or `distance`, which needs `near`), `page` and `pageSize` (1 to 20). The answer is `{ items, page, pageSize, total, totalPages }`. `openNow` checks at most 2000 matches, because open or closed is worked out in code. The service log shows `near=hidden`, and the web client rounds the position to about 110 m before it sends it.
 
-Open or closed is worked out in code, which copes with hours past midnight, so
-`openNow` loads every match (at most 2000), keeps the open ones and cuts the page
-itself. Only the stored rows may come from the read cache, never which are open.
-Distances are on a flat map, within a few metres over one campus. The web client
-rounds the student's position to three decimals, about 110 m, and the service
-log shows `near=hidden`.
+**A supplier** has the stored fields, `contact` (`phone`, `email`), `hours` as `[{ "day": "monday", "opens": "09:00", "closes": "16:00" }]`, `photo` (null, or the paths of the photo and the thumbnail), `availability` (`open`, `closesAt`, `nextOpensAt`, worked out per request) and `distanceMeters`.
+
+**Availability** is for the order-service, which must refuse an errand whose supplier is Inactive or closed at the needed-by time (F3.1.3). `at` must carry a UTC offset and defaults to now. `orderable` is true only when the supplier is Active and open at `at`.
+
+**Create and update.** Creating needs `name`, `type`, `zone`, `building`, `address` and `hours`. Optional: `description`, `latitude` with `longitude`, `contact`, and `status`. An update takes any subset, and a new `hours` list replaces the old one. A blank or `null` optional field clears it. Times are `HH:MM`, and closing at `24:00` or after midnight is allowed.
+
+**Photos.** `PUT` takes `{ "photo": "data:image/jpeg;base64,...", "thumbnail": "data:image/jpeg;base64,..." }`. Each must be JPEG, PNG or WebP, at most 1 MB and 256 KB, and the type is checked from the file's first bytes. The web client shrinks the images before it sends them. A photo path carries a version `v`, so the browser keeps it for a year.
+
+**Walking routes.** `POST /suppliers/{id}/route` with `{ "to": { "latitude": 1.2908, "longitude": 103.7809 } }` answers:
 
 ```json
-{ "items": [ ...suppliers ], "page": 1, "pageSize": 20, "total": 21, "totalPages": 2 }
+{ "from": { "latitude": 1.2967866, "longitude": 103.7732677 }, "metres": 1424, "seconds": 1095, "estimated": false, "mapVersion": "2026-11-09" }
 ```
 
-**Filter values.** Type, zone and building are free text, so a client cannot
-know which values exist. This lists each one in use, sorted ignoring case and
-given once when two spellings differ only in case. It takes the same `status`
-as the list (Active by default), so every value finds at least one supplier.
+- The service finds the walk itself, with A\* on `map/nus-walk.graph` (about 6 x 6 km around NUS), and asks no outside service. A walk takes a few milliseconds at most.
+- `seconds` is `metres` at 1.3 m/s.
+- A point more than 150 m from a mapped path is off the map. A walk to it, or any walk while the map is missing, is the straight line times 1.3, with `"estimated": true` and `"mapVersion": null`.
+- It is a POST so that the point, which may be where a student lives, stays out of URLs and access logs. The service does not log or store it.
+- A supplier without coordinates gets 422 `NO_LOCATION`.
+- To rebuild the map, about once a semester, run `node dev/build-walk-map.ts` in `supplier-service/`. It downloads the area from the Overpass API, writes both files in `map/` and prints a few known walks to compare with the last map. Commit both files together. The licence is in `map/README.md`.
 
-```json
-{ "types": ["Food", "Food/Coffee", "Printing", "Shopping"], "zones": ["Business", "Central", "..."], "buildings": ["Blk AS8", "..."] }
-```
-
-**A supplier** as returned by every route (values shortened):
-
-```json
-{
-  "id": "0d3c6c7e-...",
-  "name": "NUS Co-op",
-  "type": "Shopping",
-  "zone": "Central",
-  "building": "Central Library",
-  "address": "Central Library, Level 1",
-  "description": "Inside the library on the right side",
-  "latitude": 1.2967866,
-  "longitude": 103.7732677,
-  "contact": { "phone": null, "email": null },
-  "hours": [{ "day": "monday", "opens": "09:00", "closes": "16:00" }, "..."],
-  "status": "Active",
-  "photo": { "path": "/suppliers/0d3c6c7e-.../photo?v=...", "thumbnailPath": "/suppliers/0d3c6c7e-.../photo?size=thumbnail&v=..." },
-  "availability": { "open": true, "closesAt": "16:00", "nextOpensAt": null },
-  "distanceMeters": null,
-  "createdAt": "2026-10-01T04:00:00.000Z",
-  "updatedAt": "2026-10-01T04:00:00.000Z"
-}
-```
-
-`availability` is worked out when the request arrives. `closesAt` is null when
-the supplier is open around the clock. When it is closed, `nextOpensAt` gives
-the day and time it opens next.
-
-**Availability.** For the Order Service, which must refuse an errand whose
-pickup supplier is Inactive or closed at the needed-by time (F3.1.3). `at` must
-carry a UTC offset, and defaults to now.
-
-```json
-{
-  "supplierId": "0d3c6c7e-...", "at": "2026-10-01T04:00:00.000Z", "timezone": "Asia/Singapore",
-  "status": "Active", "open": true, "closesAt": "16:00", "nextOpensAt": null,
-  "orderable": true
-}
-```
-
-`orderable` is true only when the supplier is Active and open at `at`.
-
-**Create and update.** Creating needs `name`, `type`, `zone`, `building`,
-`address` and `hours`. Optional: `description`, `latitude` and
-`longitude` (together), `contact` with `phone` and `email`, and `status`
-(default Active). An update takes any subset of these, and a `hours` list
-replaces the old one. Setting `status` back to `Active` reactivates a supplier.
-Blank optional fields and `null` clear the value.
-
-```bash
-curl -X POST http://localhost:3002/suppliers \
-  -b cookies.txt -H "Content-Type: application/json" \
-  -d '{"name":"Test Cafe","type":"Food","zone":"Central",
-       "building":"Central Library","address":"Central Library, Level 1",
-       "hours":[{"day":"monday","opens":"09:00","closes":"18:00"}]}'
-```
-
-`hours` lists the weekdays the supplier is open. A weekday left out is closed.
-Times are `HH:MM`, and closing at `24:00` or after midnight is allowed.
-
-**Favorites.** Each account keeps its own list in `supplier_favorites`, keyed by
-the `accountId` the user-service returns when it authorizes the request. So the
-user-service stores nothing for this, and nobody can name another account:
-there is no account in the path, the query or the body. `GET /suppliers/favorites`
-answers `{ "supplierIds": [...] }`, and `GET /suppliers?favorites=true` lists only
-your favorites, together with every other filter. That list is never served from
-the read cache, because it belongs to one account and changes at a tap. Adding or
-removing a favorite twice gives the same result. An account that an administrator
-deletes leaves its rows behind, a few bytes each, because the user-service
-announces no deletion.
-
-**Photos.** A supplier has at most one photo and a square thumbnail for lists.
-Every supplier in a response has `photo`, which is null or holds two paths on
-this service, such as `/suppliers/{id}/photo?v=1a2b3c4d5e6f7a8b`. The `v` changes with
-every new photo, so a link that carries the current one is cached for a year
-(`private, max-age=31536000, immutable`). An old link still shows the current
-photo but is not cached, and every answer has an `ETag`.
-
-`PUT` takes both images as data URLs, which is what a browser canvas gives:
-
-```json
-{ "photo": "data:image/jpeg;base64,...", "thumbnail": "data:image/jpeg;base64,..." }
-```
-
-The photo may be 1 MB and the thumbnail 256 KB, as JPEG, PNG or WebP. The type is
-read from the file's first bytes and must match the one the data URL names. The
-web client shrinks a photo to 1280 px and a 240 px square before it sends it,
-so any phone photo fits. The images live in the `supplier_photos` table, apart
-from the suppliers, so that listing suppliers never reads them.
-
-**Walking routes.** The walk from the supplier to any point, computed in the
-service on a map of the paths around NUS. No outside service is asked.
-
-```bash
-curl -X POST http://localhost:3002/suppliers/{id}/route -b cookies.txt \
-  -H "Content-Type: application/json" -d '{"to":{"latitude":1.2908,"longitude":103.7809}}'
-```
-
-```json
-{
-  "from": { "latitude": 1.2967866, "longitude": 103.7732677 },
-  "metres": 1424, "seconds": 1095, "estimated": false, "mapVersion": "2026-11-09"
-}
-```
-
-- **Start:** `from` is the supplier's point, so a caller such as the
-  order-service can keep the point the walk was measured from.
-- **Why POST:** the point may be where a student lives, so it travels in the body.
-  That keeps it out of the gateway's access log. The service does not log it and
-  stores nothing.
-- **Time:** `seconds` is `metres` at 1.3 m/s, the walking speed of the pgRouting
-  workshop.
-- **Estimates:** a point with no mapped path point within 150 m is off the map.
-  The paths have points at their bends and crossings, so a point beside the
-  middle of a long straight road can be off the map too. A walk to or from such
-  a point, or any walk while the map is missing, is the straight line times 1.3,
-  a rough guess. The answer then says `"estimated": true` and
-  `"mapVersion": null`.
-- **Errors:** a supplier without coordinates gets 422 `NO_LOCATION`.
-
-**How it is computed.** `src/domain/walking.ts` snaps both points to the nearest
-mapped path point through a grid of about 110 m cells. It then finds the
-shortest walk with A\*, which is Dijkstra's search led by the straight-line
-distance. On this map a walk under 2 km takes about 0.2 ms, and one of 2 to 5 km
-about 1 to 3 ms, measured on a laptop.
-
-**The map.** `map/nus-walk.graph` (1.8 MB) covers about 6 x 6 km around NUS:
-campus, Prince George's Park, Clementi, Dover, one-north and West Coast. It is
-built ahead from OpenStreetMap data and shipped in the image, so the service
-never downloads anything. Its licence is in `map/README.md`.
-
-To rebuild it, about once a semester or when a route is reported wrong:
-
-```bash
-cd supplier-service
-node dev/build-walk-map.ts
-```
-
-The script downloads the area once from the Overpass API, waiting longer each
-time the server is busy. It writes both files in `map/` and prints a few known
-walks. Compare those with the last map, run the tests, and commit both files in
-one pull request. Each route carries `mapVersion`, the date of the OpenStreetMap
-data, so errands keep the map they were walked on.
-
-**Errors** always look like this. `fields` is present for validation errors and
-names every invalid field, so a form can show them all at once.
-
-```json
-{ "error": { "code": "VALIDATION_FAILED", "message": "One or more fields are invalid",
-             "fields": [{ "field": "hours[0].opens", "message": "must be a time from 00:00 to 23:59 as HH:MM" }] } }
-```
+**Errors** look like `{ "error": { "code": "VALIDATION_FAILED", "message": "...", "fields": [{ "field": "hours[0].opens", "message": "..." }] } }`. `fields` names every invalid field, so a form can show them all at once.
 
 | Status | Code | When |
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST` | invalid fields or query, malformed JSON |
-| 413 | `BAD_REQUEST` | a request body over the limit: 64 KB, or about 1.75 MB for a photo |
-| 422 | `NO_LOCATION` | a walking route from a supplier that has no coordinates |
-| 401 | `UNAUTHENTICATED` | no session cookie at all |
-| 403 | `FORBIDDEN` | the user-service did not confirm it: an unknown or ended session, an account that is not Active, a missing role, or the user-service could not be asked |
+| 401 | `UNAUTHENTICATED` | no session cookie |
+| 403 | `FORBIDDEN` | the user-service did not confirm the request |
 | 404 | `NOT_FOUND` | no such supplier or route |
+| 413 | `BAD_REQUEST` | a body over 64 KB, or about 1.75 MB for a photo |
+| 422 | `NO_LOCATION` | a walking route from a supplier without coordinates |
 | 500 | `INTERNAL_ERROR` | a bug, with no detail given |
 
 ## Access control
 
-The user-service is the single authority on who is logged in and what they may do
-(N1.1). This service never decides access from a cookie or a token, and keeps no
-copy of roles. For every request it asks the user-service, whose contract is
-documented in `user-service/README.md`:
+For every request the service asks the user-service through `POST /internal/authorize` (the contract is in `user-service/README.md`). The role each operation needs is in `src/auth.ts` (F1.5.4): an administrator creates, changes and deactivates suppliers and their photos, and any member reads them and keeps favorites.
 
-```text
-POST {USER_SERVICE_URL}/internal/authorize
-{"token": "<the relay_session cookie>", "requiredRole": "member" | "administrator"}
-
-200 {"decision": "authorized", "accountId": "...", "roles": ["member", ...]}
-200 {"decision": "denied"}
-```
-
-The role each operation needs is kept in `src/auth.ts`, as the platform rule
-F1.5.4 says: an administrator to create, update or deactivate a supplier, and any
-member to read.
-
-- **Before anything else.** The check runs before the body is parsed or the
-  database is touched. A refused caller learns nothing about which suppliers
-  exist: patching a real id, a missing id and text that is not an id all answer
-  the same 403 (N1.1.1), and a denied request changes nothing (F1.5.3).
-- **Denied requests.** A request with no session cookie at all is a 401. Anything
-  else the user-service does not confirm is a 403.
-- **Fails closed (N1.1.2).** A timeout of about two seconds, a network error, a
-  status other than 200 and any other answer all count as denied and get a 403. A
-  warning is logged when the reason is that the user-service could not be asked,
-  so that an operator can tell that apart from a plain refusal.
-- **The actor is recorded.** The `accountId` in the answer is stored as
-  `created_by` and `updated_by`.
-- **Sessions end at once for changes.** Logging out is refused straight away on
-  every create, update and deactivate. A read may go on for up to 5 seconds,
-  because the approval of a read is remembered (see Speed).
-
-`dev/fake-user-service.ts` fakes the authorization endpoint for the automated
-tests, with three fixed sessions. It is not in the compose stack or the image, so
-the running system and the demo use the real user-service.
+- The check runs before the body is read or the database is touched, so a refused caller learns nothing about which suppliers exist (N1.1.1).
+- A request without a cookie is a 401. Anything the user-service does not confirm is a 403.
+- It fails closed (N1.1.2): a timeout of 2 seconds, a network error or an unexpected answer is a 403, and the log says the user-service could not be asked.
+- `created_by` and `updated_by` keep the `accountId` from the answer.
+- The automated tests use `dev/fake-user-service.ts` in place of the user-service. It is not in Compose or the image.
 
 ## Speed
 
-The backlog asks that every supplier read answer within 100 ms, also with 1000
-clients at once (N2.1.1, N2.2.1). One query is fast on its own, but a search
-also waits on the user-service, which looks the session up in its own database,
-and on this service's database, and with a thousand clients that adds up. Two
-short-lived caches remove most of that waiting:
+N2.1.1 and N2.2.1 ask for every read within 100 ms, also with 1000 clients at once. Two short caches make that possible:
 
-| Cache | What it remembers | For | Trade-off |
+| Cache | Remembers | Variable, default | Trade-off |
 | --- | --- | --- | --- |
-| Authorization | that a session may read | `SUPPLIER_AUTH_CACHE_SECONDS`, 5 | a session that has just ended, or an account that has just been suspended, can still read until the answer expires |
-| Search results | the suppliers found by a search or listing | `SUPPLIER_READ_CACHE_SECONDS`, 2 | a change made through another instance takes up to that long to show |
+| Authorization | that a session may read | `SUPPLIER_AUTH_CACHE_SECONDS`, 5 | an ended session or a suspended account can still read until the answer expires. Changes are always checked. |
+| Search results | the rows a search found | `SUPPLIER_READ_CACHE_SECONDS`, 2 | a change made through another instance takes up to 2 seconds to show |
 
-What they never do:
+They never keep a refusal, an error, a write, favorites, open or closed, or an availability answer. A change clears the search cache of its own instance at once. `0` turns a cache off.
 
-- They never remember a refusal or an error, and never touch a create, update or
-  deactivate. Those always go to the user-service and the database.
-- A change made through this instance clears the search cache at once, so an
-  administrator sees their own edit immediately.
-- The opening hours are evaluated on every request, and `/availability` is never
-  cached, so the Order Service always gets a live answer about whether a
-  supplier is Active and open.
-- Concurrent identical questions share one answer, so a burst costs one trip.
-
-Set either to `0` to turn it off.
-
-### Load test
-
-`loadtest/search.js` is a [k6](https://k6.io) script. It runs 1000 concurrent
-clients that each search, look at the answer for about a second, and search
-again. They join over 15 seconds and only the requests made after all of them
-are in are judged. A fifth of the searches use a keyword nobody asked for a
-moment ago, so they cannot be answered from memory.
-
-The sessions are real. Before it starts, the script logs in to the user-service
-50 times as the administrator, which gives 50 different sessions that the clients
-share, and it logs them out at the end. Run it against the running system from
-the repository root:
+`loadtest/search.js` is a [k6](https://k6.io) script: 1000 clients that each search about once a second, with 50 real sessions from the user-service. Run it from the repository root while the system is up:
 
 ```bash
-docker run --rm -i --network relay_default \
+docker run --rm -i --network relay_edge \
   -v "$PWD/supplier-service/loadtest:/scripts:ro" \
   -e BASE=http://supplier-service:3002 -e USER_URL=http://user-service:3000 \
   grafana/k6 run --summary-trend-stats "avg,med,p(95),p(99),p(99.9),max" /scripts/search.js
 ```
 
-Result on one developer laptop, one instance of each service, Docker Desktop, at
-about 750 requests per second. The table covers the whole run including the
-ramp-up. Judged on the steady state alone, which is what the script's threshold
-checks, p99 was 4.9 ms with the caches on and 1.65 s with them off.
+The result on one laptop, with one instance of each service:
 
-| | requests | failed | median | p95 | p99 | p99.9 | max |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Caches on (the default) | 38,095 | 0 | 0.7 ms | 3.3 ms | **7.8 ms** | 74 ms | 113 ms |
-| Caches off | 31,672 | 39 (0.12%) | 101 ms | 937 ms | 1.67 s | 2.09 s | 2.68 s |
+| | requests | failed | median | p95 | p99 |
+| --- | --- | --- | --- | --- | --- |
+| Caches on (the default) | 38,095 | 0 | 0.7 ms | 3.3 ms | **7.8 ms** |
+| Caches off | 31,672 | 39 (0.12%) | 101 ms | 937 ms | 1.67 s |
 
-So with the caches the 100 ms bound holds for the 99th percentile with a wide
-margin, and without them it fails badly. The approval cache is what makes the
-difference. Without it every read waits on the user-service's authorization
-lookup, and that lookup cannot keep up with about 600 a second. One request in the
-run, during the ramp-up when nothing was remembered yet, took 113 ms. These are
-numbers from one machine, not a guarantee.
+Without the authorization cache every read waits for the user-service, which cannot answer about 600 lookups a second.
 
 ## Seed data
 
-At startup, when the `suppliers` table is empty, the service loads
-`../data/csv/supplier-seed-data.csv` (F2.3.1). It seeds only an empty table so
-that a restart never brings back a supplier an administrator changed or
-deactivated. The file has no campus zone, per-day hours or contact details, so:
+When the `suppliers` table is empty at start-up, the service loads `../data/csv/supplier-seed-data.csv` (F2.3.1). It never seeds a table that has rows, so a restart keeps every change an administrator made.
 
-- **Type** is taken from the file exactly as written: `Food`, `Food/Coffee`,
-  `Shopping` and `Printing`. Nothing is grouped or renamed.
-- **Zone** comes from the building, in `src/seed/suppliers.ts`. A building that
-  is not listed gets the zone `Other` and a warning in the log.
-- **Hours** are the file's one opening and closing time, applied to all seven
-  days. `0000hrs` to `2359hrs` is read as open around the clock.
-- **Buildings** written two ways (`Com 2`, `Com2`) are joined.
-- **Address** is the building and floor, such as `COM3, Level 1`.
+- The type is kept exactly as written. The zone comes from the building (`src/seed/suppliers.ts`), and an unknown building gets `Other` and a warning in the log.
+- The file's one opening and closing time applies to all seven days. `0000hrs` to `2359hrs` means open around the clock.
 - The file is Windows-1252, not UTF-8, and is decoded as such.
-- **Photos.** The `ImageURL` column names a photo for 6 suppliers. The originals
-  in `data/images` are 2.6 to 5 MB each, so shrunk copies are in
-  `data/images/resized` as `NAME.jpg` and `NAME.thumb.jpg`, about 1.4 MB for
-  all 12. They are added once per database, also to a database that was seeded
-  before photos existed, and only to a seeded supplier that still has its seed
-  name and no photo. `seed_runs` records that this happened, so a restart never
-  brings back a photo an administrator removed.
+- 6 suppliers have a photo. Shrunk copies in `data/images/resized` are added once per database, and `seed_runs` makes sure a photo that an administrator removed does not come back.
 
 ## Deploying
 
-Photos, favorites, open now, nearest and walking routes need no change to the
-deployment, so a pull request merged into `dev` is all it takes:
+A merge into `dev` is all it takes. CI runs the tests, publishes the image to GHCR (job `publish` in `.github/workflows/ci.yml`) and rolls it out to the cloud. New migrations run at start-up under a database lock, so instances that start together run them once.
 
-1. CI builds the `supplier-service` and `web-client` images and publishes them to
-   GHCR (`.github/workflows/ci.yml`, job `publish`). With the AWS deployment, the
-   same merge also rolls them out to the cloud instance.
-2. When the new supplier-service starts, it applies the migrations it has not run
-   yet (`002_supplier_photos.sql`, `003_supplier_favorites.sql`) and adds the seed
-   photos. Both take a database lock, so several copies that start together still
-   do it once.
-
-There is no new environment variable, secret, port, volume or Helm value. Worth
-knowing all the same:
-
-- **Storage.** A photo is about 250 KB and its thumbnail about 15 KB, in the
-  supplier database. Its cloud volume is 1 GiB (`databases.supplier-db.size` in
-  the Helm values), room for thousands of photos.
-- **Memory.** Each service may use 256 MiB in the cloud. With the walking map the
-  service uses about 45 to 55 MiB, measured in Docker. The browser shrinks the
-  photos, so the service holds at most about 1.75 MB for one upload.
-- **Walking map.** It is in the image (`map/`, about 2 MB). The service reads it
-  at start-up, and never downloads anything, so it needs no internet access.
-  Without the map it still starts, and every route is an estimate. The health
-  check stays green, because routes are an extra.
-- **Upload size.** The gateway lets 2 MB through on the supplier routes
-  (`web-client/nginx/templates/routes/supplier.conf.template`), which ships in the
-  web-client image.
-- **Location.** Browsers share a position only with a page over HTTPS, or from
-  localhost. The cloud serves HTTPS. On plain HTTP elsewhere, "Nearest to me"
-  says it cannot ask, and the list stays sorted by name.
-- **Logs.** The supplier-service log shows `near=hidden`. The gateway's nginx
-  access log still records the rounded position, about 110 m; changing its log
-  format is a platform change.
+- In the cloud the service runs up to 4 instances under load (N6.3). It can, because it keeps no state apart from the two caches.
+- It uses about 45 to 55 MiB of memory with the walking map loaded. The map is in the image, so the service needs no internet access. Without the map it still starts, and every route is an estimate.
+- The gateway lets 2 MB through on the supplier routes for photo uploads (`web-client/nginx/templates/routes/supplier.conf.template`).
+- Browsers share a position only over HTTPS or from localhost. Elsewhere, "Nearest to me" says it cannot ask.
 
 ## Tests
 
@@ -545,37 +176,33 @@ cd supplier-service
 npm test
 ```
 
-The tests for opening hours, validation, the seed file, the caches and the
-user-service client need nothing. They use `dev/fake-user-service.ts` in place of
-the real authorization endpoint. The API tests run the real routes and SQL against
-the `supplier_test` database that Compose creates, which they empty each time.
-They need `SUPPLIER_TEST_DATABASE_URL`, whose database name must end in `_test`.
-Without it they are skipped, and the summary says so.
+The API tests run the real routes and SQL against the `supplier_test` database that Compose creates, and they empty it each time. They need `SUPPLIER_TEST_DATABASE_URL` from `.env`, whose database name must end in `_test`. Without it they are skipped, and the summary says so. The other tests need nothing. One group gives the service a database that fails the test if it is queried, which proves that a refused or invalid request never reaches it.
 
-A group of tests hands the service a database that fails the test if anything
-queries it. That proves a request with no session, a forbidden one, or an
-invalid one is settled before the database is reached.
+## Troubleshooting
 
-## Reliability
+| You see | Usually |
+| --- | --- |
+| `Missing environment variables` at start-up | the service runs on your machine without a `.env`. Copy `.env.example` to `.env` in the repository root. |
+| 403 for every request | the session ended, or the user-service is down. The log says "The user-service could not be asked" when it is the second. |
+| skipped tests in the summary | there is no `SUPPLIER_TEST_DATABASE_URL`, or `supplier-db` is not running |
+| `"estimated": true` for a point on campus | the point is more than 150 m from a mapped path, or the map did not load. The log at start-up says which map loaded. |
+| 422 `NO_LOCATION` on a route | the supplier has no coordinates. Set them on the map in the admin supplier form. |
+| a change to the seed file does not show | the seed runs only into an empty table. `docker compose down -v` deletes the local data. |
+| 404 JSON for `/api/supplier/health` | expected. Only `/api/supplier/suppliers/...` is open through the gateway. |
 
-- If the database restarts, the service stays up, logs the dropped connection,
-  and serves again as soon as the database is back. A request that was running
-  at that moment fails.
-- If the user-service cannot answer, every request is refused with a 403 and a
-  warning is logged, except reads whose approval is still remembered for a few
-  seconds. The supplier-service itself keeps running (N6.1.2).
-- Compose restarts a container that stops, and the service reports a health
-  check that includes the database.
+## Declaration of AI-assisted work
 
-## Not done yet
+This section covers the supplier-service, the supplier parts of the web client (the supplier and admin supplier pages, `web-client/src/api/supplier/`, and the drop-off map and walk on the errand pages), and the walking route that the order-service keeps with each errand.
 
-- The web client (N5). This is the API only. A browser on another address cannot
-  send the session cookie to this service without a proxy, or cross-origin access
-  that allows credentials, and neither is set up.
-- Suspended accounts (F1.6, sprint 2). The user-service has no way to suspend an
-  account yet, so a suspended account is only covered by the fake in the
-  automated tests.
-- Availability of 99.9% (N2.1.1) is not measured. There is one instance, and
-  running more (N6.3) needs no change to the service, because it keeps no state
-  of its own apart from the two short caches.
-- Photos for the other 15 seed suppliers. The seed file has photos for only 6.
+**Tool:** Claude Code (Claude Opus and Sonnet models).
+
+**How Claude was used:**
+
+- **Explain:** Claude was used to explain Fastify, PostgreSQL, TanStack Query and Leaflet while the first steps of the service were typed by hand.
+- **Generate:** Once the patterns were established, Claude was used to write the remaining steps, the supplier screens and the nice-to-have features (photos, favorites, open now, nearest first, maps and walking routes) from a step-by-step plan. Each step became one commit, which was tested and committed by hand.
+- **Check:** Claude was used to run the type check, the tests, the build and lint, and to check the pages in a browser at 320 px before each commit. Each page was then tested by hand.
+- **Document:** Claude was used to help write this README, `AGENTS.md` and `DEMO.md`.
+
+**Decisions:** The service's responsibilities, its API, the choice of PostgreSQL and which nice-to-have features to build were decided by the team, not by Claude. The reasons for PostgreSQL are in "Why PostgreSQL" above.
+
+**Review:** Every change was reviewed and tested before it was committed. `AGENTS.md` holds the rules that both teammates and coding agents follow in this folder.

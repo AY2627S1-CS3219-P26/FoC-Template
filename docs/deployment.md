@@ -30,6 +30,26 @@ k3d cluster delete relay
 
 [`deploy/terraform`](../deploy/terraform) creates one EC2 instance (t3.xlarge, Singapore) with k3s, in its own VPC with a fixed public address. Traefik inside k3s answers on ports 80 and 443: HTTPS with a Let's Encrypt certificate from cert-manager, plain HTTP redirects to it. SSH and the Kubernetes API only accept the address terraform was run from. The images come from GHCR, where CI publishes them with the tag `dev` after every merge into `dev`.
 
+### In short: bring the cloud to the newest `dev` state
+
+```bash
+git checkout dev && git pull
+aws sso login --profile relay && export AWS_PROFILE=relay
+deploy/scripts/cloud.sh status           # start it with cloud.sh start if it is stopped
+terraform -chdir=deploy/terraform apply  # only when kubectl times out: your address changed
+deploy/scripts/cloud-kubeconfig.sh       # after every apply
+deploy/scripts/deploy.sh
+```
+
+`deploy.sh` takes the chart from your checkout and the images tagged `dev` from GHCR, which CI publishes after every merge into `dev`. If CI did not publish, build and push the changed image yourself (the token needs `write:packages`: `gh auth refresh -s write:packages`):
+
+```bash
+gh auth token | docker login ghcr.io -u <github user> --password-stdin
+docker buildx build --platform linux/amd64 -t ghcr.io/ay2627s1-cs3219-p26/user-service:dev --push user-service
+```
+
+The supplier-service builds from the repository root: `-f supplier-service/Dockerfile .` instead of the folder.
+
 Needs the AWS CLI with the SSO profile `relay`, `terraform`, `helm`, `kubectl`, and an SSH key in `~/.ssh/relay-aws` (`ssh-keygen -t ed25519 -f ~/.ssh/relay-aws -N ""`).
 
 Once:

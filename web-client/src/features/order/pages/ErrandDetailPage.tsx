@@ -1,6 +1,7 @@
 import { Flag } from 'lucide-react'
 import { createElement } from 'react'
-import { Link, useParams } from 'react-router'
+import type { ReactNode } from 'react'
+import { Link, useLocation, useParams } from 'react-router'
 import { useMyOrders, useOrder } from '@/api/order/order'
 import type { Order, OrderStatus } from '@/api/order/order'
 import { useSupplier } from '@/api/supplier/suppliers'
@@ -8,23 +9,17 @@ import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { useErrandChatSlot } from '@/lib/errandChat'
+import { formatDateTime } from '@/lib/format'
+import { ErrandActions } from '../components/ErrandActions'
 import { SupplierThumbnail } from '../components/SupplierThumbnail'
 import { WalkingRoute } from '../components/WalkingRoute'
 
-const ERRANDS_PATH = '/errands'
-
-const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-})
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : dateTimeFmt.format(d)
+// Where "Back to errands" goes when the page was not opened from the Errands page, for example from
+// Messages or a shared link: the tab this errand is listed in for the account.
+function errandsTabFor(role: string | null): string {
+  if (role === 'Requester') return '/errands?tab=requests'
+  if (role === 'Courier') return '/errands?tab=deliveries'
+  return '/errands'
 }
 
 // Status path
@@ -103,7 +98,7 @@ const MARKER: Record<StepState, { symbol: string; className: string }> = {
   ended: { symbol: '✕', className: 'bg-neutral-mark text-on-accent' },
 }
 
-function Progress({ order }: { order: Order }) {
+function Progress({ order, actions }: { order: Order; actions: ReactNode }) {
   const steps = stepsOf(order)
   return (
     <section className="ds-surface grid grid-cols-1 gap-4 p-5" aria-labelledby="progress-title">
@@ -121,7 +116,7 @@ function Progress({ order }: { order: Order }) {
             >
               {MARKER[step.state].symbol}
             </span>
-            <p className={step.state === 'notReached' ? 'text-muted' : 'font-[600]'}>{step.label}</p>
+            <p className={step.state === 'notReached' ? 'text-muted' : 'font-semibold'}>{step.label}</p>
             <p className="text-sm text-muted">
               {STATE_TEXT[step.state]}
               {step.time && ` · ${formatDateTime(step.time)}`}
@@ -130,6 +125,7 @@ function Progress({ order }: { order: Order }) {
           </li>
         ))}
       </ol>
+      {actions}
     </section>
   )
 }
@@ -146,7 +142,7 @@ function Pickup({ supplierId }: { supplierId: string }) {
   return (
     <div className="flex items-start gap-3">
       <SupplierThumbnail supplier={s} />
-      <div className="grid min-w-0 gap-1">
+      <div className="grid min-w-0 grid-cols-1 gap-1">
         <p className="wrap-anywhere">{s.name}</p>
         <p className="text-sm text-muted wrap-anywhere">
           {s.type} · {s.zone} · {s.address}
@@ -191,7 +187,7 @@ function Details({ order, role }: { order: Order; role: string | null }) {
         <div className="min-w-0 sm:col-span-2">
           <dt className="ds-label">Items</dt>
           <dd className="mt-1">
-            <ul className="m-0 grid list-disc gap-1 pl-5">
+            <ul className="m-0 grid list-disc grid-cols-1 gap-1 pl-5">
               {order.item_lines.map((line, i) => (
                 <li key={i} className="wrap-anywhere">
                   {line}
@@ -202,7 +198,7 @@ function Details({ order, role }: { order: Order; role: string | null }) {
         </div>
         <div className="min-w-0">
           <dt className="ds-label">Reward</dt>
-          <dd className="mt-1 font-[600]">{order.credit_reward} credits</dd>
+          <dd className="mt-1 font-semibold">{order.credit_reward} credits</dd>
         </div>
         {role && (
           <div className="min-w-0">
@@ -263,8 +259,11 @@ export function ErrandDetailPage() {
   const data = order.data
   const role = !data || !me ? null : data.requester_id === me ? 'Requester' : data.courier_id === me ? 'Courier' : null
 
+  // The Errands page passes the tab it was showing, so going back lands on the same list.
+  const location = useLocation()
+  const from = (location.state as { from?: string } | null)?.from
   const back = (
-    <Link to={ERRANDS_PATH} className="ds-btn ds-btn--glass">
+    <Link to={from ?? errandsTabFor(role)} className="ds-btn ds-btn--glass">
       Back to errands
     </Link>
   )
@@ -305,7 +304,10 @@ export function ErrandDetailPage() {
       >
         {(result) => (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-            <Progress order={result} />
+            <Progress
+              order={result}
+              actions={<ErrandActions order={result} me={me} allowed={result.allowed_transitions ?? []} />}
+            />
             <Details order={result} role={role} />
             <Chat order={result} role={role} />
           </div>

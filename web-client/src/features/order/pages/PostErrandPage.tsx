@@ -1,11 +1,11 @@
 import { MapPin } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
+import { useNavigate } from 'react-router'
 import type { ComponentType, SubmitEvent } from 'react'
 import { useRecommendation } from '@/api/recommendation/recommendations'
 import { useCreateOrder } from '@/api/order/order'
 import { useWalkingRoute } from '@/api/supplier/suppliers'
 import { LoadingState } from '@/components/LoadingState'
-import { Notice } from '@/components/Notice'
 import { QueryView } from '@/components/QueryView'
 import { SubmitButton } from '@/components/SubmitButton'
 import { Page } from '@/components/Page'
@@ -38,7 +38,7 @@ function defaultNeededBy(now = new Date()): string {
 export function PostErrandPage() {
   const recommend = useRecommendation()
   const create = useCreateOrder()
-  const ERRANDS_PATH = '/errands'
+  const navigate = useNavigate()
   const fieldErrors = fieldErrorsOf(create.error)
 
   const [supplier, setSupplier] = useState<Supplier | null>(null)
@@ -50,7 +50,6 @@ export function PostErrandPage() {
   const [neededBy, setNeededBy] = useState(defaultNeededBy)
   const [itemsText, setItemsText] = useState('')
   const [credits, setCredits] = useState('')
-  const [posted, setPosted] = useState(false)
   const [picking, setPicking] = useState(false)
 
   // Measured as soon as both ends are chosen, so the walk shows before posting.
@@ -68,10 +67,7 @@ export function PostErrandPage() {
     recommend.mutate(
       { supplierId, location, neededBy: neededBy ? new Date(neededBy).toISOString() : '', items },
       {
-        onSuccess: (data) => {
-          setCredits(String(data.recommendedCredits))
-          console.log('recommendation factors', data.features)
-        },
+        onSuccess: (data) => setCredits(String(data.recommendedCredits)),
       },
     )
   }
@@ -99,44 +95,33 @@ export function PostErrandPage() {
       creditReward: Number(credits),
     },
     {
-      onSuccess: () => setPosted(true),
+      // Straight to the list the new errand is in; the notice shows once at the top.
+      onSuccess: () =>
+        navigate('/errands?tab=requests', {
+          state: { notice: 'Errand posted. Couriers can accept it now.' },
+        }),
     },
     )
-  }
-
-  function resetForm() {
-    setSupplier(null)
-    setLocation('')
-    setDropOff(null)
-    setPickingDropOff(false)
-    setNeededBy(defaultNeededBy())
-    setItemsText('')
-    setCredits('')
-    setPosted(false)
-
-    create.reset()
-    recommend.reset()
   }
 
   const suggestion = recommend.data
 
   return (
     <Page title="Post an errand" subtitle="Describe the errand and set the credits you'll offer">
-      {!posted ? (
-        <form noValidate className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
+      <form noValidate className="ds-surface grid max-w-xl grid-cols-1 gap-4 p-5" onSubmit={handleSubmit}>
           <FormError
             error={create.error}
             fields={['supplierId', 'deliveryLocation', 'deliveryLatitude', 'deliveryLongitude', 'neededByTime', 'itemLines', 'creditReward']}
           />
           {/* Choose pick up */}
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <span>
               Picking up from
             </span>
             {supplier ? (
               <div className="flex items-center gap-3">
                 <SupplierThumbnail supplier={supplier} />
-                <div className="grid min-w-0 flex-1 gap-1">
+                <div className="grid grid-cols-1 min-w-0 flex-1 gap-1">
                   <p className="wrap-anywhere">{supplier.name}</p>
                   <p className="text-sm text-muted wrap-anywhere">
                     {supplier.type} · {supplier.zone}
@@ -208,7 +193,7 @@ export function PostErrandPage() {
           <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} errors={fieldErrors.neededByTime}/>
           <TextField label="Items" name="items" value={itemsText} onChange={setItemsText} hint="Comma-separated, e.g. coffee, sandwich" errors={fieldErrors.itemLines}/>
 
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <TextField label="Credits" name="credits" value={credits} onChange={setCredits} inputMode="numeric" errors={fieldErrors.creditReward}/>
@@ -224,7 +209,7 @@ export function PostErrandPage() {
             </div>
 
             {suggestion && (
-              <div className="grid gap-1 text-sm">
+              <div className="grid grid-cols-1 gap-1 text-sm">
                 <p className="text-muted">
                   Suggested <span className="font-medium text-default">{suggestion.recommendedCredits}</span>{' '}
                   {suggestion.basis === 'formula' ? 'from the market rate' : '(default for a new supplier)'}
@@ -245,25 +230,6 @@ export function PostErrandPage() {
             Post errand
           </SubmitButton>
         </form>
-       ) : (
-        <div className="ds-surface grid grid-cols-1 gap-4 p-5">
-          <Notice tone="success" role="status" title="Errand posted" />
-          <p>Errand posted. You will find it under “My requests”.</p>
-          <div className="flex flex-wrap gap-3">
-            <a className="ds-btn ds-btn--primary" href={ERRANDS_PATH}>
-              View my errands
-            </a>
-            <button
-              type="button"
-              className="ds-btn"
-              onClick={resetForm}
-            >
-              Post another
-            </button>
-          </div>
-        </div>
-        ) 
-      }
       {/* show the pick up list */}
       {picking && (
         <PickUpList

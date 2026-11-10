@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { useErrandChatSlot } from '@/lib/errandChat'
+import { formatDateTime } from '@/lib/format'
 import { ErrandActions } from '../components/ErrandActions'
 import { SupplierThumbnail } from '../components/SupplierThumbnail'
 import { WalkingRoute } from '../components/WalkingRoute'
@@ -19,20 +20,6 @@ function errandsTabFor(role: string | null): string {
   if (role === 'Requester') return '/errands?tab=requests'
   if (role === 'Courier') return '/errands?tab=deliveries'
   return '/errands'
-}
-
-const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-})
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : dateTimeFmt.format(d)
 }
 
 // Status path
@@ -129,7 +116,7 @@ function Progress({ order, actions }: { order: Order; actions: ReactNode }) {
             >
               {MARKER[step.state].symbol}
             </span>
-            <p className={step.state === 'notReached' ? 'text-muted' : 'font-[600]'}>{step.label}</p>
+            <p className={step.state === 'notReached' ? 'text-muted' : 'font-semibold'}>{step.label}</p>
             <p className="text-sm text-muted">
               {STATE_TEXT[step.state]}
               {step.time && ` · ${formatDateTime(step.time)}`}
@@ -155,7 +142,7 @@ function Pickup({ supplierId }: { supplierId: string }) {
   return (
     <div className="flex items-start gap-3">
       <SupplierThumbnail supplier={s} />
-      <div className="grid min-w-0 gap-1">
+      <div className="grid min-w-0 grid-cols-1 gap-1">
         <p className="wrap-anywhere">{s.name}</p>
         <p className="text-sm text-muted wrap-anywhere">
           {s.type} · {s.zone} · {s.address}
@@ -200,7 +187,7 @@ function Details({ order, role }: { order: Order; role: string | null }) {
         <div className="min-w-0 sm:col-span-2">
           <dt className="ds-label">Items</dt>
           <dd className="mt-1">
-            <ul className="m-0 grid list-disc gap-1 pl-5">
+            <ul className="m-0 grid list-disc grid-cols-1 gap-1 pl-5">
               {order.item_lines.map((line, i) => (
                 <li key={i} className="wrap-anywhere">
                   {line}
@@ -211,7 +198,7 @@ function Details({ order, role }: { order: Order; role: string | null }) {
         </div>
         <div className="min-w-0">
           <dt className="ds-label">Reward</dt>
-          <dd className="mt-1 font-[600]">{order.credit_reward} credits</dd>
+          <dd className="mt-1 font-semibold">{order.credit_reward} credits</dd>
         </div>
         {role && (
           <div className="min-w-0">

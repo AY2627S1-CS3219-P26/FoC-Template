@@ -67,10 +67,7 @@ export function PostErrandPage() {
     recommend.mutate(
       { supplierId, location, neededBy: neededBy ? new Date(neededBy).toISOString() : '', items },
       {
-        onSuccess: (data) => {
-          setCredits(String(data.recommendedCredits))
-          console.log('recommendation factors', data.features)
-        },
+        onSuccess: (data) => setCredits(String(data.recommendedCredits)),
       },
     )
   }
@@ -111,20 +108,20 @@ export function PostErrandPage() {
 
   return (
     <Page title="Post an errand" subtitle="Describe the errand and set the credits you'll offer">
-      <form noValidate className="ds-surface grid max-w-xl gap-4 p-5" onSubmit={handleSubmit}>
+      <form noValidate className="ds-surface grid max-w-xl grid-cols-1 gap-4 p-5" onSubmit={handleSubmit}>
           <FormError
             error={create.error}
             fields={['supplierId', 'deliveryLocation', 'deliveryLatitude', 'deliveryLongitude', 'neededByTime', 'itemLines', 'creditReward']}
           />
           {/* Choose pick up */}
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <span>
               Picking up from
             </span>
             {supplier ? (
               <div className="flex items-center gap-3">
                 <SupplierThumbnail supplier={supplier} />
-                <div className="grid min-w-0 flex-1 gap-1">
+                <div className="grid grid-cols-1 min-w-0 flex-1 gap-1">
                   <p className="wrap-anywhere">{supplier.name}</p>
                   <p className="text-sm text-muted wrap-anywhere">
                     {supplier.type} · {supplier.zone}
@@ -196,7 +193,7 @@ export function PostErrandPage() {
           <TextField label="Needed by" name="neededBy" type="datetime-local" value={neededBy} onChange={setNeededBy} errors={fieldErrors.neededByTime}/>
           <TextField label="Items" name="items" value={itemsText} onChange={setItemsText} hint="Comma-separated, e.g. coffee, sandwich" errors={fieldErrors.itemLines}/>
 
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <TextField label="Credits" name="credits" value={credits} onChange={setCredits} inputMode="numeric" errors={fieldErrors.creditReward}/>
@@ -212,7 +209,7 @@ export function PostErrandPage() {
             </div>
 
             {suggestion && (
-              <div className="grid gap-1 text-sm">
+              <div className="grid grid-cols-1 gap-1 text-sm">
                 <p className="text-muted">
                   Suggested <span className="font-medium text-default">{suggestion.recommendedCredits}</span>{' '}
                   {suggestion.basis === 'formula' ? 'from the market rate' : '(default for a new supplier)'}

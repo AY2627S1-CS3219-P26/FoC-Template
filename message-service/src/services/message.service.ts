@@ -29,10 +29,8 @@ function between(firstId: string, secondId: string) {
     };
 }
 
-export async function createMessage(senderId: string, receiverId: string, content: string) {
-    return Message.create({ senderId, receiverId, content, status: "unread" });
-
-
+export async function createMessage(senderId: string, receiverId: string, orderId: string, content: string) {
+    return Message.create({ senderId, receiverId, orderId, content, status: "unread" });
 }
 
 export async function markConversationAsRead(senderId: string, receiverId: string) {
@@ -47,6 +45,20 @@ export async function getLastMessageBetween(firstId: string, secondId: string) {
 // Page 1 is the newest messages, since a chat opens at its end. Each page reads oldest first.
 export async function getConversation(firstId: string, secondId: string, page: number, pageSize: number) {
     const filter = between(firstId, secondId);
+    const [newestFirst, total] = await Promise.all([
+        Message.find(filter)
+            .sort({ createdAt: -1, _id: -1 })
+            .skip((page - 1) * pageSize)
+            .limit(pageSize),
+        Message.countDocuments(filter),
+    ]);
+
+    return { items: newestFirst.reverse(), page, pageSize, total };
+}
+
+// The messages about one errand, paged like getConversation.
+export async function getErrandConversation(orderId: string, page: number, pageSize: number) {
+    const filter = { orderId };
     const [newestFirst, total] = await Promise.all([
         Message.find(filter)
             .sort({ createdAt: -1, _id: -1 })

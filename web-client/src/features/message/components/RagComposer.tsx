@@ -51,7 +51,14 @@ export function RagComposer({ messages, senderId, addMessage }: MessageComposerP
 
 
         addMessage(userMessage)
-        const data = await postPrompt(text, messages.map((m) => m.content))
+        const data = await postPrompt(text, messages.map(
+            (m: Message) => {
+                return {
+                    "role": m.senderId == senderId ? "user" : "assistent",
+                    "content": m.content
+                }
+            })
+        )
 
         const ragMessage: Message = {
             _id: generateUniqueId(),

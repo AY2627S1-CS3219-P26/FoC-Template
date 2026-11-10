@@ -1,7 +1,8 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { ALICE, BOB, cookieOf, useFakeUserService, userServiceDown } from "./helpers/auth.ts";
+import { ACTIVE_ERRAND, ALICE, BOB, CAROL, COMPLETED_ERRAND, OPEN_ERRAND, cookieOf, orderServiceDown, useFakeUserService, userServiceDown } from "./helpers/auth.ts";
+import Message from "../src/models/message.model.ts";
 import { useTestDatabase } from "./helpers/db.ts";
 
 useTestDatabase();
@@ -29,7 +30,7 @@ describe("authorization", () => {
     });
 
     it("does not let a third person read a conversation", async () => {
-        await send("alice-token", { receiverId: BOB, content: "hi" });
+        await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "hi" });
         const res = await request(app).get(`/messages/${ALICE}/${BOB}`).set("Cookie", cookieOf("carol-token"));
         expect(res.status).toBe(403);
     });
@@ -37,26 +38,26 @@ describe("authorization", () => {
 
 describe("sending", () => {
     it("saves the message with the logged-in account as sender", async () => {
-        const res = await send("alice-token", { receiverId: BOB, content: "hi bob", senderId: "someone-else" });
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "hi bob", senderId: "someone-else" });
         expect(res.status).toBe(201);
         expect(res.body).toMatchObject({ senderId: ALICE, receiverId: BOB, content: "hi bob", status: "unread" });
     });
 
     it("refuses an empty message", async () => {
-        const res = await send("alice-token", { receiverId: BOB, content: "   " });
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "   " });
         expect(res.status).toBe(400);
     });
 
     it("refuses a message to Relay", async () => {
-        const res = await send("alice-token", { receiverId: "0", content: "hello relay" });
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: "0", content: "hello relay" });
         expect(res.status).toBe(400);
     });
 });
 
 describe("reading", () => {
     it("returns both directions of a conversation, oldest first", async () => {
-        await send("alice-token", { receiverId: BOB, content: "first" });
-        await send("bob-token", { receiverId: ALICE, content: "second" });
+        await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "first" });
+        await send("bob-token", { orderId: ACTIVE_ERRAND, receiverId: ALICE, content: "second" });
 
         const res = await request(app).get(`/messages/${ALICE}/${BOB}`).set("Cookie", cookieOf("alice-token"));
         expect(res.status).toBe(200);
@@ -70,12 +71,76 @@ describe("reading", () => {
     });
 
     it("lists conversations with the unread count for the reader", async () => {
-        await send("alice-token", { receiverId: BOB, content: "one" });
-        await send("alice-token", { receiverId: BOB, content: "two" });
+        await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "one" });
+        await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "two" });
 
         const res = await request(app).get("/messages/conversations").set("Cookie", cookieOf("bob-token"));
         expect(res.status).toBe(200);
         expect(res.body).toHaveLength(1);
         expect(res.body[0]).toMatchObject({ otherId: ALICE, unread: 2, lastMessage: { content: "two" } });
+    });
+});
+
+describe("errand chat", () => {
+    it("stores the errand on the message", async () => {
+        const res = await send("bob-token", { orderId: ACTIVE_ERRAND, receiverId: ALICE, content: "on my way" });
+        expect(res.status).toBe(201);
+        expect(res.body).toMatchObject({ orderId: ACTIVE_ERRAND, senderId: BOB, receiverId: ALICE });
+    });
+
+    it("refuses a message without an errand", async () => {
+        const res = await send("alice-token", { receiverId: BOB, content: "hi" });
+        expect(res.status).toBe(400);
+    });
+
+    it("refuses someone who is not on the errand, the same way as an unknown errand", async () => {
+        const stranger = await send("carol-token", { orderId: ACTIVE_ERRAND, receiverId: ALICE, content: "hi" });
+        const unknown = await send("alice-token", { orderId: "999", receiverId: BOB, content: "hi" });
+        expect(stranger.status).toBe(403);
+        expect(unknown.status).toBe(403);
+        expect(unknown.body).toEqual(stranger.body);
+    });
+
+    it("refuses a receiver who is not the other person on the errand", async () => {
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: CAROL, content: "hi" });
+        expect(res.status).toBe(403);
+    });
+
+    it("refuses chatting before a courier has accepted", async () => {
+        const res = await send("alice-token", { orderId: OPEN_ERRAND, receiverId: BOB, content: "hi" });
+        expect(res.status).toBe(403);
+    });
+
+    it("closes the chat once the errand has ended", async () => {
+        const res = await send("alice-token", { orderId: COMPLETED_ERRAND, receiverId: BOB, content: "thanks" });
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CHAT_CLOSED");
+    });
+
+    it("refuses when the order-service cannot be reached", async () => {
+        orderServiceDown();
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "hi" });
+        expect(res.status).toBe(503);
+        expect(await Message.countDocuments()).toBe(0);
+    });
+
+    it("keeps a closed chat readable for its participants", async () => {
+        await Message.create({ senderId: ALICE, receiverId: BOB, orderId: COMPLETED_ERRAND, content: "earlier" });
+
+        const res = await request(app).get(`/messages/orders/${COMPLETED_ERRAND}`).set("Cookie", cookieOf("bob-token"));
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ total: 1, open: false, otherId: ALICE });
+        expect(res.body.items[0]).toMatchObject({ content: "earlier" });
+    });
+
+    it("reports an active chat as open", async () => {
+        const res = await request(app).get(`/messages/orders/${ACTIVE_ERRAND}`).set("Cookie", cookieOf("alice-token"));
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ total: 0, open: true, otherId: BOB });
+    });
+
+    it("does not let a third person read an errand chat", async () => {
+        const res = await request(app).get(`/messages/orders/${ACTIVE_ERRAND}`).set("Cookie", cookieOf("carol-token"));
+        expect(res.status).toBe(403);
     });
 });

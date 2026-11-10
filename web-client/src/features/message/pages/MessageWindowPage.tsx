@@ -17,6 +17,7 @@ export function MessageWindowPage() {
   const isSystem = id === SYSTEM_SENDER_ID
   const name = useName(id, !isSystem)
   const { history, messages, addSent } = useChat(id)
+  const orderId = messages.findLast((m) => m.orderId)?.orderId
 
   return (
     <Page title={isSystem ? 'Relay' : (name.data ?? 'Conversation')}>
@@ -39,7 +40,7 @@ export function MessageWindowPage() {
         />
       )}
 
-      {!isSystem && <MessageComposer receiverId={id} onSent={addSent} />}
+      {!isSystem && <MessageComposer receiverId={id} orderId={orderId} onSent={addSent} />}
     </Page>
   )
 }

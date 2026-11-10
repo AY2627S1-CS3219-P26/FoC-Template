@@ -6,6 +6,8 @@ export type Message = {
   _id: string
   senderId: string
   receiverId: string
+  // The errand the chat belongs to. Only the welcome message from Relay has none.
+  orderId?: string
   content: string
   status: MessageStatus
   createdAt: string

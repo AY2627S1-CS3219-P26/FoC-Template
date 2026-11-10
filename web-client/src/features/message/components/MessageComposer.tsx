@@ -10,10 +10,12 @@ const SEND_TIMEOUT_MS = 5000
 
 type MessageComposerProps = {
   receiverId: string
+  // Replies continue the chat of the newest errand. Without one there is nothing to reply on.
+  orderId: string | undefined
   onSent: (message: Message) => void
 }
 
-export function MessageComposer({ receiverId, onSent }: MessageComposerProps) {
+export function MessageComposer({ receiverId, orderId, onSent }: MessageComposerProps) {
   const queryClient = useQueryClient()
   const { socket } = useMessage()
   const [text, setText] = useState('')
@@ -22,7 +24,7 @@ export function MessageComposer({ receiverId, onSent }: MessageComposerProps) {
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = text
-    if (!socket || !content.trim()) return
+    if (!socket || !orderId || !content.trim()) return
 
     setError(null)
     setText('')
@@ -30,7 +32,7 @@ export function MessageComposer({ receiverId, onSent }: MessageComposerProps) {
     // On a refusal or no answer the text goes back into the field, so nothing typed is lost.
     socket
       .timeout(SEND_TIMEOUT_MS)
-      .emit('sendMessage', { receiverId, content }, (err: Error | null, saved: Message | SocketError) => {
+      .emit('sendMessage', { orderId, receiverId, content }, (err: Error | null, saved: Message | SocketError) => {
         if (err) {
           setText(content)
           setError('The message service did not answer. Try again.')
@@ -60,6 +62,11 @@ export function MessageComposer({ receiverId, onSent }: MessageComposerProps) {
             Messages can be sent as soon as the connection is back.
           </Notice>
         )}
+        {!orderId && (
+          <Notice tone="info" role="status" title="No errand to reply on">
+            Chats belong to an errand. Start one from an errand you share once a courier has accepted it.
+          </Notice>
+        )}
         {error && <Notice tone="danger" role="alert" title={error} />}
         <div className="ds-surface ds-surface--chrome flex gap-2 p-2">
           <input
@@ -69,7 +76,7 @@ export function MessageComposer({ receiverId, onSent }: MessageComposerProps) {
             onChange={(e) => setText(e.target.value)}
             placeholder="Type a message"
           />
-          <button type="submit" className="ds-btn ds-btn--primary" aria-disabled={!socket}>
+          <button type="submit" className="ds-btn ds-btn--primary" aria-disabled={!socket || !orderId}>
             Send
           </button>
         </div>

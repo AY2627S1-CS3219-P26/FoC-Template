@@ -19,6 +19,8 @@ type Tab = 'browse' | 'requests' | 'deliveries'
 type Flash = { kind: 'ok' | 'error'; text: string }
 
 const TERMINAL: OrderStatus[] = ['Completed', 'Cancelled', 'Expired']
+// Mirrors CHAT_OPEN_STATUSES in message-service: a chat opens when a courier accepts and closes when the errand ends.
+const CHAT_OPEN: OrderStatus[] = ['Accepted', 'PickedUp', 'Delivered']
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   Pending: 'Pending',
@@ -357,7 +359,12 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
       {note && <p className="text-sm text-muted">{note}</p>}
 
       <div className="mt-auto flex flex-wrap justify-center gap-2">
-        <MessageErrand receiverId={(isRequester ? order.courier_id : order.requester_id) || ""} />
+        {CHAT_OPEN.includes(order.status) && order.courier_id && (
+          <MessageErrand
+            receiverId={isRequester ? order.courier_id : order.requester_id}
+            orderId={String(order.id)}
+          />
+        )}
 
         <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
           View details

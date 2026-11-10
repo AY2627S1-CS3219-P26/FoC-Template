@@ -29,6 +29,6 @@ export function useConversation(accountId: string, otherId: string) {
   })
 }
 
-export function postMessage(content: string, receiverId: string) {
-  return request<Message>('message', '/messages/send', { method: 'POST', body: { receiverId, content } })
+export function postMessage(content: string, receiverId: string, orderId: string) {
+  return request<Message>('message', '/messages/send', { method: 'POST', body: { orderId, receiverId, content } })
 }

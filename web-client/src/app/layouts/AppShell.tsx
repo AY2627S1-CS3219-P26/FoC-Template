@@ -1,11 +1,11 @@
 import { BalanceCard } from '@/features/credit/components/BalanceCard'
 import { RagWindowPage } from '@/features/message/pages/RagWindowPage'
-import { RagButton } from '@/features/rag/components/RagButton'
 import { LogoutButton } from '@/features/user/components/LogoutButton'
 import { appNav } from '../navigation'
 import { Shell } from './Shell'
 import { SideNav } from './SideNav'
 import { TabBar } from './TabBar'
+import { RagButton } from '@/features/rag/components/RagButton'
 
 export function AppShell() {
   return (

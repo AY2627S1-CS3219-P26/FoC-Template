@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
 import Message from "../src/models/message.model.ts";
 import SocketServer from "../src/webSocket.ts";
-import { ALICE, BOB, CAROL, cookieOf, useFakeUserService } from "./helpers/auth.ts";
+import { ACTIVE_ERRAND, ALICE, BOB, CAROL, COMPLETED_ERRAND, cookieOf, useFakeUserService } from "./helpers/auth.ts";
 import { useTestDatabase } from "./helpers/db.ts";
 
 useTestDatabase();
@@ -48,7 +48,7 @@ describe("socket", () => {
         const bob = await connect("bob-token");
 
         const received = nextEvent<{ senderId: string; content: string }>(bob, "receiveMessage");
-        const saved = await alice.emitWithAck("sendMessage", { receiverId: BOB, content: "hi", senderId: CAROL });
+        const saved = await alice.emitWithAck("sendMessage", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "hi", senderId: CAROL });
 
         expect(saved.senderId).toBe(ALICE);
         expect(await received).toMatchObject({ senderId: ALICE, content: "hi" });
@@ -56,14 +56,20 @@ describe("socket", () => {
 
     it("answers a refused message with a reason", async () => {
         const alice = await connect("alice-token");
-        const result = await alice.emitWithAck("sendMessage", { receiverId: BOB, content: "" });
+        const result = await alice.emitWithAck("sendMessage", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "" });
         expect(result.error.code).toBe("VALIDATION_FAILED");
+    });
+
+    it("answers a message on a closed errand with a reason", async () => {
+        const alice = await connect("alice-token");
+        const result = await alice.emitWithAck("sendMessage", { orderId: COMPLETED_ERRAND, receiverId: BOB, content: "thanks" });
+        expect(result.error.code).toBe("CHAT_CLOSED");
     });
 
     it("marks messages as read and tells the sender once", async () => {
         const alice = await connect("alice-token");
         const bob = await connect("bob-token");
-        await alice.emitWithAck("sendMessage", { receiverId: BOB, content: "hi" });
+        await alice.emitWithAck("sendMessage", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "hi" });
 
         const told = nextEvent<{ readerId: string }>(alice, "messagesRead");
         expect(await bob.emitWithAck("markAsRead", { senderId: ALICE })).toEqual({ changed: 1 });

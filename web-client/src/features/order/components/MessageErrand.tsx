@@ -8,9 +8,10 @@ import { TextAreaField } from '@/components/TextAreaField'
 
 type MessageErrandProps = {
     receiverId: string
+    orderId: string
 }
 
-export function MessageErrand({ receiverId }: MessageErrandProps) {
+export function MessageErrand({ receiverId, orderId }: MessageErrandProps) {
     const [text, setText] = useState('')
     const [isOpen, setIsOpen] = useState(false)
     const [isSending, setIsSending] = useState(false)
@@ -25,7 +26,7 @@ export function MessageErrand({ receiverId }: MessageErrandProps) {
         setError(null)
 
         try {
-            await postMessage(text.trim(), receiverId)
+            await postMessage(text.trim(), receiverId, orderId)
             setText('')
             setIsOpen(false)
         } catch (err) {

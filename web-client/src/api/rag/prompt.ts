@@ -7,13 +7,20 @@ export interface queryResponse {
     response: string,
 }
 
+export interface Conversation {
+    role: string
+    content: string
 
-export async function postPrompt(prompt: string, conversations: string[]) {
+}
+
+
+export async function postPrompt(prompt: string, conversations: Conversation[]) {
     try {
         const body = {
             query: prompt,
             conversations
         }
+
         const method = 'POST';
         return await request<queryResponse>('rag', '/query/', { method, body })
     } catch {

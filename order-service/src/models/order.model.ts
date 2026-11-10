@@ -238,7 +238,9 @@ export const OrderModel = {
                         'deliverySupplierId', delivery_location,
                         'creditReward', credit_reward,
                         'itemCount', coalesce(array_length(item_lines, 1), 0),
-                        'distance', route_metres
+                        'distance', route_metres,
+                        'neededBy', needed_by_time,
+                        'postedAt', created_at
                     )
                 FROM updated WHERE status IN ('Completed', 'Cancelled', 'Expired', 'Rejected')
             )

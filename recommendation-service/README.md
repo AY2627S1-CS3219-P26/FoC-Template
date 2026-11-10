@@ -1,7 +1,7 @@
 # recommendation-service
 
-Credit recommendation service. Minimal TypeScript + Express skeleton — no database
-or broker yet, and not wired into `compose.yaml`.
+Credit recommendation service with per-supplier scoring, completed-errand consumption,
+and an offline weight trainer. Compose uses an in-memory feature store by default.
 
 ## Layout
 
@@ -38,14 +38,15 @@ curl http://localhost:3006/health
 # {"status":"ok"}
 ```
 
-Other scripts: `npm start` (no watch), `npm run typecheck` (`tsc --noEmit`).
+Other scripts: `npm start` (no watch), `npm run typecheck` (`tsc --noEmit`), `npm test`.
+New tests are kept locally under `test/` and ignored by Git; existing tracked tests remain tracked.
 
 ## How a recommendation is worked out
 
 We price an errand from the supplier's recent history plus three things about the request:
 how many items, how soon it's needed, and how far the delivery is.
 
-If the supplier has fewer than 5 completed errands we don't trust its averages yet, so we just
+If the supplier has fewer than 3 completed errands we don't trust its averages yet, so we just
 suggest a flat 10 credits.
 
 Otherwise we start from the supplier's recent average reward (the "market rate") and nudge it:
@@ -70,26 +71,39 @@ weights both update on their own — see below.
 
 ## Learning loop (two-speed), both OFF the request path
 
-The request path does one local feature-store read and scores. Nothing below it touches that path.
+The request path does one feature-store read and scores. Everything below runs asynchronously and never blocks it.
 
-**Fast cadence (seconds), the market rate.** `order.errand.completed` events are consumed
-asynchronously and folded into each supplier's rolling averages (EWMA) in the feature store. The
-read path sees fresher numbers on the next request, but never waits on an event.
+- **Fast — the market rate (seconds).** A worker consumes `order.errand.completed` and folds each outcome into the supplier's rolling EWMA averages (`avgReward`, `avgItems`, `avgDist`). The next request reads the fresher numbers; it never waits on an event.
+- **Slow — the weights (batch).** `npm run trainer` reads the training samples from S3, refits `a`, `b`, `c`, and writes them to the `scorer_weights` DynamoDB item (`id = "current"`). The API's `WeightsProvider` polls that item every ~30 min and swaps them in — no redeploy, no added latency. Scheduling the trainer is a deployment concern; this repo doesn't provision it.
 
-**Slow cadence (~30 min), the weights `a`, `b`, `c`.** An EventBridge schedule triggers
-`src/trainer/refit-weights.ts` as a batch job (App Runner job, Lambda, or a scheduled task). It reads
-the append-only recommendation logs from S3, refits the weights, and writes them to the
-`scorer_weights` DynamoDB item (`id = "current"`). The API's `WeightsProvider` polls that item every
-~30 min off the request path and swaps them in, so the next request scores with the new weights with
-no redeploy and no added latency.
+### Training samples
 
-Recommendation logs are buffered in memory and shipped to S3 as newline-delimited JSON objects under
-`recommendations/YYYY/MM/DD/`; `record()` is called after the response is sent, so logging never adds
-to request latency. Set `S3_BUCKET` to enable it (unset = disabled, for local dev).
+Each completed outcome becomes one sample, scored against the supplier's stats from *before* that completion (needs ≥5 prior completions and a positive average reward):
 
-`refitWeights()` is a stub that returns the current weights: a real refit needs outcome labels (was
-the errand accepted/completed at that credit price?), which these logs do not yet carry. The pipeline
-(read S3 -> refit -> write DynamoDB -> API reloads) is wired end to end so only that function changes.
+```
+rewardOverMarket = completedReward / prior.avgReward - 1
+itemFactorInput  = prior.avgItems > 0 ? itemCount / prior.avgItems - 1 : 0
+urgencyInput     = urgency(neededBy, postedAt)      # 0..1, or 0 when the times are missing
+distFactorInput  = prior.avgDist > 0 ? distance / prior.avgDist - 1 : 0
+rewardOverMarket ≈ a * itemFactorInput + b * urgencyInput + c * distFactorInput
+```
+
+These features mirror the scorer, so the last line is just the scorer's formula and the fit recovers the weights that best explain the rewards people actually chose. The event carries `neededBy` and `postedAt`, so the consumer rebuilds urgency the way the scorer saw it — the deadline measured against posting time, not the already-passed completion time. If the prior `avgDist > 0` but the outcome has no measured distance, the sample is skipped rather than treated as a zero.
+
+### Trainer rules
+
+- Needs ≥20 valid samples; reads only `training/` NDJSON (including historical batches), skips malformed rows, dedups by event id.
+- A feature that doesn't vary in the batch keeps its current weight; collinear or non-finite inputs keep the whole current fit. Weights are clamped to `[0, 2]`.
+- Reads the stored weights first and writes conditionally, so a concurrent run can't overwrite a newer fit with a stale one. Too little data writes nothing; an invalid stored row or a failed read aborts. Defaults apply only before the weights item exists.
+
+### Logging and durability
+
+- **Recommendation logs** buffer in memory and ship to S3 under `recommendations/YYYY/MM/DD/` after the response is sent — never on the request path. Set `S3_BUCKET` to enable (unset = off, for local dev). These are predictions, never training targets.
+- **Training export** (DynamoDB mode) commits the stats update and a dedup receipt (`__event#<eventId>` in the feature table — no extra table) in one transaction, then writes the sample to `training/events/<eventId>.ndjson` and only acks after that write. A redelivery reuses the receipt, so a retried export never double-counts. In-memory mode keeps this only for the process lifetime.
+
+### Config (DynamoDB mode)
+
+Set `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `SCORER_WEIGHTS_TABLE`, `S3_BUCKET`, `AWS_REGION` (optionally `DYNAMODB_ENDPOINT`/`S3_ENDPOINT`). Feature table keyed by `supplierId`, weights table by `id`, plus the S3 bucket — no sort keys. Permissions: the worker needs `GetItem`/`PutItem` on the feature table and `s3:PutObject` on `training/*`; the API needs `GetItem` on both tables and `s3:PutObject` on `recommendations/*`; the trainer needs `s3:ListBucket`+`GetObject` on `training/*` and `GetItem`/`PutItem` on the weights table. The trainer reads exported env vars (`node --env-file=.env src/trainer/refit-weights.ts` to use `.env`). None of this is provisioned by the current manifests.
 
 ## Deploy (AWS, ap-southeast-1)
 
@@ -100,7 +114,7 @@ Two App Runner services run the same image, differing only by the `ROLE` env var
 | --- | --- | --- |
 | `ROLE` | `api` | `worker` |
 | Does | serves `POST /recommendations` | consumes `order.errand.completed`, updates the feature store |
-| Env it needs | `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `SCORER_WEIGHTS_TABLE`, `S3_BUCKET`, `USER_SERVICE_URL`, `AWS_REGION` | `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `BROKER_URL` (Amazon MQ), `AWS_REGION` |
+| Env it needs | `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `SCORER_WEIGHTS_TABLE`, `S3_BUCKET`, `USER_SERVICE_URL`, `AWS_REGION` | `FEATURE_STORE=dynamodb`, `DYNAMODB_TABLE`, `S3_BUCKET`, `BROKER_URL` (Amazon MQ), `AWS_REGION` |
 
 `.github/workflows/deploy-recommendation-service.yml` runs on merge to `dev`: it typechecks and tests,
 builds the image, pushes it to ECR tagged `:<sha>` and `:dev`, then triggers a deploy of each service.

@@ -22,7 +22,8 @@ export function createRecommendationsRouter(store: FeatureStore, log: Recommenda
     router.post("/recommendations", authorize(), async (req, res) => {
         const result = validateRecommendationRequest(req.body);
         if (!result.ok) {
-            res.status(400).json({ errors: result.errors });
+            // Shared error envelope the gateway and other services use, so the web client shows the message.
+            res.status(400).json({ error: { code: "VALIDATION_ERROR", message: result.errors.join(". ") } });
             return;
         }
 

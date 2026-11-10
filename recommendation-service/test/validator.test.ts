@@ -40,7 +40,7 @@ test("rejects a negative distance", () => {
     });
 
     assert.equal(result.ok, false);
-    if (!result.ok) assert.ok(result.errors.some((e) => e.includes("distance")));
+    if (!result.ok) assert.ok(result.errors.some((e) => e.toLowerCase().includes("distance")));
 });
 
 test("returns every error and no recommendation when several rules break at once", () => {
@@ -55,10 +55,10 @@ test("returns every error and no recommendation when several rules break at once
     assert.equal(result.ok, false);
     if (!result.ok) {
         assert.equal(result.errors.length, 4);
-        assert.ok(result.errors.some((e) => e.includes("supplierId")));
-        assert.ok(result.errors.some((e) => e.includes("location")));
-        assert.ok(result.errors.some((e) => e.includes("neededBy")));
-        assert.ok(result.errors.some((e) => e.includes("items")));
+        assert.ok(result.errors.some((e) => e.includes("pickup")));
+        assert.ok(result.errors.some((e) => e.includes("drop-off")));
+        assert.ok(result.errors.some((e) => e.includes("needed-by")));
+        assert.ok(result.errors.some((e) => e.includes("item")));
     }
     assert.ok(!("data" in result));
 });

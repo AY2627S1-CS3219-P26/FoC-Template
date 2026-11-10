@@ -21,5 +21,8 @@ Thumbs.db
 # Postman workspace link (per person)
 .postman/
 
+# Playwright MCP test artifacts
+.playwright-mcp/
+
 # Python
 __pycache__/

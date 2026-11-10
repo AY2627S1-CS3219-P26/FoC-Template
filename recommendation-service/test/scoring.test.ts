@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recommendScore, type SupplierStats } from "../src/scoring.ts";
+import { countItems, recommendScore, type SupplierStats } from "../src/scoring.ts";
 
 const farFuture = () => new Date(Date.now() + 48 * 3_600_000).toISOString();
 
 const base = { lastEventId: "evt-0", updatedAt: "2026-01-01T00:00:00.000Z" };
 
-test("cold start: fewer than 5 completed errands returns the flat default", () => {
-    const stats: SupplierStats = { completedCount: 3, avgReward: 30, avgItems: 4, avgDist: 10, ...base };
+test("cold start: fewer than 3 completed errands returns the flat default", () => {
+    const stats: SupplierStats = { completedCount: 2, avgReward: 30, avgItems: 4, avgDist: 10, ...base };
     const result = recommendScore({ items: ["a", "b"], neededBy: farFuture(), distance: 10 }, stats);
 
     assert.equal(result.recommendedCredits, 10);
@@ -37,6 +37,12 @@ test("normal case: a perfectly average errand returns the market rate", () => {
     assert.equal(result.recommendedCredits, 20);
     assert.equal(result.basis, "formula");
     assert.equal(result.contributions.multiplier, 1);
+});
+
+test("countItems counts comma-separated tokens, even when one field holds several", () => {
+    assert.equal(countItems(["coffee", "sandwich"]), 2);
+    assert.equal(countItems(["coffee, sandwich", "juice"]), 3);
+    assert.equal(countItems([]), 0);
 });
 
 test("a farther-than-average delivery raises the recommendation via the distance factor", () => {

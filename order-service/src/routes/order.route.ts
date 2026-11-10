@@ -9,6 +9,9 @@ router.use(createRequireAuth(config.USER_SERVICE_URL));
 // POST /orders - Create a new errand request
 router.post("/", OrderController.createOrder);
 
+// GET /orders/admin - Get all orders, only for admin side
+router.get("/admin", OrderController.getAllOrders);
+
 // GET /orders/open - Browse open requests available for couriers[cite: 7]
 router.get("/open", OrderController.getOpenRequests);
 
@@ -24,5 +27,11 @@ router.post("/:id/accept", OrderController.acceptOrder);
 
 // PATCH /orders/:id/status - Update order lifecycle status (e.g., PICKED_UP, COMPLETED, CANCELLED)[cite: 7]
 router.patch("/:id/status", OrderController.updateStatus);
+
+// GET /admin/:id - Get specific order details, for admin view
+router.get("/admin/:id", OrderController.getOrderForAdmin);
+
+// POST /admin/:id/cancel - Cancel an order through report decision by admin
+router.post("/admin/:id/cancel", OrderController.adminCancelOrder);
 
 export default router;

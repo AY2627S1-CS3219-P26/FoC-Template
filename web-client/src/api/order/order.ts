@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { ApiError, request } from '@/lib/http'
 
 export type OrderStatus =
@@ -61,7 +61,17 @@ export type MyOrder = Order & {
   transitions: OrderTransition[]
 }
 
+export type AdminOrders = {
+  orders: Order[]
+  page: number
+  pageSize: number
+  total: number
+}
+
 export type MyOrders = { orders: MyOrder[]; accountId: string }
+
+// GET /orders/:id adds what the caller may do next, like /orders/mine.
+export type OrderDetail = Order & { allowed_transitions: OrderStatus[] }
 
 // Refetch while the page is visible so couriers see new errands and requesters see progress.
 const POLL_MS = 15_000
@@ -71,6 +81,37 @@ export function useOpenOrders() {
     queryKey: ['order', 'open'],
     queryFn: async ({ signal }) => (await request<{ data: Order[] }>('order', '/orders/open', { signal })).data,
     refetchInterval: POLL_MS,
+  })
+}
+
+export function useAllOrders(page: number, pageSize = 10, q = '', status = '') {
+  return useQuery<AdminOrders>({
+    queryKey: ['order', 'admin', page, pageSize, q, status],
+    queryFn: async ({ signal }): Promise<AdminOrders> => {
+      const response = await request<{ data: AdminOrders }>('order', '/orders/admin', {
+        query: { page, pageSize, q: q || undefined, status: status || undefined },
+        signal,
+      })
+      return response.data
+    },
+    // Keeps the current page on screen while the next one loads, as useSuppliers does.
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useAdminOrder(id: number) {
+  return useQuery({
+    queryKey: ['order', 'admin', id],
+    queryFn: async ({ signal }) => (await request<{ data: Order }>('order', `/orders/admin/${id}`, { signal })).data,
+    enabled: id > 0,
+  })
+}
+
+export function useAdminCancelOrder() {
+  const invalidate = useInvalidateOrders()
+  return useMutation({
+    mutationFn: (id: number) => request<{ data: Order }>('order', `/orders/admin/${id}/cancel`, { method: 'POST' }),
+    onSettled: invalidate,
   })
 }
 
@@ -117,10 +158,12 @@ export function useUpdateOrderStatus() {
   })
 }
 
+// For order details
+
 export function useOrder(id: number) {
   return useQuery({
     queryKey: ['order', 'detail', id],
-    queryFn: async ({ signal }) => (await request<{ data: Order }>('order', `/orders/${id}`, { signal })).data,
+    queryFn: async ({ signal }) => (await request<{ data: OrderDetail }>('order', `/orders/${id}`, { signal })).data,
     enabled: id > 0,
     refetchInterval: POLL_MS,
   })

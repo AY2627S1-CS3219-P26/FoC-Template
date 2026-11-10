@@ -1,4 +1,4 @@
-import { CirclePlus, Coins, Flag, List, Package, Store, TriangleAlert, User, Users, Wallet, MessageSquareText } from 'lucide-react'
+import { CirclePlus, Coins, Flag, List, Package, Store, User, Users, Wallet, MessageSquareText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
@@ -24,7 +24,6 @@ export const adminNav: NavItem[] = [
   { to: '/admin/orders', label: 'Orders', icon: List },
   { to: '/admin/students', label: 'Students', icon: Users },
   { to: '/admin/reports', label: 'Reports', icon: Flag },
-  { to: '/admin/disputes', label: 'Disputes', icon: TriangleAlert },
   { to: '/admin/suppliers', label: 'Suppliers', icon: Store },
   { to: '/admin/credits', label: 'Credits', icon: Coins },
 ]

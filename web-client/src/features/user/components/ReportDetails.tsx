@@ -2,6 +2,7 @@ import type { Report } from '@/api/user/types'
 import { formatDateTime } from '@/lib/format'
 import { AccountLink } from './AccountLink'
 import { ReportStateBadge } from './ReportStateBadge'
+import { ErrandStatus } from './ErrandStatus'
 
 type ReportDetailsProps = {
   report: Report
@@ -30,7 +31,7 @@ export function ReportDetails({ report }: ReportDetailsProps) {
         </div>
         <div className="min-w-0">
           <dt className="ds-label">Errand</dt>
-          <dd className="mt-1 nums-tabular">#{report.errandId}</dd>
+          <dd className="mt-1 nums-tabular">#{report.errandId} <ErrandStatus errandId={report.errandId}/></dd>
         </div>
         <div className="min-w-0">
           <dt className="ds-label">Filed</dt>

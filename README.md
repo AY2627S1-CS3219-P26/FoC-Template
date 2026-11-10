@@ -14,7 +14,7 @@ Live deployment: <https://relay.54-254-126-243.sslip.io> (only while the cloud i
 | --- | --- |
 | Felix Soeren Haag | user-service, web-client, deployment (Kubernetes, AWS, CI/CD) |
 | William Kento Rasmussen | message-service (N2H), rag-service (N2H) |
-| Nguyen Viet Quang | supplier-service |
+| Nguyen Viet Quang | supplier-service, maps and walking routes (N2H) |
 | Dinh Khoat Hoang Long | credit-service, recommendation-service (N2H) |
 | Truong Kim Mai | order-service |
 
@@ -25,7 +25,7 @@ Live deployment: <https://relay.54-254-126-243.sslip.io> (only while the cloud i
 | Component | Responsibility | Stack | Data store |
 | --- | --- | --- | --- |
 | [`user-service`](user-service/README.md) | Accounts, email verification, sessions, roles; the only authority on authorization | Node.js, TypeScript, Express | MongoDB |
-| [`supplier-service`](supplier-service/README.md) | Catalogue of campus stores, facilities and landmarks | Node.js, TypeScript, Fastify | PostgreSQL |
+| [`supplier-service`](supplier-service/README.md) | Catalogue of campus stores, facilities and landmarks; walking routes from a supplier to a drop-off point on a map of the NUS area (N2H) | Node.js, TypeScript, Fastify | PostgreSQL |
 | [`order-service`](order-service/README.md) | Errand requests and their lifecycle | Node.js, TypeScript, Express | PostgreSQL |
 | [`credit-service`](credit-service/README.md) | Credit balances, reservations and transfers | Node.js, TypeScript, Express | MongoDB (replica set) |
 | [`recommendation-service`](recommendation-service/README.md) | Suggests a credit reward for a new errand from completed ones (N2H) | Node.js, TypeScript, Express | in-memory feature store |

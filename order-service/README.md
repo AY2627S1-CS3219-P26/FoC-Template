@@ -122,3 +122,10 @@ For local development, run the dependencies in Compose, set the variables in the
 npm run typecheck
 npm test
 ```
+
+## Declaration of AI-assisted work
+
+Architecture and schemas, workflow are human-made. Below are AI-assisted actions:
+
+**Debug:** Claude was used to debug the issues of Order Service not being able to receive/correctly parse information from Supplier Service
+**Generate:** Claude was used to generate the Order Life Cycle in this document

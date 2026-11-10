@@ -23,6 +23,9 @@ class RetrievalTest(unittest.TestCase):
     def test_starting_credits_question(self):
         self.assert_retrieves("how many credits do i start with", "What credits are")
 
+    def test_project_name_question(self):
+        self.assert_retrieves("what is friend on campus", "What Relay is")
+
 
 if __name__ == "__main__":
     unittest.main()

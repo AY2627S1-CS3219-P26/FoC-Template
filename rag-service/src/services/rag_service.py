@@ -11,6 +11,14 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 documents = [path.read_text(encoding="utf-8") for path in sorted(DATA_DIR.glob("*.txt"))]
 
+# Sent with every question, because the search only hands over the two closest documents and
+# the one about the name is rarely among them.
+IDENTITY = (
+    "You are the AI Help Assistant of Relay, an errand platform for NUS students. "
+    "Always call the app Relay. Friend on Campus (FoC) is only the name of the course project "
+    "Relay was built for; never call the app Friend on Campus, and only explain the name if asked."
+)
+
 
 class rag_system():
 
@@ -34,7 +42,9 @@ class rag_system():
         context = self.retrieve(question)
 
         # Create prompt
-        prompt = f"""Answer the question based only on this context:
+        prompt = f"""{IDENTITY}
+
+Answer the question based only on this context:
 
     Context:
     {chr(10).join(context)}

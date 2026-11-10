@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageCircle } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import {
   describeOrderError,
   useAcceptOrder,
@@ -13,6 +13,7 @@ import type { MyOrder, Order, OrderStatus } from '@/api/order/order'
 import { useSuppliers } from '@/api/supplier/suppliers'
 import type { Supplier } from '@/api/supplier/types'
 import { Notice } from '@/components/Notice'
+import { ACCEPT_LABEL, STATUS_ACTIONS } from '../components/statusActions'
 
 type Tab = 'browse' | 'requests' | 'deliveries'
 type Flash = { kind: 'ok' | 'error'; text: string }
@@ -41,27 +42,16 @@ const BADGE_TONE: Record<OrderStatus, string> = {
   Expired: 'bg-neutral-surface text-neutral',
 }
 
-// The states
-const ACTIONS: Partial<Record<OrderStatus, { label: (order: Order) => string; success: string; confirm?: (order: Order) => string }>> = {
-  Cancelled: {
-    label: () => 'Cancel request',
-    confirm: () => 'Cancel this errand? Your reserved credits will be released.',
-    success: 'Errand cancelled. Your credits are being released.',
-  },
-  PickedUp: { label: () => 'Mark picked up', success: 'Marked as picked up.' },
-  Delivered: { label: () => 'Mark delivered', success: 'Marked as delivered. Waiting for the requester to confirm.' },
-  Completed: {
-    label: (order) => `Confirm delivery / Pay courier ${order.credit_reward} credits`,
-    confirm: (order) => `Confirm you received everything? ${order.credit_reward} credits go to your courier.`,
-    success: 'Delivery confirmed. Credits are on their way to your courier.',
-  },
-}
-
 const TABS = [
   ['browse', 'Browse open'],
   ['requests', 'My requests'],
   ['deliveries', 'My deliveries'],
 ] as const
+
+// The tab lives in the URL, so the errand page can send the student back to the list they came from.
+function tabOf(value: string | null): Tab {
+  return value === 'requests' || value === 'deliveries' ? value : 'browse'
+}
 
 const dateFmt = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',
@@ -85,8 +75,16 @@ function relativeTo(iso: string, now: number): string {
 }
 
 export function ErrandsPage() {
-  const [tab, setTab] = useState<Tab>('browse')
-  const [flash, setFlash] = useState<Flash | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = tabOf(searchParams.get('tab'))
+  const setTab = (next: Tab) =>
+    setSearchParams(next === 'browse' ? {} : { tab: next }, { replace: true })
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Post an errand sends the student here with a notice to show once.
+  const arrival = (location.state as { notice?: string } | null)?.notice
+  const [flash, setFlash] = useState<Flash | null>(arrival ? { kind: 'ok', text: arrival } : null)
+  const from = location.pathname + location.search
   const [busy, setBusy] = useState<number[]>([])
   const [now, setNow] = useState(() => Date.now())
 
@@ -110,6 +108,11 @@ export function ErrandsPage() {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  // Cleared right away, so a reload or going back does not show "Errand posted" again.
+  useEffect(() => {
+    if (arrival) navigate(location.pathname + location.search, { replace: true, state: null })
+  }, [arrival, navigate, location.pathname, location.search])
 
   useEffect(() => {
     if (flash?.kind !== 'ok') return
@@ -228,6 +231,7 @@ export function ErrandsPage() {
                     allowed={'allowed_transitions' in order ? order.allowed_transitions : []}
                     now={now}
                     supplier={supplierName(order.supplier_id)}
+                    from={from}
                     busy={busy.includes(order.id)}
                     onAccept={() => void accept(order)}
                     onStatus={(status, success) => void setStatus(order, status, success)}
@@ -266,6 +270,8 @@ function emptyText(tab: Tab): string {
 
 interface CardProps {
   order: Order
+  // The list this card is shown in, handed to the errand page for its back link.
+  from: string
   me: string | null
   allowed: OrderStatus[]
   now: number
@@ -283,7 +289,7 @@ const VARIANT_CLASS: Record<Variant, string> = {
 }
 
 
-function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatus }: CardProps) {
+function ErrandCard({ order, me, allowed, now, supplier, from, busy, onAccept, onStatus }: CardProps) {
   const isRequester = me !== null && order.requester_id === me
   const isCourier = me !== null && order.courier_id === me
   const pastDue = order.status === 'Open' && new Date(order.needed_by_time).getTime() < now
@@ -302,10 +308,10 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
     )
 
   if (order.status === 'Open' && !isRequester) {
-    button('accept', 'Accept errand', onAccept, 'primary')
+    button('accept', ACCEPT_LABEL, onAccept, 'primary')
   }
   for (const status of allowed) {
-    const action = ACTIONS[status]
+    const action = STATUS_ACTIONS[status]
     if (!action) continue
     const { confirm } = action
     const change = () => onStatus(status, action.success)
@@ -355,12 +361,12 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
       {note && <p className="text-sm text-muted">{note}</p>}
 
       <div className="mt-auto flex flex-wrap justify-center gap-2">
-        <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
+        <Link to={`/errands/${order.id}`} state={{ from }} className="ds-btn ds-btn--glass">
           View details
         </Link>
         {/* The chat lives on the errand page; the message-service decides whether it still takes messages. */}
         {order.courier_id && (isRequester || isCourier) && !TERMINAL.includes(order.status) && (
-          <Link to={`/errands/${order.id}#chat`} className="ds-btn ds-btn--glass">
+          <Link to={`/errands/${order.id}#chat`} state={{ from }} className="ds-btn ds-btn--glass">
             <MessageCircle aria-hidden="true" />
             Chat
           </Link>

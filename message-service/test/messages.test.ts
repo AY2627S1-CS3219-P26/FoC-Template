@@ -1,6 +1,7 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.ts";
+import { socketServer } from "../src/index.ts";
 import { ACTIVE_ERRAND, ALICE, BOB, CAROL, COMPLETED_ERRAND, OPEN_ERRAND, cookieOf, orderServiceDown, useFakeUserService, userServiceDown } from "./helpers/auth.ts";
 import Message from "../src/models/message.model.ts";
 import { useTestDatabase } from "./helpers/db.ts";
@@ -48,6 +49,28 @@ describe("sending", () => {
         expect(res.status).toBe(400);
     });
 
+    it("refuses a message longer than the limit", async () => {
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "x".repeat(2001) });
+        expect(res.status).toBe(400);
+    });
+
+    it("answers a body that is not JSON with a JSON error", async () => {
+        const res = await request(app)
+            .post("/messages/send")
+            .set("Cookie", cookieOf("alice-token"))
+            .set("content-type", "application/json")
+            .send("{not json");
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe("INVALID_JSON");
+    });
+
+    it("pushes the message to the receiver like the socket does", async () => {
+        vi.mocked(socketServer.sendToUser).mockClear();
+        const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "live" });
+        expect(socketServer.sendToUser).toHaveBeenCalledWith(BOB, "receiveMessage", expect.objectContaining({ content: "live" }));
+        expect(res.status).toBe(201);
+    });
+
     it("refuses a message to Relay", async () => {
         const res = await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: "0", content: "hello relay" });
         expect(res.status).toBe(400);
@@ -77,7 +100,15 @@ describe("reading", () => {
         const res = await request(app).get("/messages/conversations").set("Cookie", cookieOf("bob-token"));
         expect(res.status).toBe(200);
         expect(res.body).toHaveLength(1);
-        expect(res.body[0]).toMatchObject({ otherId: ALICE, unread: 2, lastMessage: { content: "two" } });
+        expect(res.body[0]).toMatchObject({ otherId: ALICE, orderId: ACTIVE_ERRAND, unread: 2, lastMessage: { content: "two" } });
+    });
+
+    it("lists one row per errand when two people share several errands", async () => {
+        await Message.create({ senderId: ALICE, receiverId: BOB, orderId: COMPLETED_ERRAND, content: "old errand" });
+        await send("alice-token", { orderId: ACTIVE_ERRAND, receiverId: BOB, content: "new errand" });
+
+        const res = await request(app).get("/messages/conversations").set("Cookie", cookieOf("bob-token"));
+        expect(res.body.map((c: { orderId: string }) => c.orderId)).toEqual([ACTIVE_ERRAND, COMPLETED_ERRAND]);
     });
 });
 

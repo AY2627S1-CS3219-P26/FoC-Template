@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { ZodError } from "zod";
 import { AppError } from "../errors.ts";
+import { socketServer } from "../index.ts";
 import { ConversationQuerySchema, OrderParamsSchema, SendMessageSchema } from "../schemas/message.schema.ts";
 import { checkCanChat, checkErrandParticipant } from "../services/errand.service.ts";
 import { createMessage, getConversation, getErrandConversation, getLastMessageBetween, listConversations } from "../services/message.service.ts";
@@ -64,6 +65,8 @@ export async function send(req: Request, res: Response) {
     }
 
     const message = await createMessage(senderId, receiverId, orderId, content);
+    // Same as a message sent over the socket, so the receiver sees it without reloading.
+    socketServer.sendToUser(receiverId, "receiveMessage", message);
     return res.status(201).json(message);
 }
 

@@ -45,11 +45,11 @@ All errors have the shape `{ "error": { "code": "...", "message": "...", "detail
 | Method | Path | Access | What it does |
 | --- | --- | --- | --- |
 | GET | `/health` | public | `200 {status:"ok",db:"up"}`, or `503` while the database is down |
-| GET | `/messages/conversations` | member | One row per person the caller has written with, newest first |
+| GET | `/messages/conversations` | member | One row per errand chat the caller takes part in, newest first |
 | GET | `/messages/last-message/:userId` | member | The newest message between the caller and `userId`, or `null` |
 | GET | `/messages/orders/:orderId?page=&pageSize=` | errand participant | One page of the errand's chat, with `otherId` and whether it is `open` |
 | GET | `/messages/:senderId/:receiverId?page=&pageSize=` | participant | One page of the conversation |
-| POST | `/messages/send` | errand participant | Saves a message, `201` with the message |
+| POST | `/messages/send` | errand participant | Saves a message and pushes it to the receiver like `sendMessage`, `201` with the message |
 
 A refusal is `401 UNAUTHENTICATED` without a cookie and `403 FORBIDDEN` otherwise. Reading a conversation you are not part of is refused before anything is looked up, so the answer does not reveal whether it exists.
 
@@ -68,13 +68,13 @@ A message:
 }
 ```
 
-`GET /messages/conversations` returns `[{ "otherId": "...", "lastMessage": <message>, "unread": 2 }]`, where `unread` counts the messages to the caller that are still unread. Messages from Relay have `senderId` `"0"` and no `orderId`.
+`GET /messages/conversations` returns `[{ "otherId": "...", "orderId": "42", "lastMessage": <message>, "unread": 2 }]`, where `unread` counts the messages to the caller that are still unread. Two people who share several errands get one row per errand, since each errand has its own chat. Messages from Relay have `senderId` `"0"` and no `orderId`, and form one row without `orderId`.
 
 `GET /messages/:senderId/:receiverId` returns `{ "items": [...], "page": 1, "pageSize": 20, "total": 27 }`. Page 1 holds the newest messages, and the items inside a page are oldest first, ready to show. `page` starts at 1, `pageSize` is 1 to 100 (default 20). The two ids can be given in either order.
 
 `GET /messages/orders/:orderId` returns `{ "items": [...], "page": 1, "pageSize": 20, "total": 3, "otherId": "...", "open": true }`, paged like the conversation above. Only the errand's requester and courier may read it, also after it has closed.
 
-`POST /messages/send` takes `{ "orderId": "42", "receiverId": "...", "content": "..." }` and follows the errand chat rules above. `content` must not be empty, and `receiverId` must not be `"0"`.
+`POST /messages/send` takes `{ "orderId": "42", "receiverId": "...", "content": "..." }` and follows the errand chat rules above. `content` must not be empty or longer than 2000 characters, and `receiverId` must not be `"0"`.
 
 ## Socket events
 
@@ -83,10 +83,10 @@ Connect with `io({ path: "/api/message/socket.io" })` through the gateway. Each 
 | Direction | Event | Payload | Answer |
 | --- | --- | --- | --- |
 | client → server | `sendMessage` | `{ orderId, receiverId, content }` | ack with the saved message, or `{ error: { code, message } }`, with the same codes as `POST /messages/send` |
-| client → server | `markAsRead` | `{ senderId }` | ack `{ changed }`, the number of messages marked read |
+| client → server | `markAsRead` | `{ senderId, orderId? }` | ack `{ changed }`, the number of messages marked read. With `orderId` only that errand's chat, without it every message from `senderId` |
 | client → server | `heartbeat` | none | emits `heartbeat:ack { timestamp }` |
 | server → client | `receiveMessage` | a message | sent to the receiver |
-| server → client | `messagesRead` | `{ readerId }` | sent to the sender, only when `markAsRead` changed something |
+| server → client | `messagesRead` | `{ readerId, orderId? }` | sent to the sender, only when `markAsRead` changed something |
 
 A connection without a valid session is refused with the error `FORBIDDEN`. If the session ends while connected, the next event is refused and the socket is disconnected.
 

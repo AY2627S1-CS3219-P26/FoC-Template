@@ -79,4 +79,13 @@ describe("socket", () => {
         // Nothing left to change, so nothing is announced.
         expect(await bob.emitWithAck("markAsRead", { senderId: ALICE })).toEqual({ changed: 0 });
     });
+
+    it("marks only the chat of the given errand as read", async () => {
+        await Message.create({ senderId: ALICE, receiverId: BOB, orderId: COMPLETED_ERRAND, content: "old" });
+        await Message.create({ senderId: ALICE, receiverId: BOB, orderId: ACTIVE_ERRAND, content: "new" });
+        const bob = await connect("bob-token");
+
+        expect(await bob.emitWithAck("markAsRead", { senderId: ALICE, orderId: ACTIVE_ERRAND })).toEqual({ changed: 1 });
+        expect(await Message.countDocuments({ status: "unread", orderId: COMPLETED_ERRAND })).toBe(1);
+    });
 });

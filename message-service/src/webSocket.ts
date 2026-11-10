@@ -66,8 +66,9 @@ class SocketServer {
 
                 try {
                     // Only a real change is announced, so nobody can tell a stranger their messages were read.
-                    const changed = await markConversationAsRead(parsed.data.senderId, accountId);
-                    if (changed > 0) this.io.to(parsed.data.senderId).emit('messagesRead', { readerId: accountId });
+                    const { senderId, orderId } = parsed.data;
+                    const changed = await markConversationAsRead(senderId, accountId, orderId);
+                    if (changed > 0) this.io.to(senderId).emit('messagesRead', { readerId: accountId, orderId });
                     // The client reloads its unread counts once this arrives, so they never show the old state.
                     ack({ changed });
                 } catch (err) {

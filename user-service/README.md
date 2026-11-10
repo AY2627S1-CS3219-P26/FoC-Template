@@ -20,6 +20,7 @@ From the repository root, `docker compose up --build` starts the service on http
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Outgoing email |
 | `COOKIE_SECURE` | Send the session cookie over HTTPS only (default true, false in compose for local HTTP) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME` | First administrator, created at start-up when none exists (F1.5.6) |
+| `SEED_DEMO_STUDENTS`, `SEED_DEMO_PASSWORD` | When `true`, creates the Active demo students `alice.tan`, `ben.lim`, `chloe.ng` and `daniel.koh` (`<username>@u.nus.edu`) at start-up, all with this password and announced like verified accounts. Existing accounts are left as they are. Off by default; on in `compose.yaml` and the cloud |
 
 ## API
 

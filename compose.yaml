@@ -44,6 +44,8 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nus.edu.sg}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      SEED_DEMO_STUDENTS: ${SEED_DEMO_STUDENTS:-true}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-change-me}
     # Published to this machine only, so /internal/authorize cannot be reached from the network.
     ports:
       - "127.0.0.1:3001:3000"

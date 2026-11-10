@@ -3,13 +3,14 @@ import { createApp } from "./app.ts";
 import { config } from "./config.ts";
 import { connectWithRetry } from "./db.ts";
 import { logger } from "./lib/logger.ts";
-import { ensureAdministrator } from "./bootstrap.ts";
+import { ensureAdministrator, seedDemoStudents } from "./bootstrap.ts";
 import { closeBroker } from "./broker.ts";
 import { ensureAnnouncements, startAnnouncementRelay, stopAnnouncementRelay } from "./services/announcement.service.ts";
 
 try {
     await connectWithRetry();
     await ensureAdministrator();
+    if (config.SEED_DEMO_STUDENTS) await seedDemoStudents(config.SEED_DEMO_PASSWORD!);
     await ensureAnnouncements();
 } catch(err) {
     logger.fatal({ err }, "could not start, exiting");

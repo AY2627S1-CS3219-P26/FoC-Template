@@ -13,7 +13,7 @@ export type Role = "requester" | "courier" | "admin";
 const USER_TRANSITIONS: Partial<Record<OrderStatus, { to: OrderStatus; by: Role }[]>> = {
     Open: [{ to: "Cancelled", by: "requester" }],
     Accepted: [{ to: "PickedUp", by: "courier" }, { to: "Cancelled", by: "requester" }],
-    PickedUp: [{ to: "Delivered", by: "courier" }, { to: "Cancelled", by: "admin"}],
+    PickedUp: [{ to: "Delivered", by: "courier" }],
     Delivered: [{ to: "Completed", by: "requester" }],
 };
 

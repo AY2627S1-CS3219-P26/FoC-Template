@@ -40,6 +40,34 @@ curl http://localhost:3006/health
 
 Other scripts: `npm start` (no watch), `npm run typecheck` (`tsc --noEmit`).
 
+## How a recommendation is worked out
+
+We price an errand from the supplier's recent history plus three things about the request:
+how many items, how soon it's needed, and how far the delivery is.
+
+If the supplier has fewer than 5 completed errands we don't trust its averages yet, so we just
+suggest a flat 10 credits.
+
+Otherwise we start from the supplier's recent average reward (the "market rate") and nudge it:
+
+- more items than this supplier usually gets -> up
+- needed soon (within the next 24h) -> up
+- delivery farther than usual -> up
+
+Each nudge is how far the request sits from that supplier's own average, times a weight. Add the
+nudges to 1, multiply the market rate by it, round, and keep it between 1 and 50.
+
+```
+itemFactor     = a * (items / avgItems - 1)
+urgencyFactor  = b * urgency            # 0..1, climbs over the last 24h before it's due
+distanceFactor = c * (distance / avgDist - 1)
+credits        = clamp(round(marketRate * (1 + itemFactor + urgencyFactor + distanceFactor)), 1, 50)
+```
+
+So an average-sized, average-distance, not-urgent errand lands on the market rate; anything heavier,
+farther, or more urgent costs more. Defaults are `a = 0.5`, `b = 0.5`, `c = 0.3`. The averages and the
+weights both update on their own — see below.
+
 ## Learning loop (two-speed), both OFF the request path
 
 The request path does one local feature-store read and scores. Nothing below it touches that path.
@@ -81,3 +109,13 @@ both services at the `:dev` tag.
 
 GitHub secrets: `AWS_DEPLOY_ROLE_ARN` (OIDC role the workflow assumes), `APP_RUNNER_API_ARN`,
 `APP_RUNNER_CONSUMER_ARN`.
+
+## Declaration of AI-assisted work
+
+I drew the architecture myself — the endpoints, the functions that should exist, and how the service talks to the others — and had Claude fill them in one step at a time, reviewing each result.
+
+- **Generate:** Claude was used to write the route handlers, the scoring and feature-store code, the weights trainer and the tests, one step at a time from a plan.
+- **Adapt:** Claude was used to wire the per-request distance into the scorer and keep the service in line with the other services' patterns.
+- **Debug:** Claude was used to chase down CI lint and test failures.
+- **Explain:** Claude was used to explain each change before it was committed.
+- **Document:** Claude was used to help write this document, including the scoring explanation above.

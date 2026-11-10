@@ -82,16 +82,6 @@ export type SupplierFilterValues = {
   buildings: string[]
 }
 
-// GET /suppliers/:id/availability. orderable is true only when the supplier is Active and open at `at`,
-// which is what a new errand needs (F3.1.3).
-export type SupplierAvailabilityCheck = SupplierAvailability & {
-  supplierId: string
-  at: string
-  timezone: string
-  status: SupplierStatus
-  orderable: boolean
-}
-
 // POST /suppliers/:id/route. The walk from the supplier (from) to a point. seconds is the metres at the
 // supplier-service's walking speed, and estimated is true when the point is off its walking map.
 export type WalkingRoute = {

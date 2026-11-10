@@ -11,7 +11,7 @@
 // asks the real user-service, as it would for 50 different people.
 //
 // Run it from the repository root, with the system up (docker compose up -d):
-//   docker run --rm -i --network relay_default \
+//   docker run --rm -i --network relay_edge \
 //     -v "$PWD/supplier-service/loadtest:/scripts:ro" \
 //     -e BASE=http://supplier-service:3002 -e USER_URL=http://user-service:3000 \
 //     grafana/k6 run --summary-trend-stats "avg,med,p(95),p(99),p(99.9),max" /scripts/search.js

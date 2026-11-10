@@ -70,7 +70,21 @@ export function PostErrandPage() {
       {
         onSuccess: (data) => {
           setCredits(String(data.recommendedCredits))
-          console.log('recommendation factors', data.features)
+          const f = data.features
+          console.group(`Credit recommendation: ${data.recommendedCredits} credits (${data.basis}, scorer ${data.version})`)
+          if (data.basis === 'default') {
+            console.log('Cold start: too few completed errands to trust this supplier\'s averages, so the formula is skipped and a flat default is returned.')
+          }
+          console.log("Market rate (supplier's recent average reward):", f.marketRate)
+          console.log('Weights in use — a=items, b=urgency, c=distance:', f.weights)
+          console.table({
+            'items (a)': { weight: f.weights.a, value: f.items, supplierAvg: f.avgItems, contribution: f.itemFactor },
+            'urgency (b)': { weight: f.weights.b, value: f.urgency, supplierAvg: '—', contribution: f.urgencyFactor },
+            'distance (c)': { weight: f.weights.c, value: f.distance, supplierAvg: f.avgDist, contribution: f.distanceFactor },
+          })
+          console.log(`multiplier = 1 + ${f.itemFactor.toFixed(3)} (items) + ${f.urgencyFactor.toFixed(3)} (urgency) + ${f.distanceFactor.toFixed(3)} (distance) = ${f.multiplier.toFixed(3)}`)
+          console.log(`credits = clamp(round(${f.marketRate} × ${f.multiplier.toFixed(3)}), 1, 50) = ${data.recommendedCredits}`)
+          console.groupEnd()
         },
       },
     )

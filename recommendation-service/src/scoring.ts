@@ -35,8 +35,14 @@ export type ScoreResult = {
     basis: "formula" | "default";
     contributions: {
         marketRate: number;
+        weights: Weights;
+        items: number;
+        avgItems: number;
         itemFactor: number;
+        urgency: number;
         urgencyFactor: number;
+        distance: number;
+        avgDist: number;
         distanceFactor: number;
         multiplier: number;
     };
@@ -60,19 +66,26 @@ export function urgency(neededBy: string, now: number = Date.now()): number {
 }
 
 export function recommendScore(input: ScoreInput, stats: SupplierStats, weights: Weights = DEFAULT_WEIGHTS): ScoreResult {
+    const mkt = stats.avgReward;
+    const items = countItems(input.items);
+    const urgencyValue = urgency(input.neededBy);
+
     if (stats.completedCount < COLD_START_THRESHOLD) {
         return {
             recommendedCredits: COLD_START_CREDITS,
             basis: "default",
-            contributions: { marketRate: stats.avgReward, itemFactor: 0, urgencyFactor: 0, distanceFactor: 0, multiplier: 1 },
+            contributions: {
+                marketRate: mkt, weights,
+                items, avgItems: stats.avgItems, itemFactor: 0,
+                urgency: urgencyValue, urgencyFactor: 0,
+                distance: input.distance, avgDist: stats.avgDist, distanceFactor: 0,
+                multiplier: 1,
+            },
         };
     }
 
-    const mkt = stats.avgReward;
-    const items = countItems(input.items);
-
     const itemFactor = weights.a * (stats.avgItems > 0 ? items / stats.avgItems - 1 : 0);
-    const urgencyFactor = weights.b * urgency(input.neededBy);
+    const urgencyFactor = weights.b * urgencyValue;
     const distanceFactor = weights.c * (stats.avgDist > 0 ? input.distance / stats.avgDist - 1 : 0);
     const multiplier = 1 + itemFactor + urgencyFactor + distanceFactor;
 
@@ -81,6 +94,12 @@ export function recommendScore(input: ScoreInput, stats: SupplierStats, weights:
     return {
         recommendedCredits,
         basis: "formula",
-        contributions: { marketRate: mkt, itemFactor, urgencyFactor, distanceFactor, multiplier },
+        contributions: {
+            marketRate: mkt, weights,
+            items, avgItems: stats.avgItems, itemFactor,
+            urgency: urgencyValue, urgencyFactor,
+            distance: input.distance, avgDist: stats.avgDist, distanceFactor,
+            multiplier,
+        },
     };
 }

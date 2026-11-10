@@ -10,8 +10,14 @@ export type Recommendation = {
   version: string
   features: {
     marketRate: number
+    weights: { a: number; b: number; c: number }
+    items: number
+    avgItems: number
     itemFactor: number
+    urgency: number
     urgencyFactor: number
+    distance: number
+    avgDist: number
     distanceFactor: number
     multiplier: number
   }

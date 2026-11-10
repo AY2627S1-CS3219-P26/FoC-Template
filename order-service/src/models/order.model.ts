@@ -1,5 +1,6 @@
 import { pool } from "../db.ts";
 import type { QueryResult } from "pg";
+import type { WalkingRoute } from "../services/clients.ts";
 
 export type OrderStatus =
     | "Pending"
@@ -24,6 +25,14 @@ export interface Order {
     status: OrderStatus;
     created_at: Date;
     updated_at: Date;
+    // Null on errands created before these existed. The route is also null when it could not be measured.
+    pickup_latitude: number | null;
+    pickup_longitude: number | null;
+    delivery_latitude: number | null;
+    delivery_longitude: number | null;
+    route_metres: number | null;
+    route_seconds: number | null;
+    route_estimated: boolean | null;
 }
 
 export interface OrderTransition {
@@ -44,6 +53,9 @@ export interface CreateOrderData {
     neededByTime: string;
     itemLines: string[];
     creditReward: number;
+    deliveryLatitude: number;
+    deliveryLongitude: number;
+    route: WalkingRoute | null;
 }
 
 export const OrderModel = {
@@ -51,9 +63,11 @@ export const OrderModel = {
         const query = `
             INSERT INTO orders (
                 requester_id, supplier_id, delivery_location,
-                needed_by_time, item_lines, credit_reward, status
+                needed_by_time, item_lines, credit_reward, status,
+                delivery_latitude, delivery_longitude, pickup_latitude, pickup_longitude,
+                route_metres, route_seconds, route_estimated
             )
-            VALUES ($1, $2, $3, $4, $5::text[], $6, 'Pending')
+            VALUES ($1, $2, $3, $4, $5::text[], $6, 'Pending', $7, $8, $9, $10, $11, $12, $13)
             RETURNING *;
         `;
         const values = [
@@ -62,7 +76,14 @@ export const OrderModel = {
             data.deliveryLocation,
             data.neededByTime,
             data.itemLines,
-            data.creditReward
+            data.creditReward,
+            data.deliveryLatitude,
+            data.deliveryLongitude,
+            data.route?.from.latitude ?? null,
+            data.route?.from.longitude ?? null,
+            data.route?.metres ?? null,
+            data.route?.seconds ?? null,
+            data.route?.estimated ?? null,
         ];
         const result: QueryResult<Order> = await pool.query(query, values);
         return result.rows[0];

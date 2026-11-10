@@ -2,6 +2,16 @@ import { AppError } from "../errors.ts";
 
 export type SupplierAvailability = { active: boolean; open: boolean };
 
+export type Point = { latitude: number; longitude: number };
+
+// The walk the supplier-service measured from the supplier (from) to the drop-off point. seconds is
+// metres at its preset walking speed, and estimated is true when the point is off its walking map.
+export type WalkingRoute = { from: Point; metres: number; seconds: number; estimated: boolean };
+
+const isPoint = (value: unknown): value is Point =>
+    typeof value === "object" && value !== null &&
+    Number.isFinite((value as Point).latitude) && Number.isFinite((value as Point).longitude);
+
 function unavailable(service: "supplier" | "credit"): AppError {
     return new AppError(503, `${service.toUpperCase()}_SERVICE_UNAVAILABLE`, `The ${service} service cannot be reached right now, try again later`);
 }
@@ -31,6 +41,25 @@ export function createServiceClients(supplierUrl: string, creditUrl: string, req
             const body = await response.json().catch(() => null) as { status?: unknown; open?: unknown } | null;
             if (typeof body?.open !== "boolean" || typeof body.status !== "string") throw unavailable("supplier");
             return { active: body.status === "Active", open: body.open };
+        },
+
+        // The route is an extra on the errand, so this never fails the creation: anything but a clear
+        // answer, a supplier without a map location included, is null.
+        async walkingRoute(supplierId: string, to: Point, cookie: string): Promise<WalkingRoute | null> {
+            const url = new URL(`/suppliers/${encodeURIComponent(supplierId)}/route`, supplierUrl);
+            try {
+                const response = await call(url, cookie, 2000, { method: "POST", body: JSON.stringify({ to }) });
+                if (!response.ok) return null;
+                const body = await response.json() as Partial<WalkingRoute>;
+                if (!isPoint(body.from) || !Number.isInteger(body.metres) || !Number.isInteger(body.seconds) ||
+                    typeof body.estimated !== "boolean") {
+                    return null;
+                }
+                const { from, metres, seconds, estimated } = body as WalkingRoute;
+                return { from: { latitude: from.latitude, longitude: from.longitude }, metres, seconds, estimated };
+            } catch {
+                return null;
+            }
         },
 
         async reserve(userId: string, errandRef: string, amount: number, cookie: string): Promise<void> {

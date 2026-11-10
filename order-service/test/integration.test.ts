@@ -1,19 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { allowedTransitions, createOrderService } from "../src/services/order.service.ts";
-import { createServiceClients } from "../src/services/clients.ts";
+import { createServiceClients, type WalkingRoute } from "../src/services/clients.ts";
 
 const input = {
-    supplierId: "supplier-1", deliveryLocation: "COM1",
+    supplierId: "supplier-1", deliveryLocation: "COM1", deliveryLatitude: 1.2948, deliveryLongitude: 103.7738,
     neededByTime: "2099-10-23T04:00:00.000Z", itemLines: ["Coffee"], creditReward: 5,
 };
 
+const walk: WalkingRoute = { from: { latitude: 1.2967866, longitude: 103.7732677 }, metres: 287, seconds: 221, estimated: false };
+
 function setup() {
     let order: any;
+    let created: any;
     const effects: string[] = [];
     const transitions: string[][] = [];
     const model: any = {
         async create(data: any) {
+            created = data;
             order = { id: 42, requester_id: data.requesterId, courier_id: null,
                 status: "Pending", credit_reward: data.creditReward, needed_by_time: new Date(data.neededByTime) };
             return { ...order };
@@ -41,8 +45,14 @@ function setup() {
             assert.equal(ref, "42"); assert.equal(amount, 5); assert.equal(cookie, "relay_session=valid");
             effects.push("reserve");
         },
+        async walkingRoute(_supplier: string, _to: { latitude: number; longitude: number }, _cookie: string) {
+            return walk as WalkingRoute | null;
+        },
     };
-    return { service: createOrderService(model, clients), model, clients, effects, transitions, order: () => order };
+    return {
+        service: createOrderService(model, clients), model, clients, effects, transitions,
+        order: () => order, created: () => created,
+    };
 }
 
 async function openErrand(status = "Open", courier: string | null = null) {
@@ -63,7 +73,7 @@ test("creation validates supplier and reserves credits before making an order Op
 
 test("a refused submission names every invalid field at once and creates nothing", async () => {
     const ctx = setup();
-    const body = { supplierId: "supplier-1", deliveryLocation: "x", neededByTime: "2020-01-01T00:00:00.000Z", itemLines: [], creditReward: 51 };
+    const body = { ...input, deliveryLocation: "x", neededByTime: "2020-01-01T00:00:00.000Z", itemLines: [], creditReward: 51 };
     await assert.rejects(ctx.service.createOrder("requester", body, "relay_session=valid"), {
         status: 400,
         code: "VALIDATION_FAILED",
@@ -98,6 +108,57 @@ test("a failed supplier lookup refuses the errand without creating it", async ()
     const ctx = setup();
     ctx.clients.supplierAvailability = async () => { throw Object.assign(new Error("down"), { status: 503 }); };
     await assert.rejects(ctx.service.createOrder("requester", input, "relay_session=valid"), { status: 503 });
+    assert.equal(ctx.order(), undefined);
+});
+
+test("creation keeps the drop-off point and the walk the supplier-service measured to it", async () => {
+    const ctx = setup();
+    let asked: unknown;
+    ctx.clients.walkingRoute = async (supplier, to, cookie) => {
+        asked = { supplier, to, cookie };
+        return walk;
+    };
+    await ctx.service.createOrder("requester", input, "relay_session=valid");
+    assert.deepEqual(asked, {
+        supplier: "supplier-1",
+        to: { latitude: 1.2948, longitude: 103.7738 },
+        cookie: "relay_session=valid",
+    });
+    assert.equal(ctx.created().deliveryLatitude, 1.2948);
+    assert.equal(ctx.created().deliveryLongitude, 103.7738);
+    assert.deepEqual(ctx.created().route, walk);
+});
+
+test("a distance sent by the client is ignored, only the measured walk is kept", async () => {
+    const ctx = setup();
+    await ctx.service.createOrder("requester", { ...input, routeMetres: 1, route: { metres: 1 } }, "relay_session=valid");
+    assert.deepEqual(ctx.created().route, walk);
+    assert.equal(ctx.created().routeMetres, undefined);
+});
+
+test("an errand is still created when the walk cannot be measured, just without it", async () => {
+    const ctx = setup();
+    ctx.clients.walkingRoute = async () => null;
+    const order = await ctx.service.createOrder("requester", input, "relay_session=valid");
+    assert.equal(order.status, "Open");
+    assert.equal(ctx.created().route, null);
+    assert.equal(ctx.created().deliveryLatitude, 1.2948);
+});
+
+test("the drop-off point on the map is required next to the address", async () => {
+    const ctx = setup();
+    const { deliveryLatitude: _lat, ...withoutLatitude } = input;
+    await assert.rejects(ctx.service.createOrder("requester", { ...withoutLatitude, deliveryLongitude: 200 }, "relay_session=valid"), {
+        status: 400,
+        details: { fields: {
+            deliveryLatitude: ["is required"],
+            deliveryLongitude: ["must be from -180 to 180"],
+        } },
+    });
+    await assert.rejects(ctx.service.createOrder("requester", { ...input, deliveryLatitude: "1.29" }, "relay_session=valid"), {
+        status: 400,
+        details: { fields: { deliveryLatitude: ["must be a number"] } },
+    });
     assert.equal(ctx.order(), undefined);
 });
 
@@ -256,4 +317,35 @@ test("the reservation waits 5 seconds for the credit service", async () => {
     // AbortSignal.timeout keeps no public duration, so check it is still alive well after 2 seconds would have passed.
     await new Promise((resolve) => setTimeout(resolve, 2500));
     assert.equal(signal.aborted, false, `aborted after ${Date.now() - started} ms`);
+});
+
+test("the walk is asked from the supplier route with the drop-off point in the body and the session cookie", async () => {
+    const calls: { url: URL; init: RequestInit }[] = [];
+    const clients = createServiceClients("http://supplier:3002", "http://credit:3002", async (url, init) => {
+        calls.push({ url: new URL(String(url)), init: init! });
+        return Response.json({ ...walk, mapVersion: "2026-11-09" });
+    });
+    const to = { latitude: 1.2948, longitude: 103.7738 };
+    assert.deepEqual(await clients.walkingRoute("supplier/1", to, "relay_session=valid"), walk);
+    assert.equal(calls[0].url.pathname, "/suppliers/supplier%2F1/route");
+    assert.equal(calls[0].url.search, "", "the point stays out of the URL, so no access log keeps it");
+    assert.equal(calls[0].init.method, "POST");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), { to });
+    assert.equal(new Headers(calls[0].init.headers).get("cookie"), "relay_session=valid");
+});
+
+test("a supplier without a map location, a failure or an unclear answer gives no walk instead of an error", async () => {
+    const answer = (reply: () => Promise<Response>) =>
+        createServiceClients("http://supplier", "http://credit", reply).walkingRoute("s1", { latitude: 1.29, longitude: 103.78 }, "c");
+    assert.deepEqual(await answer(async () => Response.json({ ...walk, estimated: true })), { ...walk, estimated: true });
+    for (const reply of [
+        async () => Response.json({ error: { code: "NO_LOCATION" } }, { status: 422 }),
+        async () => new Response("down", { status: 503 }),
+        async () => Response.json({ metres: 287 }),
+        async () => Response.json({ ...walk, metres: "287" }),
+        async () => new Response("not json"),
+        async () => { throw new TypeError("fetch failed"); },
+    ]) {
+        assert.equal(await answer(reply), null);
+    }
 });

@@ -607,7 +607,8 @@ describe('supplier API', { skip }, () => {
       const { id } = await create(coop)
       const response = await walk(id, park)
       assert.equal(response.status, 200, JSON.stringify(response.body))
-      const { metres, seconds, estimated, mapVersion } = response.body
+      const { from, metres, seconds, estimated, mapVersion } = response.body
+      assert.deepEqual(from, coop)
       assert.equal(estimated, false)
       assert.ok(metres > 1300 && metres < 1550, `${metres} m`)
       assert.equal(seconds, Math.round(metres / 1.3))

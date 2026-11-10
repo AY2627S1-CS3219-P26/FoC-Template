@@ -312,9 +312,14 @@ curl -X POST http://localhost:3002/suppliers/{id}/route -b cookies.txt \
 ```
 
 ```json
-{ "metres": 1424, "seconds": 1095, "estimated": false, "mapVersion": "2026-11-09" }
+{
+  "from": { "latitude": 1.2967866, "longitude": 103.7732677 },
+  "metres": 1424, "seconds": 1095, "estimated": false, "mapVersion": "2026-11-09"
+}
 ```
 
+- **Start:** `from` is the supplier's point, so a caller such as the
+  order-service can keep the point the walk was measured from.
 - **Why POST:** the point may be where a student lives, so it travels in the body.
   That keeps it out of the gateway's access log. The service does not log it and
   stores nothing.

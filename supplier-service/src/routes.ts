@@ -207,7 +207,9 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps): void {
     if (supplier.latitude === null || supplier.longitude === null) {
       throw new HttpError(422, 'NO_LOCATION', 'This supplier has no map location')
     }
-    return walkingRoute(deps.walkMap, { latitude: supplier.latitude, longitude: supplier.longitude }, parsed.value)
+    const from = { latitude: supplier.latitude, longitude: supplier.longitude }
+    // The start too, so that an errand can keep the point its walk was measured from.
+    return { from, ...walkingRoute(deps.walkMap, from, parsed.value) }
   })
 
   app.get<{ Params: Params }>('/suppliers/:id/photo', { onRequest: requires('supplier.read') }, async (request, reply) => {

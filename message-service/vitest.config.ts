@@ -16,6 +16,8 @@ export default defineConfig({
             MONGO_URL: "mongodb://unused",
             // Never called: test/helpers/auth.ts answers in place of the user-service.
             USER_SERVICE_URL: "http://user-service.test",
+            // Never called either: test/helpers/auth.ts also answers in place of the order-service.
+            ORDER_SERVICE_URL: "http://order-service.test",
             BROKER_URL: "amqp://unused",
         },
     },

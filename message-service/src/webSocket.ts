@@ -5,6 +5,8 @@ import type { Server as HttpServer } from "http";
 import { logger } from "./lib/logger.ts";
 import { cookieSocketEventMiddleware, cookieSocketMiddleware } from "./middleware/auth.ts";
 import { MarkAsReadSchema, SendMessageSchema } from "./schemas/message.schema.ts";
+import { AppError } from "./errors.ts";
+import { checkCanChat } from "./services/errand.service.ts";
 import { createMessage, markConversationAsRead } from "./services/message.service.ts";
 
 class SocketServer {
@@ -12,9 +14,7 @@ class SocketServer {
 
     constructor(httpServer: HttpServer) {
         this.io = new Server(httpServer);
-
         this.io.use(cookieSocketMiddleware);
-
         this.initializeHandlers();
     }
 
@@ -36,14 +36,20 @@ class SocketServer {
                     return;
                 }
 
+                const { orderId, receiverId, content } = parsed.data;
                 try {
-                    const message = await createMessage(accountId, parsed.data.receiverId, parsed.data.content);
+                    await checkCanChat(orderId, accountId, receiverId);
+                    const message = await createMessage(accountId, receiverId, orderId, content);
 
                     // Emit to receiver's room (targeted)
-                    this.io.to(parsed.data.receiverId).emit('receiveMessage', message);
+                    this.io.to(receiverId).emit('receiveMessage', message);
                     // Ack back to sender
                     ack(message);
                 } catch (err) {
+                    if (err instanceof AppError) {
+                        ack({ error: { code: err.code, message: err.message } });
+                        return;
+                    }
                     logger.error({ err }, "could not save message");
                     ack({ error: { code: "INTERNAL", message: "Could not send the message" } });
                 }
@@ -60,8 +66,9 @@ class SocketServer {
 
                 try {
                     // Only a real change is announced, so nobody can tell a stranger their messages were read.
-                    const changed = await markConversationAsRead(parsed.data.senderId, accountId);
-                    if (changed > 0) this.io.to(parsed.data.senderId).emit('messagesRead', { readerId: accountId });
+                    const { senderId, orderId } = parsed.data;
+                    const changed = await markConversationAsRead(senderId, accountId, orderId);
+                    if (changed > 0) this.io.to(senderId).emit('messagesRead', { readerId: accountId, orderId });
                     // The client reloads its unread counts once this arrives, so they never show the old state.
                     ack({ changed });
                 } catch (err) {

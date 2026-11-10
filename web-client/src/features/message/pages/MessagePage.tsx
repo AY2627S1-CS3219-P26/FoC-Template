@@ -9,7 +9,7 @@ export function MessagePage() {
   const conversations = useConversations()
 
   return (
-    <Page title="Messages" subtitle="Your conversations">
+    <Page title="Messages" subtitle="Your chats with the people on your errands">
       <QueryView
         query={conversations}
         loadingLabel="Loading conversations"
@@ -28,7 +28,7 @@ export function MessagePage() {
         {(items) => (
           <ul className="ds-surface ds-rows">
             {items.map((conversation) => (
-              <MessageCard key={conversation.otherId} conversation={conversation} />
+              <MessageCard key={`${conversation.otherId}-${conversation.orderId ?? ''}`} conversation={conversation} />
             ))}
           </ul>
         )}

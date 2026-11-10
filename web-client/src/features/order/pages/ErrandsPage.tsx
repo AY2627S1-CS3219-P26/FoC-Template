@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { MessageCircle } from 'lucide-react'
 import { Link } from 'react-router'
 import {
   describeOrderError,
@@ -357,6 +358,13 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
         <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
           View details
         </Link>
+        {/* The chat lives on the errand page; the message-service decides whether it still takes messages. */}
+        {order.courier_id && (isRequester || isCourier) && !TERMINAL.includes(order.status) && (
+          <Link to={`/errands/${order.id}#chat`} className="ds-btn ds-btn--glass">
+            <MessageCircle aria-hidden="true" />
+            Chat
+          </Link>
+        )}
         {actions}
       </div>
     </article>

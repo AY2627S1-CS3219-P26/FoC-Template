@@ -141,6 +141,7 @@ services:
       LOG_LEVEL: info
       MONGO_URL: mongodb://message-db:27017/message-service
       USER_SERVICE_URL: http://user-service:3000
+      ORDER_SERVICE_URL: http://order-service:3000
       BROKER_URL: amqp://relay:$(BROKER_PASSWORD)@broker:5672
 
   # No autoscaling: every instance loads the embedding model, about 600 MB.

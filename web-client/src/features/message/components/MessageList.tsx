@@ -10,6 +10,12 @@ type MessageListProps = {
   onLoadEarlier: () => void
   // Keeps room at the bottom, so the last message is never hidden behind the composer.
   reserveComposerSpace: boolean
+  // 'page': the list is part of the page and the page scrolls (the conversation page).
+  // 'self': the list scrolls inside its own box (the errand page, the assistant overlay), so a new
+  // message never moves the page around it. The box's height comes from className.
+  scroll?: 'page' | 'self'
+  className?: string
+  emptyText?: string
 }
 
 export function MessageList({
@@ -19,7 +25,11 @@ export function MessageList({
   loadingEarlier,
   onLoadEarlier,
   reserveComposerSpace,
+  scroll = 'page',
+  className = '',
+  emptyText = 'No messages yet. Say hello.',
 }: MessageListProps) {
+  const boxRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const hasScrolled = useRef(false)
   const lastMessageId = messages.at(-1)?._id
@@ -27,13 +37,19 @@ export function MessageList({
   // Only a new last message scrolls down, so loading earlier messages keeps the reader's place.
   // Opening the chat jumps straight to the newest message; later messages glide in.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: hasScrolled.current ? 'smooth' : 'instant' })
+    const behavior = hasScrolled.current ? 'smooth' : 'instant'
+    if (scroll === 'self') {
+      boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior })
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior })
+    }
     hasScrolled.current = true
-  }, [lastMessageId])
+  }, [lastMessageId, scroll])
+
+  const layout = scroll === 'self' ? 'min-h-0 content-start overflow-y-auto' : reserveComposerSpace ? 'pb-40' : ''
 
   return (
-    <div className={reserveComposerSpace ? 'grid grid-cols-1 gap-3 pb-40' : 'grid grid-cols-1 gap-3'}>
-
+    <div ref={boxRef} className={`grid grid-cols-1 gap-3 ${layout} ${className}`}>
       {hasEarlier && (
         <button
           type="button"
@@ -44,7 +60,7 @@ export function MessageList({
           Load earlier messages
         </button>
       )}
-      {messages.length === 0 && <p className="text-muted">No messages yet. Say hello.</p>}
+      {messages.length === 0 && <p className="text-muted">{emptyText}</p>}
       {messages.map((m) => (
         <MessageField
           key={m._id}

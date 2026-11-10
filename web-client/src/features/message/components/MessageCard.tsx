@@ -9,7 +9,7 @@ type MessageCardProps = {
 }
 
 export function MessageCard({ conversation }: MessageCardProps) {
-  const { otherId, lastMessage, unread } = conversation
+  const { otherId, orderId, lastMessage, unread } = conversation
   const isSystem = otherId === SYSTEM_SENDER_ID
   // Relay is not an account, so there is no name to look up.
   const name = useName(otherId, !isSystem)
@@ -17,9 +17,14 @@ export function MessageCard({ conversation }: MessageCardProps) {
 
   return (
     <li>
-      <Link to={`/message/${otherId}`} className="flex items-start justify-between gap-3 p-4">
+      {/* An errand's chat lives on its errand page. Only Relay's messages have their own page. */}
+      <Link
+        to={orderId ? `/errands/${orderId}#chat` : `/message/${otherId}`}
+        className="flex items-start justify-between gap-3 p-4"
+      >
         <div className="grid min-w-0 grid-cols-1 gap-1">
           <p className="font-semibold wrap-anywhere">{title}</p>
+          {orderId && <p className="text-sm text-subtle">Errand #{orderId}</p>}
           <p className="text-muted wrap-anywhere">{lastMessage.content}</p>
           <p className="text-sm text-subtle">{formatDateTime(lastMessage.createdAt)}</p>
         </div>

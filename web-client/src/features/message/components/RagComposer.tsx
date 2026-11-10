@@ -1,97 +1,42 @@
-
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
-import type { Message } from '@/api/message/types'
-import { postPrompt } from '@/api/rag/prompt'
+import { FormError } from '@/components/FormError'
 
-
-const RAG_ID = "1";
-
-type MessageComposerProps = {
-    messages: Message[]
-    senderId: string
-    addMessage: (message: Message) => void
+type RagComposerProps = {
+  pending: boolean
+  error: unknown
+  // Resolves false when the assistant could not answer, so the question goes back into the field.
+  onAsk: (question: string) => Promise<boolean>
 }
 
-function generateUniqueId(): string {
-    // Format: YYYYMMDDHHMMSS
-    const dateStr = new Date().toISOString()
-        .replace(/[-T:.Z]/g, '')
-        .slice(0, 14);
+export function RagComposer({ pending, error, onAsk }: RagComposerProps) {
+  const [text, setText] = useState('')
 
-    // Generate a random 4-digit number (1000 to 9999)
-    const randomNum = Math.floor(1000 + Math.random() * 9000).toString();
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const question = text.trim()
+    if (!question || pending) return
 
-    return `${dateStr}-${randomNum}`;
-}
+    setText('')
+    const answered = await onAsk(question)
+    if (!answered) setText(question)
+  }
 
-
-
-export function RagComposer({ messages, senderId, addMessage }: MessageComposerProps) {
-
-    const [text, setText] = useState('')
-
-
-    async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
-        event.preventDefault()
-
-        const userMessage: Message = {
-            _id: generateUniqueId(),
-            senderId: senderId,
-            receiverId: RAG_ID,
-            content: text,
-            status: "read",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        }
-
-
-        if (!text.trim()) return
-
-
-
-        addMessage(userMessage)
-        const data = await postPrompt(text, messages.map(
-            (m: Message) => {
-                return {
-                    "role": m.senderId == senderId ? "user" : "assistent",
-                    "content": m.content
-                }
-            })
-        )
-
-        const ragMessage: Message = {
-            _id: generateUniqueId(),
-            senderId: RAG_ID,
-            receiverId: senderId,
-            content: data?.response || "Unable to get a answer",
-            status: "read",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        }
-        addMessage(ragMessage)
-
-        setText('')
-
-    }
-
-    return (
-
-        <form
-            noValidate
-            onSubmit={handleSubmit}
-            className="flex gap-2 border-t border-border p-2"
-        >
-            <input
-                className="ds-field min-w-0 flex-1"
-                aria-label="Prompt"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Ask the assistant"
-            />
-            <button type="submit" className="ds-btn ds-btn--primary">
-                Send
-            </button>
-        </form>
-    )
+  return (
+    <form noValidate onSubmit={handleSubmit} className="grid grid-cols-1 gap-2 border-t border-border p-2">
+      <FormError error={error} />
+      <div className="flex gap-2">
+        <input
+          className="ds-field min-w-0 flex-1"
+          aria-label="Question for the assistant"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Ask the assistant"
+        />
+        <button type="submit" className="ds-btn ds-btn--primary" aria-disabled={pending}>
+          {pending ? 'Asking…' : 'Send'}
+        </button>
+      </div>
+    </form>
+  )
 }

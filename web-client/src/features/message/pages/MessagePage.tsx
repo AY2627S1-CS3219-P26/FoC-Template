@@ -5,13 +5,11 @@ import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { MessageCard } from '../components/MessageCard'
 
-
 export function MessagePage() {
   const conversations = useConversations()
 
   return (
-    <Page title="Messages" subtitle="Your conversations with people and AI">
-      <h2>People</h2>
+    <Page title="Messages" subtitle="Your chats with the people on your errands">
       <QueryView
         query={conversations}
         loadingLabel="Loading conversations"
@@ -30,7 +28,7 @@ export function MessagePage() {
         {(items) => (
           <ul className="ds-surface ds-rows">
             {items.map((conversation) => (
-              <MessageCard key={conversation.otherId} conversation={conversation} />
+              <MessageCard key={`${conversation.otherId}-${conversation.orderId ?? ''}`} conversation={conversation} />
             ))}
           </ul>
         )}

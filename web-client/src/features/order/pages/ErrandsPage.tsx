@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { MessageCircle } from 'lucide-react'
 import { Link } from 'react-router'
 import {
   describeOrderError,
@@ -12,15 +13,11 @@ import type { MyOrder, Order, OrderStatus } from '@/api/order/order'
 import { useSuppliers } from '@/api/supplier/suppliers'
 import type { Supplier } from '@/api/supplier/types'
 import { Notice } from '@/components/Notice'
-import { MessageErrand } from '../components/MessageErrand'
-//import { MessageErrand } from '../components/MessageErrand'
 
 type Tab = 'browse' | 'requests' | 'deliveries'
 type Flash = { kind: 'ok' | 'error'; text: string }
 
 const TERMINAL: OrderStatus[] = ['Completed', 'Cancelled', 'Expired']
-// Mirrors CHAT_OPEN_STATUSES in message-service: a chat opens when a courier accepts and closes when the errand ends.
-const CHAT_OPEN: OrderStatus[] = ['Accepted', 'PickedUp', 'Delivered']
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   Pending: 'Pending',
@@ -87,8 +84,6 @@ function relativeTo(iso: string, now: number): string {
   return diffMin >= 0 ? `in ${span}` : `${span} overdue`
 }
 
-
-//Insert the id of the errand owner in receiver
 export function ErrandsPage() {
   const [tab, setTab] = useState<Tab>('browse')
   const [flash, setFlash] = useState<Flash | null>(null)
@@ -201,8 +196,9 @@ export function ErrandsPage() {
               aria-selected={tab === key}
               aria-controls="errands-panel"
               onClick={() => setTab(key)}
-              className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 ${tab === key ? 'border-current font-semibold' : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
+              className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 ${
+                tab === key ? 'border-current font-semibold' : 'border-transparent opacity-70 hover:opacity-100'
+              }`}
             >
               {label}
               <span className="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-xs">{counts[key]}</span>
@@ -355,21 +351,20 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
         <dt className="ds-label">Reward</dt>
         <dd className="m-0 font-[600]">{order.credit_reward} credits</dd>
       </dl>
-
+      
       {note && <p className="text-sm text-muted">{note}</p>}
 
       <div className="mt-auto flex flex-wrap justify-center gap-2">
-        {CHAT_OPEN.includes(order.status) && order.courier_id && (
-          <MessageErrand
-            receiverId={isRequester ? order.courier_id : order.requester_id}
-            orderId={String(order.id)}
-          />
-        )}
-
         <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
           View details
         </Link>
-
+        {/* The chat lives on the errand page; the message-service decides whether it still takes messages. */}
+        {order.courier_id && (isRequester || isCourier) && !TERMINAL.includes(order.status) && (
+          <Link to={`/errands/${order.id}#chat`} className="ds-btn ds-btn--glass">
+            <MessageCircle aria-hidden="true" />
+            Chat
+          </Link>
+        )}
         {actions}
       </div>
     </article>

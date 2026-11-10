@@ -6,7 +6,6 @@ export type CompletedErrand = {
     reward: number;
     itemCount: number;
     distance: number;
-    leadTimeMin: number;
 };
 
 const ALPHA = 0.2;
@@ -20,7 +19,6 @@ export function ewmaUpdate(prev: SupplierStats | null, errand: CompletedErrand):
             avgReward: errand.reward,
             avgItems: errand.itemCount,
             avgDist: errand.distance,
-            avgLeadTimeMin: errand.leadTimeMin,
             lastEventId: errand.eventId,
             updatedAt: new Date().toISOString(),
         };
@@ -31,7 +29,6 @@ export function ewmaUpdate(prev: SupplierStats | null, errand: CompletedErrand):
         avgReward: blend(prev.avgReward, errand.reward),
         avgItems: blend(prev.avgItems, errand.itemCount),
         avgDist: blend(prev.avgDist, errand.distance),
-        avgLeadTimeMin: blend(prev.avgLeadTimeMin, errand.leadTimeMin),
         lastEventId: errand.eventId,
         updatedAt: new Date().toISOString(),
     };

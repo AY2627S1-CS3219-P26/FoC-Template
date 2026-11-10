@@ -40,14 +40,13 @@ export class DynamoFeatureStore implements FeatureStore {
                     Key: { supplierId: errand.supplierId },
                     UpdateExpression:
                         "SET completedCount = :cc, avgReward = :ar, avgItems = :ai, " +
-                        "avgDist = :ad, avgLeadTimeMin = :al, lastEventId = :eid, updatedAt = :now",
+                        "avgDist = :ad, lastEventId = :eid, updatedAt = :now",
                     ConditionExpression: "attribute_not_exists(lastEventId) OR lastEventId <> :eid",
                     ExpressionAttributeValues: {
                         ":cc": next.completedCount,
                         ":ar": next.avgReward,
                         ":ai": next.avgItems,
                         ":ad": next.avgDist,
-                        ":al": next.avgLeadTimeMin,
                         ":eid": next.lastEventId,
                         ":now": next.updatedAt,
                     },

@@ -26,7 +26,6 @@ export type SupplierStats = {
     avgReward: number;
     avgItems: number;
     avgDist: number;
-    avgLeadTimeMin: number;
     lastEventId: string;
     updatedAt: string;
 };

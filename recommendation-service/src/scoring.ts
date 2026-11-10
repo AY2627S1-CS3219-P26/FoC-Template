@@ -10,7 +10,7 @@ export const DEFAULT_WEIGHTS: Weights = { a: A, b: B, c: C };
 
 const URGENCY_HORIZON_HOURS = 24;
 
-const COLD_START_THRESHOLD = 5;
+const COLD_START_THRESHOLD = 3;
 const COLD_START_CREDITS = 10;
 const CREDIT_MIN = 1;
 const CREDIT_MAX = 50;
@@ -44,6 +44,15 @@ export type ScoreResult = {
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
+// ponytail: counts comma-separated tokens, so "coffee, sandwich" in one field still counts as 2.
+// Equals items.length when the caller already split on commas (today's frontend does).
+export function countItems(items: string[]): number {
+    return items
+        .join(",")
+        .split(",")
+        .filter((token) => token.trim() !== "").length;
+}
+
 function urgency(neededBy: string): number {
     const hoursUntil = (new Date(neededBy).getTime() - Date.now()) / 3_600_000;
     if (!Number.isFinite(hoursUntil)) return 0;
@@ -60,7 +69,7 @@ export function recommendScore(input: ScoreInput, stats: SupplierStats, weights:
     }
 
     const mkt = stats.avgReward;
-    const items = input.items.length;
+    const items = countItems(input.items);
 
     const itemFactor = weights.a * (stats.avgItems > 0 ? items / stats.avgItems - 1 : 0);
     const urgencyFactor = weights.b * urgency(input.neededBy);

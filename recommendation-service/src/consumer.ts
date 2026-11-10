@@ -1,6 +1,33 @@
 import { connect, type ConsumeMessage } from "amqplib";
+import { z } from "zod";
 import { logger } from "./lib/logger.ts";
-import type { CompletedErrand, FeatureStore } from "./feature-store.ts";
+import type { CompletedErrand, FeatureStore, TrainingSample } from "./feature-store.ts";
+import type { RecommendationLog } from "./recommendation-log.ts";
+
+const CompletedEventSchema = z.object({
+    eventId: z.string().min(1),
+    type: z.literal("order.errand.completed"),
+    data: z.object({
+        supplierId: z.string().min(1).refine(id => !id.startsWith("__event#")),
+        creditReward: z.number().nonnegative().optional(),
+        reward: z.number().nonnegative().optional(),
+        itemCount: z.number().int().nonnegative(),
+        distance: z.number().nonnegative().nullish().transform(value => value ?? undefined),
+    }).refine(data => data.creditReward !== undefined || data.reward !== undefined),
+});
+
+export function parseCompletedEvent(value: unknown): CompletedErrand {
+    const { eventId, data } = CompletedEventSchema.parse(value);
+    return {
+        eventId, supplierId: data.supplierId, reward: data.creditReward ?? data.reward!, itemCount: data.itemCount,
+        ...(data.distance === undefined ? {} : { distance: data.distance }),
+    };
+}
+
+export async function applyCompletedErrand(store: FeatureStore, errand: CompletedErrand, training?: RecommendationLog<TrainingSample>): Promise<void> {
+    const sample = await store.apply(errand);
+    if (sample && training) await training.recordDurably(sample, errand.eventId);
+}
 
 const BROKER_URL = process.env.BROKER_URL ?? "amqp://relay:change-me@localhost:5672";
 const EXCHANGE = "relay.events";
@@ -9,11 +36,11 @@ const QUEUE = "recommendation-service.orders";
 const EVENT_TYPE = "order.errand.completed";
 const RETRY_MS = 5000;
 
-export async function startErrandConsumer(store: FeatureStore): Promise<void> {
+export async function startErrandConsumer(store: FeatureStore, training?: RecommendationLog<TrainingSample>): Promise<void> {
     try {
         const connection = await connect(BROKER_URL);
         connection.on("error", () => {});
-        connection.on("close", () => setTimeout(() => void startErrandConsumer(store), RETRY_MS));
+        connection.on("close", () => setTimeout(() => void startErrandConsumer(store, training), RETRY_MS));
 
         const channel = await connection.createChannel();
         await channel.assertExchange(EXCHANGE, "topic", { durable: true });
@@ -28,29 +55,13 @@ export async function startErrandConsumer(store: FeatureStore): Promise<void> {
             if (!message) return;
             let errand: CompletedErrand;
             try {
-                const event = JSON.parse(message.content.toString());
-                errand = {
-                    supplierId: event.data.supplierId,
-                    eventId: event.eventId,
-                    reward: event.data.creditReward,
-                    itemCount: event.data.itemCount,
-                    distance: event.data.distance,
-                };
-                if (
-                    typeof errand.eventId !== "string" ||
-                    typeof errand.supplierId !== "string" ||
-                    typeof errand.reward !== "number" ||
-                    typeof errand.itemCount !== "number" ||
-                    typeof errand.distance !== "number"
-                ) {
-                    throw new Error("malformed errand event");
-                }
+                errand = parseCompletedEvent(JSON.parse(message.content.toString()));
             } catch {
                 channel.nack(message, false, false);
                 return;
             }
             try {
-                await store.apply(errand);
+                await applyCompletedErrand(store, errand, training);
                 logger.info({ eventId: errand.eventId, supplierId: errand.supplierId }, "applied completed errand");
                 channel.ack(message);
             } catch (err) {
@@ -61,6 +72,6 @@ export async function startErrandConsumer(store: FeatureStore): Promise<void> {
         logger.info({ queue: QUEUE, eventType: EVENT_TYPE }, "consuming completed errands");
     } catch (err) {
         logger.error({ err }, "broker connect failed, will retry");
-        setTimeout(() => void startErrandConsumer(store), RETRY_MS);
+        setTimeout(() => void startErrandConsumer(store, training), RETRY_MS);
     }
 }

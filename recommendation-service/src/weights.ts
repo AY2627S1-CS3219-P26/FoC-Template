@@ -10,6 +10,12 @@ export type WeightsProviderOptions = {
     refreshMs?: number;
 };
 
+export function isValidWeights(value: unknown): value is Weights {
+    if (!value || typeof value !== "object") return false;
+    const weights = value as Weights;
+    return [weights.a, weights.b, weights.c].every(v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 2);
+}
+
 export class WeightsProvider {
     private current: Weights = DEFAULT_WEIGHTS;
     private readonly doc?: DynamoDBDocumentClient;
@@ -36,7 +42,7 @@ export class WeightsProvider {
         if (!this.doc || !this.table) return;
         try {
             const { Item } = await this.doc.send(new GetCommand({ TableName: this.table, Key: { id: "current" } }));
-            if (Item && typeof Item.a === "number" && typeof Item.b === "number" && typeof Item.c === "number") {
+            if (isValidWeights(Item)) {
                 this.current = { a: Item.a, b: Item.b, c: Item.c };
                 logger.info({ weights: this.current }, "reloaded scorer weights");
             }

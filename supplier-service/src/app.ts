@@ -3,8 +3,10 @@ import { TtlCache } from './cache.ts'
 import { HttpError } from './errors.ts'
 import { registerRoutes, type RouteDeps } from './routes.ts'
 
-export interface AppOptions extends Omit<RouteDeps, 'now' | 'listCache'> {
+export interface AppOptions extends Omit<RouteDeps, 'now' | 'listCache' | 'walkMap'> {
   now?: () => Date
+  // The map routes are walked on. Without one every route is an estimate.
+  walkMap?: RouteDeps['walkMap']
   // How long a search or listing may be served from memory. Off by default.
   readCacheSeconds?: number
   logger?: FastifyServerOptions['logger']
@@ -40,6 +42,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     ...options,
     now: options.now ?? (() => new Date()),
     listCache: new TtlCache((options.readCacheSeconds ?? 0) * 1000),
+    walkMap: options.walkMap ?? null,
   })
   return app
 }

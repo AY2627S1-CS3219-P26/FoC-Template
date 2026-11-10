@@ -8,6 +8,7 @@ import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { useErrandChatSlot } from '@/lib/errandChat'
 import { SupplierThumbnail } from '../components/SupplierThumbnail'
+import { WalkingRoute } from '../components/WalkingRoute'
 
 const ERRANDS_PATH = '/errands'
 
@@ -173,6 +174,15 @@ function Details({ order, role }: { order: Order; role: string | null }) {
           <dt className="ds-label">Deliver to</dt>
           <dd className="mt-1 wrap-anywhere">{order.delivery_location}</dd>
         </div>
+        {/* Errands posted before the drop-off point existed have no walk to show. */}
+        {typeof order.delivery_latitude === 'number' && (
+          <div className="min-w-0 sm:col-span-2">
+            <dt className="ds-label">Walk</dt>
+            <dd className="mt-1">
+              <WalkingRoute order={order} />
+            </dd>
+          </div>
+        )}
         <div className="min-w-0">
           <dt className="ds-label">Needed by</dt>
           <dd className="mt-1">{formatDateTime(order.needed_by_time)}</dd>

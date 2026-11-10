@@ -10,6 +10,8 @@ RUN npm ci --omit=dev
 
 # Node runs the TypeScript directly, so there is nothing to compile.
 COPY supplier-service/src ./src
+# The walking map, built ahead by dev/build-walk-map.ts (about 2 MB).
+COPY supplier-service/map ./map
 COPY data/csv ./data/csv
 # The shrunk seed photos only, not the originals of several megabytes each.
 COPY data/images/resized ./data/images/resized

@@ -114,7 +114,7 @@ deploy/scripts/loadtest.sh
 
 1. `aws sso login --profile relay`, then `deploy/scripts/cloud.sh start` about 15 minutes before (or Actions → cloud → start).
 2. Run the smoke test against the HTTPS address. It registers a test account, so do it before the audience watches, not during.
-3. Log in as the administrator (`admin`, `ADMIN_PASSWORD` from `deploy/cloud-secrets.env`). Verification codes for new accounts are in Mailpit under `/mail/`.
+3. Log in as the administrator (`admin`, `ADMIN_PASSWORD` from `deploy/cloud-secrets.env`). The demo students `alice.tan`, `ben.lim`, `chloe.ng` and `daniel.koh` log in with `SEED_DEMO_PASSWORD` from the same file. Verification codes for new accounts are in Mailpit under `/mail/`.
 4. To show the autoscaling live: `kubectl --kubeconfig ~/.kube/relay-aws.yaml -n relay get hpa -w` in one terminal and `HOLD=3m AFTER_SECONDS=0 deploy/scripts/loadtest.sh` in another. The first extra instance appears about 2.5 minutes after the start. The run from `docs/evidence/` is the backup if there is no time.
 5. Afterwards `deploy/scripts/cloud.sh stop`. If you forget, the idle alarm stops the instance after 4 hours.
 

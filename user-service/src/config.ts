@@ -22,6 +22,13 @@ const EnvSchema = z.object({
     ADMIN_EMAIL: z.email().trim().toLowerCase(),
     ADMIN_PASSWORD: z.string().min(8, "must be at least 8 characters"),
     ADMIN_USERNAME: z.string().trim().min(3).default("admin"),
+
+    // Fixed student accounts for the final demo, created on start-up when switched on.
+    SEED_DEMO_STUDENTS: z.stringbool().default(false),
+    SEED_DEMO_PASSWORD: z.string().min(8, "must be at least 8 characters").optional(),
+}).refine((env) => !env.SEED_DEMO_STUDENTS || env.SEED_DEMO_PASSWORD, {
+    path: ["SEED_DEMO_PASSWORD"],
+    message: "is required when SEED_DEMO_STUDENTS is true",
 })
 
 // Empty strings count as not set

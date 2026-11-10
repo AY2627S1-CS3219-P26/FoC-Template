@@ -27,6 +27,7 @@ secrets:
     MAILPIT_PASSWORD: change-me
     # Empty on the laptop: the rag-service starts, but every question fails until a real key is set.
     CLAUDE_API_KEY: ""
+    SEED_DEMO_PASSWORD: change-me
 
 ingress:
   # Empty answers every host name, so http://localhost:<port> works on the laptop.
@@ -53,7 +54,7 @@ services:
     health: /health
     autoscaling: {max: 4}
     waitFor: [user-db:27017]
-    secretEnv: [BROKER_PASSWORD, OTP_SECRET, ADMIN_PASSWORD]
+    secretEnv: [BROKER_PASSWORD, OTP_SECRET, ADMIN_PASSWORD, SEED_DEMO_PASSWORD]
     env:
       PORT: "3000"
       LOG_LEVEL: info
@@ -66,6 +67,7 @@ services:
       COOKIE_SECURE: "false"
       ADMIN_EMAIL: admin@nus.edu.sg
       ADMIN_USERNAME: admin
+      SEED_DEMO_STUDENTS: "true"
       # Checks that a reported pair really were requester and courier of the errand.
       ORDER_SERVICE_URL: http://order-service:3000
 

@@ -81,3 +81,7 @@ both services at the `:dev` tag.
 
 GitHub secrets: `AWS_DEPLOY_ROLE_ARN` (OIDC role the workflow assumes), `APP_RUNNER_API_ARN`,
 `APP_RUNNER_CONSUMER_ARN`.
+
+## Declaration of AI-assisted work
+
+I used Claude Code while building this service. I manually drew the architecture and defined the endpoints, the functions that should exist, and how the service should interact with other surfaces. I then asked Claude to implement those functions in a progressive, agentic way — catching potential bugs, writing tests, and so on. I reviewed the results.

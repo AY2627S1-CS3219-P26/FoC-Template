@@ -10,7 +10,7 @@ import { useAllOrders } from '@/api/order/order'
 import { EmptyState } from '@/components/EmptyState'
 import { useName } from '@/api/user/member'
 import type { Order } from '@/api/order/order'
-import { OrderDetailsDialog } from '@/features/order/components/OrderDetailsDialog'
+import { OrderDetailsDialog } from '../components/OrderDetailsDialog'
 
 export function AdminOrdersPage() {
   const [page, setPage] = useState(1)

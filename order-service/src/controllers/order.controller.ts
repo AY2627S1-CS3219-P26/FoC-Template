@@ -76,9 +76,4 @@ export const OrderController = {
         if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
         res.status(200).json({ data: await OrderService.updateOrderStatus(orderId, res.locals.accountId, parsed.data.status) });
     }),
-
-    // GET /admin/orders/:id
-    getOrderForAdmin: handle(async (req, res) => {
-        res.status(200).json({ data: await OrderService.getOrderForAdmin(orderIdOf(req))})
-    })
 };

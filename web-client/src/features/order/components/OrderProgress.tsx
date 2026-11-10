@@ -1,5 +1,5 @@
 import type { Order, OrderStatus } from '@/api/order/order'
-import { formatDateTime } from '@/features/order/format'
+import { formatDateTime } from '../format'
 
 // The happy path, in order. Each one is a status the errand passes through.
 const FLOW: { status: OrderStatus; label: string }[] = [

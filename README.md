@@ -16,7 +16,7 @@ Live deployment: <https://relay.54-254-126-243.sslip.io> (only while the cloud i
 | William Kento Rasmussen | message-service (N2H), rag-service (N2H) |
 | Nguyen Viet Quang | supplier-service |
 | Dinh Khoat Hoang Long | credit-service, recommendation-service (N2H) |
-| Truong Kim Mai | order-service |
+| Truong Kim Mai | order-service, Admin Dashboard (Orders) (N2H) |
 
 ---
 

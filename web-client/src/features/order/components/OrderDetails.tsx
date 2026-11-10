@@ -1,7 +1,7 @@
 import type { Order } from '@/api/order/order'
 import { useSupplier } from '@/api/supplier/suppliers'
-import { formatDateTime } from '@/features/order/format'
-import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
+import { formatDateTime } from '../format'
+import { SupplierThumbnail } from '../components/SupplierThumbnail'
 import { useName } from '@/api/user/member'
 
 // Its own component because the hook needs the supplier id, which is known only once the errand has loaded.

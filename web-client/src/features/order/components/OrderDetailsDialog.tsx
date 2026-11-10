@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Order } from '@/api/order/order'
-import { OrderDetails } from '@/features/order/components/OrderDetails'
-import { OrderProgress } from '@/features/order/components/OrderProgress'
+import { OrderDetails } from '../components/OrderDetails'
+import { OrderProgress } from '../components/OrderProgress'
 
 type OrderDetailsDialogProps = {
   order: Order

@@ -57,5 +57,11 @@ export function authorize(requiredRole: Role = "member") {
 // student's credits. Checked before any lookup, so a refusal never reveals whether the account
 // exists (matching the authorize() pattern above).
 export function canReadAccount(accountId: unknown, roles: unknown, userId: string): boolean {
-    return accountId === userId || (Array.isArray(roles) && roles.includes("administrator"));
+    return accountId === userId || isAdministrator(roles);
+}
+
+// The admin ledger is everyone's movements, not one account's, so an authorized member reaching it
+// is still refused. Only an administrator may read it.
+export function isAdministrator(roles: unknown): boolean {
+    return Array.isArray(roles) && roles.includes("administrator");
 }

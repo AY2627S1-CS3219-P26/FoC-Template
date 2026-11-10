@@ -6,7 +6,7 @@ import { TextAreaField } from '@/components/TextAreaField'
 import { fieldErrorsOf } from '@/lib/http'
 import { formatDateTime } from '@/lib/format'
 import { ReportStateBadge } from './ReportStateBadge'
-import { useAdminCancelOrder, useAdminOrder } from  '../../../api/order/order'
+import { useAdminCancelOrder, useAdminOrder } from  '@/api/order/order'
 import { Notice } from '@/components/Notice'
 
 type ReportDecisionProps = {

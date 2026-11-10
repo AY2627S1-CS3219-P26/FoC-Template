@@ -4,7 +4,7 @@ import { recommendScore, type SupplierStats } from "../src/scoring.ts";
 
 const farFuture = () => new Date(Date.now() + 48 * 3_600_000).toISOString();
 
-const base = { avgLeadTimeMin: 30, lastEventId: "evt-0", updatedAt: "2026-01-01T00:00:00.000Z" };
+const base = { lastEventId: "evt-0", updatedAt: "2026-01-01T00:00:00.000Z" };
 
 test("cold start: fewer than 5 completed errands returns the flat default", () => {
     const stats: SupplierStats = { completedCount: 3, avgReward: 30, avgItems: 4, avgDist: 10, ...base };

@@ -12,7 +12,6 @@ const COLD_START_STATS: SupplierStats = {
     avgReward: 0,
     avgItems: 0,
     avgDist: 0,
-    avgLeadTimeMin: 0,
     lastEventId: "",
     updatedAt: "",
 };

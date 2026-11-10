@@ -10,6 +10,7 @@ const RequestSchema = z.object({
     items: z.array(z.string().trim().min(1, "item cannot be empty"))
         .min(1, "at least one item is required")
         .max(10, "cannot have more than 10 items"),
+    distance: z.number().nonnegative("distance cannot be negative").optional(),
 });
 
 export function validateRecommendationRequest(input: unknown): ValidationResult {

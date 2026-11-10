@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from .middleware.auth_middleware import verify_auth_header_middleware
 from .services.rag_service import boostrap_rag_system
 from .controller.rag_controller import (
@@ -25,5 +25,6 @@ async def health():
 
 
 @app.post("/query/")
-async def post_query_raq(request: queryRequest):
-    return await post_query_rag_controller(request)
+async def post_query_raq(request: queryRequest, http_request: Request):
+    # Set by verify_auth_header_middleware, which lets only authorized requests reach this route.
+    return await post_query_rag_controller(request, http_request.state.account_id)

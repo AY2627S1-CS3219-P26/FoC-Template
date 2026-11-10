@@ -13,6 +13,8 @@ async def verify_auth_header_middleware(request: Request, call_next):
 
     authentication = await verify_auth_header(request)
     if authentication.get("kind") == "authorized":
+        # The controller limits questions per account, so it needs to know whose request this is.
+        request.state.account_id = authentication["accountId"]
         return await call_next(request)
 
     if authentication.get("kind") == "unauthenticated":

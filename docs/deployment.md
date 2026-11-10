@@ -16,7 +16,7 @@ The script creates the cluster `relay` on the first run, builds the images with 
 deploy/scripts/smoke-test.sh
 ```
 
-checks the system from the outside: gateway, a refused anonymous request, a closed `/internal` route, and a new student who registers, reads the code in Mailpit, verifies, logs in and fetches the own profile.
+checks the system from the outside: gateway, refused anonymous requests, a closed `/internal` route, and two new students who register, read the code in Mailpit, verify, log in and get a credit account through the broker. Then one errand runs end to end: the first student posts it at a supplier that is open at the needed-by time (credits reserved), the second accepts, picks up and delivers it, the first confirms it, and the reward reaches the courier through the broker. On the way it checks that the requester cannot accept the own errand, a second acceptance and a courier's confirmation are refused, and every transition is recorded. It needs one supplier on the first page that is open within the next 24 hours.
 
 Useful commands:
 
@@ -133,7 +133,7 @@ deploy/scripts/loadtest.sh
 ## Before a demo
 
 1. `aws sso login --profile relay`, then `deploy/scripts/cloud.sh start` about 15 minutes before (or Actions → cloud → start).
-2. Run the smoke test against the HTTPS address. It registers a test account, so do it before the audience watches, not during.
+2. Run the smoke test against the HTTPS address. It registers two test accounts and leaves one completed errand behind, so do it before the audience watches, not during.
 3. Log in as the administrator (`admin`, `ADMIN_PASSWORD` from `deploy/cloud-secrets.env`). The demo students `alice.tan`, `ben.lim`, `chloe.ng` and `daniel.koh` log in with `SEED_DEMO_PASSWORD` from the same file. Verification codes for new accounts are in Mailpit under `/mail/`.
 4. To show the autoscaling live: `kubectl --kubeconfig ~/.kube/relay-aws.yaml -n relay get hpa -w` in one terminal and `HOLD=3m AFTER_SECONDS=0 deploy/scripts/loadtest.sh` in another. The first extra instance appears about 2.5 minutes after the start. The run from `docs/evidence/` is the backup if there is no time.
 5. Afterwards `deploy/scripts/cloud.sh stop`. If you forget, the idle alarm stops the instance after 4 hours.
@@ -153,3 +153,19 @@ Use a commit on `dev` or `main` whose CI run has published the images.
 1. Add an entry under `services` in `deploy/helm/relay/values.yaml` (port, health path, `waitFor`, `secretEnv`, `env`). The comments there explain each field. The service name becomes the host name, so URLs from `compose.yaml` keep working.
 2. If it has a database, add it under `databases` with `kind: mongo` or `kind: postgres`.
 3. Add the service name to `SERVICES` in `deploy/scripts/local-up.sh`.
+
+## Declaration of AI-assisted work
+
+**Tool:** Claude Code (Claude Opus models).
+
+**How Claude was used:**
+
+- **Generate:** Claude was used to write the Terraform files, the Helm chart, the scripts in `deploy/scripts/`, the load test and the CI/CD workflows in `.github/workflows/`, one step at a time from a plan.
+- **Adapt:** Claude was used to adapt the other services so they run in Kubernetes.
+- **Debug:** Claude was used to debug failing pods, the certificates and the CI deploy job.
+- **Explain:** Claude was used to explain each step before it was committed.
+- **Document:** Claude was used to help write this document.
+
+**Decisions:** The choice of k3s on one EC2 instance with Helm and HPA, over Elastic Beanstalk and EKS, was made by the team, not by Claude. The decision and its reasons are in `docs/decisions/0004-cloud-deployment.md`.
+
+**Review:** Every change was reviewed, deployed by hand and checked in the cluster. The autoscaling evidence in `docs/evidence/` comes from real runs.

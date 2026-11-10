@@ -28,9 +28,9 @@ export function createRecommendationsRouter(store: FeatureStore, log: Recommenda
         }
 
         const start = Date.now();
-        const { supplierId, items, neededBy } = result.data;
+        const { supplierId, items, neededBy, distance } = result.data;
         const stats = (await store.get(supplierId)) ?? COLD_START_STATS;
-        const score = recommendScore({ items, neededBy, distance: stats.avgDist }, stats, weights.get());
+        const score = recommendScore({ items, neededBy, distance: distance ?? stats.avgDist }, stats, weights.get());
         const latencyMs = Date.now() - start;
 
         res.json({

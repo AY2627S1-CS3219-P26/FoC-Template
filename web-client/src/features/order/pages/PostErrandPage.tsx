@@ -12,8 +12,6 @@ import { TextField } from '@/components/TextField'
 import { ApiError, fieldErrorsOf } from '@/lib/http'
 import { FormError } from '@/components/FormError'
 
-const pct = (n: number) => `${n >= 0 ? '+' : ''}${Math.round(n * 100)}%`
-
 // datetime-local expects "YYYY-MM-DDTHH:mm" in the browser's time. The default is the first
 // full hour at least an hour from now, so on most days it is today.
 function defaultNeededBy(now = new Date()): string {
@@ -45,7 +43,12 @@ export function PostErrandPage() {
       .filter(Boolean)
     recommend.mutate(
       { supplierId, location, neededBy: neededBy ? new Date(neededBy).toISOString() : '', items },
-      { onSuccess: (data) => setCredits(String(data.recommendedCredits)) },
+      {
+        onSuccess: (data) => {
+          setCredits(String(data.recommendedCredits))
+          console.log('recommendation factors', data.features)
+        },
+      },
     )
   }
 
@@ -156,12 +159,6 @@ export function PostErrandPage() {
                   Suggested <span className="font-medium text-default">{suggestion.recommendedCredits}</span>{' '}
                   {suggestion.basis === 'formula' ? 'from the market rate' : '(default for a new supplier)'}
                 </p>
-                {suggestion.basis === 'formula' && (
-                  <p className="text-xs text-muted">
-                    Items {pct(suggestion.features.itemFactor)} · Urgency {pct(suggestion.features.urgencyFactor)} · Distance{' '}
-                    {pct(suggestion.features.distanceFactor)}
-                  </p>
-                )}
               </div>
             )}
             {recommend.isError && (

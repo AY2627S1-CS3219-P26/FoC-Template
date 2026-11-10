@@ -76,3 +76,20 @@ Then stop the container of your service (`docker compose stop supplier-service`)
 | the web-client container restarts | a route file uses a variable that `compose.yaml` does not set. `docker compose logs web-client` names it. |
 | a red outline and a console warning | something is wider than the screen. The warning names the element (N5.1). |
 | an import error from `npm run lint` | an import crosses an area boundary. The message says what to import instead. |
+
+## Declaration of AI-assisted work
+
+This section covers the foundation (gateway, routing, data layer, design system, layout) and the user and admin screens. The other screens are declared by the teammates who built them.
+
+**Tool:** Claude Code (Claude Opus and Sonnet models).
+
+**How Claude was used:**
+
+- **Explain:** Claude was used to explain React Router, TanStack Query, Tailwind and the nginx configuration while the first steps of the foundation were typed by hand.
+- **Generate:** Once the patterns were established, Claude was used to write the remaining steps and the user and admin screens from a step-by-step plan. Each step became one commit, which was tested and committed by hand.
+- **Check:** Claude was used to run the build and lint and to check the pages in a browser at 320 and 393 px before each commit. Each page was then tested by hand.
+- **Document:** Claude was used to help write this README, `AGENTS.md` and `DESIGN.md`.
+
+**Decisions:** The architecture (one gateway origin, no domain rules in the client) and the design system were decided by the team, not by Claude. They are recorded in `docs/decisions/0002-web-client-gateway.md` and `DESIGN.md`.
+
+**Review:** Every change was reviewed and tested before it was committed. `AGENTS.md` holds the rules that both teammates and coding agents follow in this folder.

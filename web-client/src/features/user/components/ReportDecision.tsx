@@ -6,6 +6,8 @@ import { TextAreaField } from '@/components/TextAreaField'
 import { fieldErrorsOf } from '@/lib/http'
 import { formatDateTime } from '@/lib/format'
 import { ReportStateBadge } from './ReportStateBadge'
+import { useAdminCancelOrder, useAdminOrder } from  '../../../api/order/order'
+import { Notice } from '@/components/Notice'
 
 type ReportDecisionProps = {
   report: Report
@@ -19,6 +21,24 @@ export function ReportDecision({ report }: ReportDecisionProps) {
   const fieldErrors = fieldErrorsOf(decide.error)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const pendingOutcome = decide.isPending ? decide.variables?.outcome : undefined
+  const errandId = Number(report.errandId)
+  const errand = useAdminOrder(Number.isInteger(errandId) ? errandId : 0)
+  const cancel = useAdminCancelOrder()
+
+  const status = errand.data?.status
+  const canCancel = !status || ['Accepted', 'PickedUp'].includes(status)
+  const alreadyCancelled = status === 'Cancelled' || cancel.isSuccess
+
+  function handleCancelErrand() {
+    if (busy) return
+    const reward = errand.data ? ` The ${errand.data.credit_reward} reserved credits go back to the requester.` : ''
+    if (!window.confirm(`Cancel errand #${errandId}?${reward}`)) return
+    cancel.mutate(errandId)
+  }
+
+  console.log(errand.data)
+
+  const busy = decide.isPending || cancel.isPending
 
   // The buttons that had focus are gone once the report is decided, so focus moves to the decision.
   // The mutation reports success only after the report reloaded, so that heading exists by now.
@@ -28,7 +48,7 @@ export function ReportDecision({ report }: ReportDecisionProps) {
 
   function handleDecide(outcome: ReportOutcome) {
     // aria-disabled keeps keyboard focus on the button, so a running request is ignored here (as in SubmitButton).
-    if (decide.isPending) return
+    if (busy) return
     decide.mutate({ outcome, justification })
   }
 
@@ -58,9 +78,24 @@ export function ReportDecision({ report }: ReportDecisionProps) {
       <p className="text-muted">
         {alreadySuspended
           ? 'The reported account is already suspended. Actioning the report keeps it that way.'
-          : 'Suspending marks the report actioned and suspends the reported account with this justification.'}
+          : 'Suspending marks the report actioned and suspends the reported account with this justification. Cancel order will release the reserved credit to the requestor.'}
       </p>
       <FormError error={decide.error} fields={['justification']} />
+        {alreadyCancelled ? (
+          <Notice tone="success" role="status" title={`Errand #${errandId} is cancelled`} />
+        ) : canCancel ? (
+          <button
+            type="button"
+            className="ds-btn ds-btn--glass"
+            aria-disabled={busy || undefined}
+            aria-busy={cancel.isPending || undefined}
+            onClick={handleCancelErrand}
+          >
+            {cancel.isPending ? 'Cancelling…' : 'Cancel errand'}
+          </button>
+        ) : (
+          <p className="text-sm text-muted">This errand is {status} and cannot be cancelled.</p>
+        )}
       <TextAreaField
         label="Justification"
         name="justification"

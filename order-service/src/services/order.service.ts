@@ -6,14 +6,14 @@ import type { createServiceClients } from "./clients.ts";
 
 export const SYSTEM_ACTOR = "system";
 
-export type Role = "requester" | "courier";
+export type Role = "requester" | "courier" | "admin";
 
 // The transitions a participant may instruct, by current state. Open to Accepted goes through
 // acceptOrder because it also assigns the courier; Open to Expired is only done by the system.
 const USER_TRANSITIONS: Partial<Record<OrderStatus, { to: OrderStatus; by: Role }[]>> = {
     Open: [{ to: "Cancelled", by: "requester" }],
     Accepted: [{ to: "PickedUp", by: "courier" }, { to: "Cancelled", by: "requester" }],
-    PickedUp: [{ to: "Delivered", by: "courier" }],
+    PickedUp: [{ to: "Delivered", by: "courier" }, { to: "Cancelled", by: "admin"}],
     Delivered: [{ to: "Completed", by: "requester" }],
 };
 
@@ -39,6 +39,8 @@ function notFound(): AppError {
 function notOpen(): AppError {
     return new AppError(409, "ORDER_NOT_AVAILABLE", "This errand is no longer open");
 }
+
+const ADMIN_CANCELLABLE: OrderStatus[] = ["Open", "Accepted", "PickedUp", "Delivered"];
 
 export function createOrderService(model: typeof OrderModel, clients: ReturnType<typeof createServiceClients>) {
     async function findErrand(orderId: number): Promise<Order> {
@@ -161,6 +163,20 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             const updated = await model.updateStatus(orderId, newStatus, current, userId);
             if (!updated) throw new AppError(409, "STATE_CHANGED", "The errand changed in the meantime, reload it");
             return updated;
-        }
+        },
+
+
+        async adminCancelOrder(orderId: number, adminId: string): Promise<Order> {
+            const order = await model.findById(orderId);
+            if (!order) throw notFound();
+            if (order.status === "Cancelled") return order;     // repeating it is safe
+            if (!ADMIN_CANCELLABLE.includes(order.status)) {
+                // Completed has already paid the courier, so it cannot be undone from here
+                throw new AppError(409, "INVALID_STATE_TRANSITION", `An errand that is ${order.status} cannot be cancelled`);
+            }
+            const updated = await model.updateStatus(orderId, "Cancelled", order.status, adminId);
+            if (!updated) throw new AppError(409, "STATE_CHANGED", "The errand changed in the meantime, reload it");
+            return updated;
+        },
     };
 }

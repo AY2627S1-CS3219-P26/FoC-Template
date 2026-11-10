@@ -28,4 +28,10 @@ router.post("/:id/accept", OrderController.acceptOrder);
 // PATCH /orders/:id/status - Update order lifecycle status (e.g., PICKED_UP, COMPLETED, CANCELLED)[cite: 7]
 router.patch("/:id/status", OrderController.updateStatus);
 
+// GET /admin/:id - Get specific order details, for admin view
+router.get("/admin/:id", OrderController.getOrderForAdmin);
+
+// POST /admin/:id/cancel - Cancel an order through report decision by admin
+router.post("/admin/:id/cancel", OrderController.adminCancelOrder);
+
 export default router;

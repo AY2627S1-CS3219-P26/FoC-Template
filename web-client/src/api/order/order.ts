@@ -99,6 +99,22 @@ export function useAllOrders(page: number, pageSize = 10, q = '', status = '') {
   })
 }
 
+export function useAdminOrder(id: number) {
+  return useQuery({
+    queryKey: ['order', 'admin', id],
+    queryFn: async ({ signal }) => (await request<{ data: Order }>('order', `/orders/admin/${id}`, { signal })).data,
+    enabled: id > 0,
+  })
+}
+
+export function useAdminCancelOrder() {
+  const invalidate = useInvalidateOrders()
+  return useMutation({
+    mutationFn: (id: number) => request<{ data: Order }>('order', `/orders/admin/${id}/cancel`, { method: 'POST' }),
+    onSettled: invalidate,
+  })
+}
+
 // Orders I requested or am delivering, plus account id (GET /orders/mine).
 export function useMyOrders() {
   return useQuery({

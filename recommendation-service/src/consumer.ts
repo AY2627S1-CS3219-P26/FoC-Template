@@ -13,6 +13,8 @@ const CompletedEventSchema = z.object({
         reward: z.number().nonnegative().optional(),
         itemCount: z.number().int().nonnegative(),
         distance: z.number().nonnegative().nullish().transform(value => value ?? undefined),
+        neededBy: z.string().optional(),
+        postedAt: z.string().optional(),
     }).refine(data => data.creditReward !== undefined || data.reward !== undefined),
 });
 
@@ -21,6 +23,8 @@ export function parseCompletedEvent(value: unknown): CompletedErrand {
     return {
         eventId, supplierId: data.supplierId, reward: data.creditReward ?? data.reward!, itemCount: data.itemCount,
         ...(data.distance === undefined ? {} : { distance: data.distance }),
+        ...(data.neededBy === undefined ? {} : { neededBy: data.neededBy }),
+        ...(data.postedAt === undefined ? {} : { postedAt: data.postedAt }),
     };
 }
 

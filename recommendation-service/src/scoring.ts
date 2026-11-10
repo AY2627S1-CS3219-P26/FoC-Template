@@ -53,8 +53,8 @@ export function countItems(items: string[]): number {
         .filter((token) => token.trim() !== "").length;
 }
 
-function urgency(neededBy: string): number {
-    const hoursUntil = (new Date(neededBy).getTime() - Date.now()) / 3_600_000;
+export function urgency(neededBy: string, now: number = Date.now()): number {
+    const hoursUntil = (new Date(neededBy).getTime() - now) / 3_600_000;
     if (!Number.isFinite(hoursUntil)) return 0;
     return clamp((URGENCY_HORIZON_HOURS - hoursUntil) / URGENCY_HORIZON_HOURS, 0, 1);
 }

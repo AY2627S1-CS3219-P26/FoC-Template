@@ -1,4 +1,4 @@
-import type { SupplierStats } from "./scoring.ts";
+import { urgency, type SupplierStats } from "./scoring.ts";
 
 export type CompletedErrand = {
     supplierId: string;
@@ -6,6 +6,8 @@ export type CompletedErrand = {
     reward: number;
     itemCount: number;
     distance?: number;
+    neededBy?: string;
+    postedAt?: string;
 };
 
 export type TrainingSample = {
@@ -13,6 +15,7 @@ export type TrainingSample = {
     supplierId?: string;
     rewardOverMarket: number;
     itemFactorInput: number;
+    urgencyInput?: number;
     distFactorInput: number;
 };
 
@@ -27,9 +30,10 @@ export function trainingSample(prior: SupplierStats | null, errand: CompletedErr
         supplierId: errand.supplierId,
         rewardOverMarket: errand.reward / prior.avgReward - 1,
         itemFactorInput: prior.avgItems > 0 ? errand.itemCount / prior.avgItems - 1 : 0,
+        urgencyInput: errand.neededBy && errand.postedAt ? urgency(errand.neededBy, new Date(errand.postedAt).getTime()) : 0,
         distFactorInput: prior.avgDist > 0 ? errand.distance! / prior.avgDist - 1 : 0,
     };
-    return [sample.rewardOverMarket, sample.itemFactorInput, sample.distFactorInput].every(Number.isFinite) ? sample : null;
+    return [sample.rewardOverMarket, sample.itemFactorInput, sample.urgencyInput, sample.distFactorInput].every(Number.isFinite) ? sample : null;
 }
 
 const ALPHA = 0.2;

@@ -25,33 +25,65 @@ export function validSamples(records: unknown[]): TrainingSample[] {
     });
 }
 
+const FEATURE_EPS = 1e-12;
+
 export function refitWeights(records: unknown[], current: Weights = DEFAULT_WEIGHTS): Weights {
     const samples = validSamples(records);
     if (samples.length < MIN_SAMPLES) return current;
 
-    let sii = 0, sdd = 0, sid = 0, siy = 0, sdy = 0;
+    let sii = 0, siu = 0, sid = 0, suu = 0, sud = 0, sdd = 0, siy = 0, suy = 0, sdy = 0;
     for (const s of samples) {
-        const { itemFactorInput: xi, distFactorInput: xd, rewardOverMarket: y } = s;
-        sii += xi * xi; sdd += xd * xd; sid += xi * xd; siy += xi * y; sdy += xd * y;
+        const xi = s.itemFactorInput;
+        const xu = Number.isFinite(s.urgencyInput) ? s.urgencyInput! : 0;
+        const xd = s.distFactorInput;
+        const y = s.rewardOverMarket;
+        sii += xi * xi; siu += xi * xu; sid += xi * xd;
+        suu += xu * xu; sud += xu * xd; sdd += xd * xd;
+        siy += xi * y; suy += xu * y; sdy += xd * y;
+    }
+    if (![sii, siu, sid, suu, sud, sdd, siy, suy, sdy].every(Number.isFinite)) return current;
+
+    const ai = sii > FEATURE_EPS, au = suu > FEATURE_EPS, ad = sdd > FEATURE_EPS;
+    if (!ai && !au && !ad) return current;
+
+    const ri = siy - (au ? 0 : current.b * siu) - (ad ? 0 : current.c * sid);
+    const ru = suy - (ai ? 0 : current.a * siu) - (ad ? 0 : current.c * sud);
+    const rd = sdy - (ai ? 0 : current.a * sid) - (au ? 0 : current.b * sud);
+    const singular = (det: number, scale: number) => !Number.isFinite(scale) || Math.abs(det) <= 1e-9 * scale;
+
+    let a = current.a, b = current.b, c = current.c;
+    if (ai && au && ad) {
+        const det = sii * (suu * sdd - sud * sud) - siu * (siu * sdd - sud * sid) + sid * (siu * sud - suu * sid);
+        if (singular(det, sii * suu * sdd)) return current;
+        a = (ri * (suu * sdd - sud * sud) - siu * (ru * sdd - sud * rd) + sid * (ru * sud - suu * rd)) / det;
+        b = (sii * (ru * sdd - rd * sud) - ri * (siu * sdd - sud * sid) + sid * (siu * rd - ru * sid)) / det;
+        c = (sii * (suu * rd - ru * sud) - siu * (siu * rd - ru * sid) + ri * (siu * sud - suu * sid)) / det;
+    } else if (ai && ad) {
+        const det = sii * sdd - sid * sid;
+        if (singular(det, sii * sdd)) return current;
+        a = (ri * sdd - rd * sid) / det;
+        c = (rd * sii - ri * sid) / det;
+    } else if (ai && au) {
+        const det = sii * suu - siu * siu;
+        if (singular(det, sii * suu)) return current;
+        a = (ri * suu - ru * siu) / det;
+        b = (ru * sii - ri * siu) / det;
+    } else if (au && ad) {
+        const det = suu * sdd - sud * sud;
+        if (singular(det, suu * sdd)) return current;
+        b = (ru * sdd - rd * sud) / det;
+        c = (rd * suu - ru * sud) / det;
+    } else if (ai) {
+        a = ri / sii;
+    } else if (au) {
+        b = ru / suu;
+    } else {
+        c = rd / sdd;
     }
 
-    if (![sii, sdd, sid, siy, sdy].every(Number.isFinite)) return current;
-    let a = current.a, c = current.c;
-    if (sii > 1e-12 && sdd > 1e-12) {
-        const scale = sii * sdd;
-        const det = scale - sid * sid;
-        if (!Number.isFinite(scale) || det <= 1e-9 * scale) return current;
-        a = (siy * sdd - sdy * sid) / det;
-        c = (sdy * sii - siy * sid) / det;
-    } else if (sii > 1e-12) {
-        a = (siy - current.c * sid) / sii;
-    } else if (sdd > 1e-12) {
-        c = (sdy - current.a * sid) / sdd;
-    } else return current;
-
-    if (![a, c].every(Number.isFinite)) return current;
+    if (![a, b, c].every(Number.isFinite)) return current;
     const clamp = (n: number) => Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, n));
-    return { a: clamp(a), b: current.b, c: clamp(c) };
+    return { a: clamp(a), b: clamp(b), c: clamp(c) };
 }
 
 export async function main(): Promise<void> {

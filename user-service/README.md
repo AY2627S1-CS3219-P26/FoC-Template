@@ -20,6 +20,7 @@ From the repository root, `docker compose up --build` starts the service on http
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Outgoing email |
 | `COOKIE_SECURE` | Send the session cookie over HTTPS only (default true, false in compose for local HTTP) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME` | First administrator, created at start-up when none exists (F1.5.6) |
+| `SEED_DEMO_STUDENTS`, `SEED_DEMO_PASSWORD` | When `true`, creates the Active demo students `alice.tan`, `ben.lim`, `chloe.ng` and `daniel.koh` (`<username>@u.nus.edu`) at start-up, all with this password and announced like verified accounts. Existing accounts are left as they are. Off by default; on in `compose.yaml` and the cloud |
 
 ## API
 
@@ -79,7 +80,7 @@ Any logged-in account can report another one with `POST /reports` (F1.6.3):
 { "reportedId": "<account id>", "errandId": "42", "reason": "Took the food and never delivered it" }
 ```
 
-The answer is `201` with the report in state `Open`. A refusal names the field (F1.6.4): `reason` when it is not 20 to 500 characters, `reportedId` when it is the reporter's own account or does not exist, and `errandId` when the same reporter already reported this errand. A unique index on reporter and errand enforces the last rule even for parallel requests. Not checked yet: that the two accounts really were requester and courier of the errand, which needs a lookup in the order-service (REL-210).
+The answer is `201` with the report in state `Open`. A refusal names the field (F1.6.4): `reason` when it is not 20 to 500 characters, `reportedId` when it is the reporter's own account or does not exist, and `errandId` when the same reporter already reported this errand. A unique index on reporter and errand enforces the last rule even for parallel requests. The user-service then asks the order-service for the errand (`GET /internal/orders/:id`): `errandId` is refused when the errand does not exist or the two accounts were not its requester and courier, in either order. When the order-service does not answer within 2 seconds, the report is refused with `503 ORDER_SERVICE_UNAVAILABLE`.
 
 Administrators list reports with `GET /reports?state=&reportedId=&page=&pageSize=`, newest first, and read one with `GET /reports/:id` (F1.6.5, F5.5.4). Accounts appear as `{ id, fullName, username, state }`, or as `null` once deleted:
 

@@ -1,54 +1,93 @@
-# CS3219 — Software Design and Architecture (AY2627 Sem 1)
+# CS3219 Software Design and Architecture (AY2627 Sem 1), Group 26
 
-## Friend on Campus (FoC)
+## Friend on Campus (Relay)
 
-**Friend on Campus (FoC)** is a peer-to-peer campus errand platform where students can request items to be collected from stores or facilities on campus, and other students can fulfil (and deliver) those requests. The platform runs on a closed credit economy — credits cannot be bought, withdrawn, or exchanged for money, and only circulate within the platform.
+**Friend on Campus (FoC)**, shown as **Relay** in the app, is a peer-to-peer campus errand platform. Students request items to be collected from stores or facilities on campus, and other students fulfil and deliver those requests. The platform runs on a closed credit economy: credits cannot be bought, withdrawn or exchanged for money, and only circulate within the platform.
 
----
-
-## Team Members
-
-| Name | Role |
-| ----- | ----- |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
+Live deployment: <https://relay.54-254-126-243.sslip.io> (only while the cloud instance is running, see [Deployment](#deployment)).
 
 ---
 
-## Running the system
+## Team and ownership
+
+| Name | Ownership |
+| --- | --- |
+| Felix Soeren Haag | user-service, web-client, deployment (Kubernetes, AWS, CI/CD) |
+| William Kento Rasmussen | message-service (N2H), rag-service (N2H) |
+| Nguyen Viet Quang | supplier-service |
+| Dinh Khoat Hoang Long | credit-service, recommendation-service (N2H) |
+| Truong Kim Mai | order-service |
+
+---
+
+## Architecture
+
+| Component | Responsibility | Stack | Data store |
+| --- | --- | --- | --- |
+| [`user-service`](user-service/README.md) | Accounts, email verification, sessions, roles; the only authority on authorization | Node.js, TypeScript, Express | MongoDB |
+| [`supplier-service`](supplier-service/README.md) | Catalogue of campus stores, facilities and landmarks | Node.js, TypeScript, Fastify | PostgreSQL |
+| [`order-service`](order-service/README.md) | Errand requests and their lifecycle | Node.js, TypeScript, Express | PostgreSQL |
+| [`credit-service`](credit-service/README.md) | Credit balances, reservations and transfers | Node.js, TypeScript, Express | MongoDB (replica set) |
+| [`recommendation-service`](recommendation-service/README.md) | Suggests a credit reward for a new errand from completed ones (N2H) | Node.js, TypeScript, Express | in-memory feature store |
+| [`message-service`](message-service/README.md) | Direct messages between accounts, live over Socket.IO (N2H) | Node.js, TypeScript, Express, Socket.IO | MongoDB |
+| [`rag-service`](rag-service/README.md) | Help assistant that answers from the help documents with Claude (N2H) | Python, FastAPI | in-memory FAISS index |
+| [`web-client`](web-client/README.md) | Browser app (React) and the gateway in front of every service (nginx) | React, Vite, nginx | none |
+
+- **Gateway:** the browser only talks to the web client, which forwards `/api/<service>/...` to the services. No service is reachable from outside directly ([ADR 0002](docs/decisions/0002-web-client-gateway.md)).
+- **Authorization:** every service asks the user-service (`POST /internal/authorize`) on each protected request and refuses when it gets no clear yes ([ADR 0001](docs/decisions/0001-server-side-sessions.md)).
+- **Events:** services announce changes asynchronously through RabbitMQ, published through an outbox and consumed idempotently. Conventions and the event catalog are in [`docs/events.md`](docs/events.md) ([ADR 0003](docs/decisions/0003-message-broker.md)).
+- **Database per service:** each service owns its database; no other service reads it.
+
+---
+
+## Running locally
 
 Requires only Docker. From the repository root:
 
-    docker compose up --build
+```bash
+docker compose up --build
+```
 
 | Component | URL |
 | --- | --- |
-| web-client (the app in the browser) | http://localhost:8080 |
-| user-service | http://localhost:3001 |
-| supplier-service | http://localhost:3002 |
-| Mailpit (local email inbox) | http://localhost:8025 |
-| RabbitMQ management UI (user `relay`, password `change-me`) | http://localhost:15672 |
+| The app (web-client and gateway) | <http://localhost:8080> |
+| user-service | <http://localhost:3001> |
+| supplier-service | <http://localhost:3002> |
+| order-service | <http://localhost:3003> |
+| credit-service | <http://localhost:3004> |
+| recommendation-service | <http://localhost:3006> |
+| message-service | <http://localhost:3008> |
+| rag-service | <http://localhost:3080> |
+| Mailpit, catches every email locally | <http://localhost:8025> |
+| RabbitMQ management UI (user `relay`, password `change-me`) | <http://localhost:15672> |origin/dev
 
-No `.env` is needed for local use; every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me` unless `ADMIN_PASSWORD` is set. To override values, copy `.env.example` to `.env`.
+No `.env` is needed: every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me`. To override a value, copy `.env.example` to `.env`. The help assistant needs a Claude API key in `CLAUDE_API_KEY`; without it the rest of the system works as usual.
 
-The browser reaches the services only through the web client, which forwards `/api/<service>/...` to them. Services tell each other about changes through RabbitMQ; the conventions and the list of events are in [`docs/events.md`](docs/events.md). How to develop the client with live reload is in [`web-client/README.md`](web-client/README.md).
-
-`docker compose down -v` stops everything and deletes the local data.
-
-## Development Workflow
-
-Work is tracked in Linear (team `REL`). Every backlog requirement is an issue there, branches are cut from `dev` as `feat/rel-<n>-...`, and changes come back through a pull request into `dev`. Branch, commit and PR conventions and the Linear structure are described in [`docs/workflow.md`](docs/workflow.md).
+`docker compose down -v` stops everything and deletes the local data. How to work on a single service, run its tests or develop the client with live reload is in that service's README.
 
 ---
 
-## Repository Structure
+## Deployment
 
-This repository follows a **one-service-per-folder** structure: each microservice (`user-service/`, `supplier-service/`, `order-service/`, `credit-service/`) lives in its own top-level folder.
+The same Helm chart ([`deploy/helm/relay`](deploy/helm/relay)) and the same images run on a laptop and in the cloud; only the values files differ.
 
-The browser client (`web-client/`) sits alongside them as a peer folder.
+- **Local Kubernetes:** `deploy/scripts/local-up.sh` builds the images and installs the chart into a k3d cluster (<http://localhost:8081>).
+- **Cloud:** one EC2 instance with k3s in AWS Singapore, created with Terraform ([`deploy/terraform`](deploy/terraform)). HTTPS through Traefik and cert-manager, horizontal autoscaling per service.
+- **CI/CD:** GitHub Actions tests every pull request and publishes the images to GHCR on every merge into `dev` or `main`. A merge into `dev` is also rolled out to the running cloud instance. `deploy/scripts/cloud.sh start | stop | status` switches the instance on and off.
+
+Setup, secrets, network rules and autoscaling are described in [`docs/deployment.md`](docs/deployment.md), the reasons in [ADR 0004](docs/decisions/0004-cloud-deployment.md).
+
+---
+
+## Development workflow
+
+Work is tracked in Linear (team `REL`); every backlog requirement is an issue there. Branches are cut from `dev` as `<type>/rel-<n>-<description>` and come back through a pull request into `dev`; `main` holds the submitted milestones. Conventions are in [`docs/workflow.md`](docs/workflow.md), the rules for coding agents in [`AGENTS.md`](AGENTS.md).
+
+---
+
+## Repository structure
+
+One folder per service at the top level. A nice-to-have feature that warrants its own service gets another folder at the same level.
 
 ```text
 .
@@ -56,13 +95,14 @@ The browser client (`web-client/`) sits alongside them as a peer folder.
 ├── supplier-service/
 ├── order-service/
 ├── credit-service/
-├── <n2h-service>/
-├── web-client/
-└── README.md
+├── message-service/      N2H
+├── rag-service/          N2H
+├── web-client/           browser app and gateway
+├── deploy/               Helm chart, Terraform, deploy scripts
+├── docs/                 decisions (ADRs), events, deployment, workflow
+├── data/                 seed data for the supplier catalogue
+├── postman/              API collections for manual testing
+└── compose.yaml          the whole system for local development
 ```
 
-- Any **nice-to-have (N2H)** feature that warrants its own service should be added as an **additional folder** at the same level, following the same per-service structure.
-- Files for agentic coding tools (e.g. agent configs, prompts, skills) may be added as needed, but must still **respect the one-service-per-folder skeleton** for core implementation.
-- `web-client/` carries **no `-service` suffix on purpose**: it owns no bounded context, no data store and no API. It is a peer *deployable*, not a peer *service*. Its design system and the rules for working on it are documented in `web-client/DESIGN.md` and `web-client/AGENTS.md`.
-
----
+`web-client/` has no `-service` suffix on purpose: it owns no bounded context, no data store and no domain API. It is a peer deployable, not a peer service.

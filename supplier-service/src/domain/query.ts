@@ -8,6 +8,13 @@ export interface ListFilters {
   zone: string | null
   building: string | null
   status: 'Active' | 'Inactive' | 'all'
+  // Only the caller's own favorites. Whose they are comes from the session, never the query.
+  favorites: boolean
+  // Only the suppliers open at the moment of the request, on the campus clock.
+  openNow: boolean
+  // Where distances are measured from, usually the student's own position.
+  near: { latitude: number; longitude: number } | null
+  sort: 'name' | 'distance'
   page: number
   pageSize: number
 }
@@ -43,6 +50,32 @@ function whole(
   return value
 }
 
+function flag(query: Query, key: string, errors: FieldError[]): boolean {
+  const text = single(query, key, errors)
+  if (text === null || text === 'false') return false
+  if (text === 'true') return true
+  errors.push({ field: key, message: 'must be true or false' })
+  return false
+}
+
+function point(query: Query, key: string, errors: FieldError[]): ListFilters['near'] {
+  const text = single(query, key, errors)
+  if (text === null) return null
+  const parts = text.split(',')
+  const [latitude, longitude] = parts.map((part) => (part.trim() === '' ? Number.NaN : Number(part)))
+  if (
+    parts.length !== 2 ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude!) > 90 ||
+    Math.abs(longitude!) > 180
+  ) {
+    errors.push({ field: key, message: 'must be latitude,longitude, such as 1.297,103.776' })
+    return null
+  }
+  return { latitude: latitude!, longitude: longitude! }
+}
+
 function status(query: Query, errors: FieldError[]): ListFilters['status'] {
   const text = single(query, 'status', errors)
   if (text === null) return 'Active'
@@ -68,6 +101,13 @@ export function parseListQuery(query: Query): Validated<ListFilters> {
   }
 
   const listStatus = status(query, errors)
+  const near = point(query, 'near', errors)
+  const sortText = single(query, 'sort', errors) ?? 'name'
+  if (sortText !== 'name' && sortText !== 'distance') {
+    errors.push({ field: 'sort', message: 'must be name or distance' })
+  } else if (sortText === 'distance' && near === null && !errors.some((e) => e.field === 'near')) {
+    errors.push({ field: 'near', message: 'is needed to sort by distance' })
+  }
 
   const filters: ListFilters = {
     terms: q === null ? [] : q.split(/\s+/).slice(0, 5),
@@ -75,6 +115,10 @@ export function parseListQuery(query: Query): Validated<ListFilters> {
     zone: text('zone', 60),
     building: text('building', 120),
     status: listStatus,
+    favorites: flag(query, 'favorites', errors),
+    openNow: flag(query, 'openNow', errors),
+    near,
+    sort: sortText === 'distance' ? 'distance' : 'name',
     page: whole(query, 'page', 1, 100000, 1, errors),
     pageSize: whole(query, 'pageSize', 1, MAX_PAGE_SIZE, MAX_PAGE_SIZE, errors),
   }

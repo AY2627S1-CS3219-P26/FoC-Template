@@ -16,6 +16,8 @@ export async function ensureIndexes() {
     );
     await db.collection('transactions').createIndex({ userId: 1 });
     await db.collection('transactions').createIndex({ errandRef: 1 });
+    // The admin ledger sorts the whole collection newest first; this index keeps that off a full scan.
+    await db.collection('transactions').createIndex({ createdAt: -1 });
 }
 
 export async function connectDB() {

@@ -1,82 +1,141 @@
-import { OrderModel, Order, OrderStatus } from "../models/order.model.js";
-import { CreateOrderInput } from "../schemas/order.schema.js";
+import type { OrderModel, Order, OrderStatus } from "../models/order.model.ts";
+import { CreateOrderSchema } from "../schemas/order.schema.ts";
+import { fieldErrorsOf, validationError, type FieldErrors } from "../util/validation.ts";
+import { AppError } from "../errors.ts";
+import type { createServiceClients } from "./clients.ts";
 
-export const OrderService = {
-    async createOrder(requesterId: string, input: CreateOrderInput): Promise<Order> {
-        // Validate needed-by time is not in the past
-        const neededTime = new Date(input.neededByTime);
-        if (neededTime <= new Date()) {
-            throw new Error("NEEDED_BY_TIME_IN_PAST");
-        }
+export const SYSTEM_ACTOR = "system";
 
-        const newOrder = await OrderModel.create({
-            requesterId,
-            supplierId: input.supplierId,
-            deliveryLocation: input.deliveryLocation,
-            neededByTime: input.neededByTime,
-            itemLines: input.itemLines,
-            creditReward: input.creditReward,
-        });
-        return newOrder;
-    },
+export type Role = "requester" | "courier";
 
-    async getOpenRequests(): Promise<Order[]> {
-        return await OrderModel.findOpenRequests();
-    },
-
-    async getOrderById(orderId: number): Promise<Order> {
-        const order = await OrderModel.findById(orderId);
-        if (!order) {
-            throw new Error("ORDER_NOT_FOUND");
-        }
-        return order;
-    },
-
-    async acceptOrder(orderId: number, courierId: string): Promise<Order> {
-        const order = await OrderModel.findById(orderId);
-        if (!order) throw new Error("ORDER_NOT_FOUND");
-
-        if (order.requester_id === courierId) {
-            throw new Error("REQUESTER_CANNOT_ACCEPT_OWN_ORDER");
-        }
-
-        if (order.status !== "Open") {
-            throw new Error("ORDER_NOT_AVAILABLE");
-        }
-
-        const updatedOrder = await OrderModel.acceptOrder(orderId, courierId);
-        if (!updatedOrder) throw new Error("ORDER_ACCEPTANCE_FAILED");
-
-        return updatedOrder;
-    },
-
-    async updateOrderStatus(orderId: number, userId: string, newStatus: OrderStatus): Promise<Order> {
-        const order = await OrderModel.findById(orderId);
-        if (!order) throw new Error("ORDER_NOT_FOUND");
-
-        // Enforce F3.3.1 state transition rules
-        const current = order.status;
-        const isValidTransition =
-            (current === "Open" && ["Accepted", "Cancelled", "Expired"].includes(newStatus)) ||
-            (current === "Accepted" && ["PickedUp", "Cancelled"].includes(newStatus)) ||
-            (current === "PickedUp" && newStatus === "Delivered") ||
-            (current === "Delivered" && newStatus === "Completed");
-
-        if (!isValidTransition) {
-            throw new Error("INVALID_STATE_TRANSITION");
-        }
-
-        // Role restrictions (Courier vs Requester)
-        if (newStatus === "PickedUp" || newStatus === "Delivered") {
-            if (order.courier_id !== userId) throw new Error("UNAUTHORIZED_COURIER_ACTION");
-        }
-        if (newStatus === "Completed") {
-            if (order.requester_id !== userId) throw new Error("UNAUTHORIZED_REQUESTER_ACTION");
-        }
-
-        const updated = await OrderModel.updateStatus(orderId, newStatus);
-        if (!updated) throw new Error("STATUS_UPDATE_FAILED");
-
-        return updated;
-    }
+// The transitions a participant may instruct, by current state. Open to Accepted goes through
+// acceptOrder because it also assigns the courier; Open to Expired is only done by the system.
+const USER_TRANSITIONS: Partial<Record<OrderStatus, { to: OrderStatus; by: Role }[]>> = {
+    Open: [{ to: "Cancelled", by: "requester" }],
+    Accepted: [{ to: "PickedUp", by: "courier" }, { to: "Cancelled", by: "requester" }],
+    PickedUp: [{ to: "Delivered", by: "courier" }],
+    Delivered: [{ to: "Completed", by: "requester" }],
 };
+
+function participantOf(order: Order, role: Role): string | null {
+    return role === "requester" ? order.requester_id : order.courier_id;
+}
+
+export function allowedTransitions(order: Order, accountId: string): OrderStatus[] {
+    return (USER_TRANSITIONS[order.status] ?? [])
+        .filter((rule) => participantOf(order, rule.by) === accountId)
+        .map((rule) => rule.to);
+}
+
+// Pending waits for its credit reservation and Rejected never got one, so neither is an errand.
+export function isErrand(order: Order): boolean {
+    return order.status !== "Pending" && order.status !== "Rejected";
+}
+
+function notFound(): AppError {
+    return new AppError(404, "ORDER_NOT_FOUND", "No errand with this id");
+}
+
+function notOpen(): AppError {
+    return new AppError(409, "ORDER_NOT_AVAILABLE", "This errand is no longer open");
+}
+
+export function createOrderService(model: typeof OrderModel, clients: ReturnType<typeof createServiceClients>) {
+    async function findErrand(orderId: number): Promise<Order> {
+        const order = await model.findById(orderId);
+        if (!order || !isErrand(order)) throw notFound();
+        return order;
+    }
+
+    return {
+        async createOrder(requesterId: string, body: unknown, cookie: string): Promise<Order> {
+            const raw = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+            const parsed = CreateOrderSchema.safeParse(raw);
+            const fields: FieldErrors = parsed.success ? {} : fieldErrorsOf(parsed.error);
+
+            // The supplier is only asked once both values it needs are valid, so a refusal
+            // still names every field that is wrong.
+            if (!fields.neededByTime && new Date(String(raw.neededByTime)) <= new Date()) {
+                fields.neededByTime = ["must be in the future"];
+            }
+            if (!fields.supplierId && !fields.neededByTime) {
+                const supplier = await clients.supplierAvailability(String(raw.supplierId).trim(), String(raw.neededByTime), cookie);
+                if (!supplier) fields.supplierId = ["does not exist"];
+                else if (!supplier.active) fields.supplierId = ["is inactive"];
+                else if (!supplier.open) fields.supplierId = ["is closed at the needed-by time"];
+            }
+            if (!parsed.success || Object.keys(fields).length > 0) throw validationError(fields);
+
+            const input = parsed.data;
+            const newOrder = await model.create({ requesterId, ...input });
+            try {
+                await clients.reserve(requesterId, String(newOrder.id), input.creditReward, cookie);
+            } catch (error) {
+                // A timed-out reservation may still succeed remotely. Rejected queues a release under
+                // the same errand reference, which credit-service applies even if it arrives first.
+                await model.updateStatus(newOrder.id, "Rejected", "Pending", SYSTEM_ACTOR);
+                throw error;
+            }
+            const opened = await model.updateStatus(newOrder.id, "Open", "Pending", requesterId);
+            if (!opened) throw new AppError(409, "ORDER_CREATION_FAILED", "The errand could not be opened, try again");
+            return opened;
+        },
+
+        async getOpenRequests(): Promise<Order[]> {
+            return await model.findOpenRequests();
+        },
+
+        // Anyone may look at an Open errand, since couriers browse them. Once it is taken, only
+        // its requester and courier see it, and everyone else is told it does not exist.
+        async getOrderById(orderId: number, accountId: string) {
+            const order = await findErrand(orderId);
+            const participant = order.requester_id === accountId || order.courier_id === accountId;
+            if (!participant && order.status !== "Open") throw notFound();
+            return { ...order, allowed_transitions: allowedTransitions(order, accountId) };
+        },
+
+        async acceptOrder(orderId: number, courierId: string): Promise<Order> {
+            const order = await findErrand(orderId);
+            if (order.requester_id === courierId) {
+                throw new AppError(403, "OWN_ERRAND", "You cannot accept your own errand");
+            }
+            if (order.status !== "Open" || new Date(order.needed_by_time) <= new Date()) throw notOpen();
+
+            // Of simultaneous acceptances only one matches the conditional update.
+            const updatedOrder = await model.acceptOrder(orderId, courierId);
+            if (!updatedOrder) throw notOpen();
+            return updatedOrder;
+        },
+
+        async getMyOrders(accountId: string) {
+            const orders = await model.findByParticipant(accountId);
+            return orders.map((order) => ({
+                ...order,
+                role: (order.requester_id === accountId ? "requester" : "courier") as Role,
+                allowed_transitions: allowedTransitions(order, accountId),
+            }));
+        },
+
+        async updateOrderStatus(orderId: number, userId: string, newStatus: OrderStatus): Promise<Order> {
+            const order = await findErrand(orderId);
+
+            // A repeated confirmation or cancellation answers with the unchanged errand.
+            if (order.status === newStatus && ["Completed", "Cancelled"].includes(newStatus) && order.requester_id === userId) {
+                return order;
+            }
+
+            const current = order.status;
+            const rule = USER_TRANSITIONS[current]?.find((candidate) => candidate.to === newStatus);
+            if (!rule) {
+                throw new AppError(409, "INVALID_STATE_TRANSITION", `An errand that is ${current} cannot become ${newStatus}`);
+            }
+            if (participantOf(order, rule.by) !== userId) {
+                throw new AppError(403, "NOT_ALLOWED", `Only the ${rule.by} can make this errand ${newStatus}`);
+            }
+
+            const updated = await model.updateStatus(orderId, newStatus, current, userId);
+            if (!updated) throw new AppError(409, "STATE_CHANGED", "The errand changed in the meantime, reload it");
+            return updated;
+        }
+    };
+}

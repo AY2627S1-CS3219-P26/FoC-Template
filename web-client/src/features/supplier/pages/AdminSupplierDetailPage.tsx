@@ -7,6 +7,7 @@ import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { formatDateTime } from '@/lib/format'
 import { AvailabilityText } from '../components/AvailabilityText'
+import { PhotoEditor } from '../components/PhotoEditor'
 import { SupplierForm } from '../components/SupplierForm'
 import { SupplierStatusButton } from '../components/SupplierStatusButton'
 
@@ -36,7 +37,11 @@ export function AdminSupplierDetailPage() {
       <QueryView query={supplier} loadingLabel="Loading supplier">
         {(current) => (
           <div className="grid grid-cols-1 gap-6">
-            {created && update.isIdle && <Notice tone="success" role="status" title="Supplier added" />}
+            {created && update.isIdle && (
+              <Notice tone="success" role="status" title="Supplier added">
+                You can add a photo below.
+              </Notice>
+            )}
 
             <section className="ds-surface grid grid-cols-1 gap-4 p-5">
               <h2>Status</h2>
@@ -65,6 +70,9 @@ export function AdminSupplierDetailPage() {
               </p>
               <SupplierStatusButton supplier={current} look="button" />
             </section>
+
+            {/* Saved on its own, apart from the form below, because it goes to its own endpoint. */}
+            <PhotoEditor supplier={current} />
 
             <SupplierForm
               // A different supplier starts from its own values, not from what was typed for the last one.

@@ -15,6 +15,7 @@ export const supplierKeys = {
   all: ['supplier'] as const,
   list: (filters: SupplierFilters) => ['supplier', 'list', filters] as const,
   filterValues: (status: SupplierStatus | 'all') => ['supplier', 'filters', status] as const,
+  favorites: ['supplier', 'favorites'] as const,
   detail: (id: string) => ['supplier', 'detail', id] as const,
   availability: (id: string, at: string | undefined) => ['supplier', 'availability', id, at] as const,
 }

@@ -156,6 +156,9 @@ days that join up (`src/domain/availability.ts`).
 | Combined | `GET /suppliers?zone=Central&type=Food/Coffee&q=roaster` |
 | Deactivated suppliers | `GET /suppliers?status=Inactive` or `?status=all` |
 | Which types, zones and buildings exist | `GET /suppliers/filters` |
+| Open at this moment | `GET /suppliers?openNow=true` |
+| Nearest first | `GET /suppliers?sort=distance&near=1.297,103.776` |
+| Your own favorites | `GET /suppliers?favorites=true` |
 | Is it open at a given time | `GET /suppliers/{id}/availability?at=2026-10-01T12:00:00%2B08:00` |
 
 ## API
@@ -173,11 +176,28 @@ user-service sets when someone logs in. Request and response bodies are JSON.
 | `POST /suppliers` | administrator | create, 201 with a `Location` header |
 | `PATCH /suppliers/{id}` | administrator | change any field except `id` and `createdAt` |
 | `DELETE /suppliers/{id}` | administrator | deactivate: sets status Inactive, the record stays |
+| `GET /suppliers/favorites` | any member | the ids of your own favorite suppliers |
+| `PUT /suppliers/{id}/favorite` | any member | add a supplier to your favorites, 204 |
+| `DELETE /suppliers/{id}/favorite` | any member | remove it, 204 |
+| `GET /suppliers/{id}/photo` | any member | the photo, or `?size=thumbnail` for the small copy |
+| `PUT /suppliers/{id}/photo` | administrator | add or replace the photo |
+| `DELETE /suppliers/{id}/photo` | administrator | remove the photo |
 
 **List.** `q` (keywords, every word must match the name, type, building,
 zone or address), `type`, `zone`, `building`, `status` (`Active`
-by default, `Inactive`, or `all`), `page` (from 1) and `pageSize` (1 to 20,
-default 20). Results are sorted by name, ignoring case.
+by default, `Inactive`, or `all`), `favorites` (`true` for only your own),
+`openNow` (`true` for only those open at this moment), `near`
+(`latitude,longitude` to measure from), `sort` (`name` by default, or `distance`,
+which needs `near`), `page` (from 1) and `pageSize` (1 to 20, default 20). Results
+are sorted by name, ignoring case, unless sorted by distance, where suppliers
+without coordinates come last. With `near`, every supplier has `distanceMeters`.
+
+Open or closed is worked out in code, which copes with hours past midnight, so
+`openNow` loads every match (at most 2000), keeps the open ones and cuts the page
+itself. Only the stored rows may come from the read cache, never which are open.
+Distances are on a flat map, within a few metres over one campus. The web client
+rounds the student's position to three decimals, about 110 m, and the service
+log shows `near=hidden`.
 
 ```json
 { "items": [ ...suppliers ], "page": 1, "pageSize": 20, "total": 21, "totalPages": 2 }
@@ -208,7 +228,9 @@ as the list (Active by default), so every value finds at least one supplier.
   "contact": { "phone": null, "email": null },
   "hours": [{ "day": "monday", "opens": "09:00", "closes": "16:00" }, "..."],
   "status": "Active",
+  "photo": { "path": "/suppliers/0d3c6c7e-.../photo?v=...", "thumbnailPath": "/suppliers/0d3c6c7e-.../photo?size=thumbnail&v=..." },
   "availability": { "open": true, "closesAt": "16:00", "nextOpensAt": null },
+  "distanceMeters": null,
   "createdAt": "2026-10-01T04:00:00.000Z",
   "updatedAt": "2026-10-01T04:00:00.000Z"
 }
@@ -250,6 +272,36 @@ curl -X POST http://localhost:3002/suppliers \
 `hours` lists the weekdays the supplier is open. A weekday left out is closed.
 Times are `HH:MM`, and closing at `24:00` or after midnight is allowed.
 
+**Favorites.** Each account keeps its own list in `supplier_favorites`, keyed by
+the `accountId` the user-service returns when it authorizes the request. So the
+user-service stores nothing for this, and nobody can name another account:
+there is no account in the path, the query or the body. `GET /suppliers/favorites`
+answers `{ "supplierIds": [...] }`, and `GET /suppliers?favorites=true` lists only
+your favorites, together with every other filter. That list is never served from
+the read cache, because it belongs to one account and changes at a tap. Adding or
+removing a favorite twice gives the same result. An account that an administrator
+deletes leaves its rows behind, a few bytes each, because the user-service
+announces no deletion.
+
+**Photos.** A supplier has at most one photo and a square thumbnail for lists.
+Every supplier in a response has `photo`, which is null or holds two paths on
+this service, such as `/suppliers/{id}/photo?v=1a2b3c4d5e6f7a8b`. The `v` changes with
+every new photo, so a link that carries the current one is cached for a year
+(`private, max-age=31536000, immutable`). An old link still shows the current
+photo but is not cached, and every answer has an `ETag`.
+
+`PUT` takes both images as data URLs, which is what a browser canvas gives:
+
+```json
+{ "photo": "data:image/jpeg;base64,...", "thumbnail": "data:image/jpeg;base64,..." }
+```
+
+The photo may be 1 MB and the thumbnail 256 KB, as JPEG, PNG or WebP. The type is
+read from the file's first bytes and must match the one the data URL names. The
+web client shrinks a photo to 1280 px and a 240 px square before it sends it,
+so any phone photo fits. The images live in the `supplier_photos` table, apart
+from the suppliers, so that listing suppliers never reads them.
+
 **Errors** always look like this. `fields` is present for validation errors and
 names every invalid field, so a form can show them all at once.
 
@@ -261,6 +313,7 @@ names every invalid field, so a form can show them all at once.
 | Status | Code | When |
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST` | invalid fields or query, malformed JSON |
+| 413 | `BAD_REQUEST` | a request body over the limit: 64 KB, or about 1.75 MB for a photo |
 | 401 | `UNAUTHENTICATED` | no session cookie at all |
 | 403 | `FORBIDDEN` | the user-service did not confirm it: an unknown or ended session, an account that is not Active, a missing role, or the user-service could not be asked |
 | 404 | `NOT_FOUND` | no such supplier or route |
@@ -384,6 +437,44 @@ deactivated. The file has no campus zone, per-day hours or contact details, so:
 - **Buildings** written two ways (`Com 2`, `Com2`) are joined.
 - **Address** is the building and floor, such as `COM3, Level 1`.
 - The file is Windows-1252, not UTF-8, and is decoded as such.
+- **Photos.** The `ImageURL` column names a photo for 6 suppliers. The originals
+  in `data/images` are 2.6 to 5 MB each, so shrunk copies are in
+  `data/images/resized` as `NAME.jpg` and `NAME.thumb.jpg`, about 1.4 MB for
+  all 12. They are added once per database, also to a database that was seeded
+  before photos existed, and only to a seeded supplier that still has its seed
+  name and no photo. `seed_runs` records that this happened, so a restart never
+  brings back a photo an administrator removed.
+
+## Deploying
+
+Photos, favorites, open now and nearest need no change to the deployment, so a
+pull request merged into `dev` is all it takes:
+
+1. CI builds the `supplier-service` and `web-client` images and publishes them to
+   GHCR (`.github/workflows/ci.yml`, job `publish`). With the AWS deployment, the
+   same merge also rolls them out to the cloud instance.
+2. When the new supplier-service starts, it applies the migrations it has not run
+   yet (`002_supplier_photos.sql`, `003_supplier_favorites.sql`) and adds the seed
+   photos. Both take a database lock, so several copies that start together still
+   do it once.
+
+There is no new environment variable, secret, port, volume or Helm value. Worth
+knowing all the same:
+
+- **Storage.** A photo is about 250 KB and its thumbnail about 15 KB, in the
+  supplier database. Its cloud volume is 1 GiB (`databases.supplier-db.size` in
+  the Helm values), room for thousands of photos.
+- **Memory.** Each service may use 256 MiB in the cloud. The browser shrinks the
+  photos, so the service holds at most about 1.75 MB for one upload.
+- **Upload size.** The gateway lets 2 MB through on the supplier routes
+  (`web-client/nginx/templates/routes/supplier.conf.template`), which ships in the
+  web-client image.
+- **Location.** Browsers share a position only with a page over HTTPS, or from
+  localhost. The cloud serves HTTPS. On plain HTTP elsewhere, "Nearest to me"
+  says it cannot ask, and the list stays sorted by name.
+- **Logs.** The supplier-service log shows `near=hidden`. The gateway's nginx
+  access log still records the rounded position, about 110 m; changing its log
+  format is a platform change.
 
 ## Tests
 
@@ -426,5 +517,4 @@ invalid one is settled before the database is reached.
 - Availability of 99.9% (N2.1.1) is not measured. There is one instance, and
   running more (N6.3) needs no change to the service, because it keeps no state
   of its own apart from the two short caches.
-- Supplier images. The seed file has links for only 6 of the 21 suppliers, and
-  they point at GitHub pages, not image files.
+- Photos for the other 15 seed suppliers. The seed file has photos for only 6.

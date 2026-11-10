@@ -38,9 +38,10 @@ export function authorize(requiredRole: Role = "member") {
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
             if (response.ok) {
-                const body = (await response.json().catch(() => null)) as { decision?: string; accountId?: string } | null;
+                const body = (await response.json().catch(() => null)) as { decision?: string; accountId?: string; roles?: string[] } | null;
                 if (body?.decision === "authorized") {
                     res.locals.accountId = body.accountId;
+                    res.locals.roles = body.roles ?? [];
                     return next();
                 }
             }
@@ -49,4 +50,18 @@ export function authorize(requiredRole: Role = "member") {
         }
         return res.status(403).send("Forbidden");
     };
+}
+
+// A balance or ledger belongs to one account. A member may read only their own (authorize set
+// res.locals.accountId); an administrator may read any, because the admin console shows a
+// student's credits. Checked before any lookup, so a refusal never reveals whether the account
+// exists (matching the authorize() pattern above).
+export function canReadAccount(accountId: unknown, roles: unknown, userId: string): boolean {
+    return accountId === userId || isAdministrator(roles);
+}
+
+// The admin ledger is everyone's movements, not one account's, so an authorized member reaching it
+// is still refused. Only an administrator may read it.
+export function isAdministrator(roles: unknown): boolean {
+    return Array.isArray(roles) && roles.includes("administrator");
 }

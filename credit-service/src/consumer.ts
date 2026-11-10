@@ -1,5 +1,7 @@
 import { connect, type ConsumeMessage } from "amqplib";
 import { createAccount } from "./services/accountService.ts";
+import { transferCredits, releaseCredits } from "./services/reservationService.ts";
+import { handleOrderEvent } from "./order-events.ts";
 
 const BROKER_URL = process.env.BROKER_URL ?? "amqp://relay:change-me@localhost:5672";
 const EXCHANGE = "relay.events";
@@ -20,6 +22,7 @@ export async function startAccountConsumer(): Promise<void> {
         connection.on("close", () => setTimeout(() => void startAccountConsumer(), RETRY_MS));
 
         const channel = await connection.createChannel();
+        channel.on("error", (err) => console.error("broker channel failed:", err));
         await channel.assertExchange(EXCHANGE, "topic", { durable: true });
         await channel.assertExchange(DEAD_EXCHANGE, "topic", { durable: true });
         await channel.assertQueue(QUEUE, { durable: true, deadLetterExchange: DEAD_EXCHANGE, deadLetterRoutingKey: QUEUE });
@@ -51,6 +54,31 @@ export async function startAccountConsumer(): Promise<void> {
             }
         });
         console.log(`consuming ${EVENT_TYPE} on ${QUEUE}`);
+
+        const orderQueue = "credit-service.orders";
+        await channel.assertQueue(orderQueue, { durable: true, deadLetterExchange: DEAD_EXCHANGE, deadLetterRoutingKey: orderQueue });
+        await channel.assertQueue(`${orderQueue}.dead`, { durable: true });
+        await channel.bindQueue(`${orderQueue}.dead`, DEAD_EXCHANGE, orderQueue);
+        for (const type of ["order.errand.completed", "order.errand.cancelled", "order.errand.expired"]) {
+            await channel.bindQueue(orderQueue, EXCHANGE, type);
+        }
+        await channel.consume(orderQueue, async (message: ConsumeMessage | null) => {
+            if (!message) return;
+            try {
+                await handleOrderEvent(JSON.parse(message.content.toString()), { transfer: transferCredits, release: releaseCredits });
+                channel.ack(message);
+                console.log(`credit request handled (event ${message.properties.messageId})`);
+            } catch (err) {
+                if (err instanceof SyntaxError || (err instanceof Error && err.message === "MALFORMED_ORDER_EVENT")) {
+                    channel.nack(message, false, false);
+                } else {
+                    console.error(`credit request ${message.properties.messageId} failed, will retry:`, err);
+                    setTimeout(() => {
+                        try { channel.nack(message, false, true); } catch { /* A closed channel requeues its unacked messages. */ }
+                    }, RETRY_MS);
+                }
+            }
+        });
     } catch (err) {
         console.error("broker connect failed, will retry:", err);
         setTimeout(() => void startAccountConsumer(), RETRY_MS);

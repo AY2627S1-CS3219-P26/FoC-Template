@@ -16,7 +16,7 @@ The script creates the cluster `relay` on the first run, builds the images with 
 deploy/scripts/smoke-test.sh
 ```
 
-checks the system from the outside: gateway, a refused anonymous request, a closed `/internal` route, and a new student who registers, reads the code in Mailpit, verifies, logs in and fetches the own profile.
+checks the system from the outside: gateway, refused anonymous requests, a closed `/internal` route, and two new students who register, read the code in Mailpit, verify, log in and get a credit account through the broker. Then one errand runs end to end: the first student posts it at a supplier that is open at the needed-by time (credits reserved), the second accepts, picks up and delivers it, the first confirms it, and the reward reaches the courier through the broker. On the way it checks that the requester cannot accept the own errand, a second acceptance and a courier's confirmation are refused, and every transition is recorded. It needs one supplier on the first page that is open within the next 24 hours.
 
 Useful commands:
 
@@ -133,7 +133,7 @@ deploy/scripts/loadtest.sh
 ## Before a demo
 
 1. `aws sso login --profile relay`, then `deploy/scripts/cloud.sh start` about 15 minutes before (or Actions → cloud → start).
-2. Run the smoke test against the HTTPS address. It registers a test account, so do it before the audience watches, not during.
+2. Run the smoke test against the HTTPS address. It registers two test accounts and leaves one completed errand behind, so do it before the audience watches, not during.
 3. Log in as the administrator (`admin`, `ADMIN_PASSWORD` from `deploy/cloud-secrets.env`). The demo students `alice.tan`, `ben.lim`, `chloe.ng` and `daniel.koh` log in with `SEED_DEMO_PASSWORD` from the same file. Verification codes for new accounts are in Mailpit under `/mail/`.
 4. To show the autoscaling live: `kubectl --kubeconfig ~/.kube/relay-aws.yaml -n relay get hpa -w` in one terminal and `HOLD=3m AFTER_SECONDS=0 deploy/scripts/loadtest.sh` in another. The first extra instance appears about 2.5 minutes after the start. The run from `docs/evidence/` is the backup if there is no time.
 5. Afterwards `deploy/scripts/cloud.sh stop`. If you forget, the idle alarm stops the instance after 4 hours.

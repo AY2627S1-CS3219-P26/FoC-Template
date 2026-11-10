@@ -12,6 +12,8 @@ import type { MyOrder, Order, OrderStatus } from '@/api/order/order'
 import { useSuppliers } from '@/api/supplier/suppliers'
 import type { Supplier } from '@/api/supplier/types'
 import { Notice } from '@/components/Notice'
+import { MessageErrand } from '../components/MessageErrand'
+//import { MessageErrand } from '../components/MessageErrand'
 
 type Tab = 'browse' | 'requests' | 'deliveries'
 type Flash = { kind: 'ok' | 'error'; text: string }
@@ -82,8 +84,7 @@ function relativeTo(iso: string, now: number): string {
     abs < 60 ? `${abs} min` : abs < 60 * 48 ? `${Math.round(abs / 60)} h` : `${Math.round(abs / 1440)} d`
   return diffMin >= 0 ? `in ${span}` : `${span} overdue`
 }
-import { Page } from '@/components/Page'
-import { MessageErrand } from '../components/MessageErrand'
+
 
 //Insert the id of the errand owner in receiver
 export function ErrandsPage() {
@@ -356,9 +357,12 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
       {note && <p className="text-sm text-muted">{note}</p>}
 
       <div className="mt-auto flex flex-wrap justify-center gap-2">
+        <MessageErrand receiverId={(isRequester ? order.courier_id : order.requester_id) || ""} />
+
         <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
           View details
         </Link>
+
         {actions}
       </div>
     </article>
@@ -384,7 +388,4 @@ function statusNote(order: Order, isRequester: boolean, isCourier: boolean): str
     case 'Expired':
       return 'Expired. Reserved credits are released.'
   }
-  return <Page title="Errands" subtitle="Your current errands">
-    <MessageErrand receiverId="receiverId" />
-  </Page>
 }

@@ -74,15 +74,16 @@ export function MessageErrand({ receiverId }: MessageErrandProps) {
                 </div>
             )}
 
-            <button
+            {!isOpen && <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 aria-expanded={isOpen}
-                className="ds-btn ds-btn--primary"
+                className="ds-btn ds-btn--glass"
             >
                 {isOpen ? <X aria-hidden="true" /> : <MessageCircle aria-hidden="true" />}
-                {isOpen ? 'Close' : 'Message'}
-            </button>
+                Message
+
+            </button>}
         </div>
     )
 }

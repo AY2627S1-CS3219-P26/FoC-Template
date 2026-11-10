@@ -24,6 +24,9 @@ JAR="$REQUESTER_JAR"
 
 REWARD=5
 STARTING_CREDITS=50
+# The drop-off point of the test errand: COM1, inside the walking map of the supplier-service.
+DROP_OFF_LATITUDE=1.2949
+DROP_OFF_LONGITUDE=103.7737
 
 failed=0
 # expect <label> <expected status> <curl args...>; prints the body to stdout for the caller.
@@ -186,7 +189,7 @@ fi
 echo "ok    supplier $supplier_id is open at $needed_by" >&2
 
 errand="$(expect "requester posts an errand" 201 --header 'Content-Type: application/json' \
-  --data "{\"supplierId\":\"$supplier_id\",\"deliveryLocation\":\"COM1 Level 2 smoke test\",\"neededByTime\":\"$needed_by\",\"itemLines\":[\"1x smoke test item\"],\"creditReward\":$REWARD}" \
+  --data "{\"supplierId\":\"$supplier_id\",\"deliveryLocation\":\"COM1 Level 2 smoke test\",\"deliveryLatitude\":$DROP_OFF_LATITUDE,\"deliveryLongitude\":$DROP_OFF_LONGITUDE,\"neededByTime\":\"$needed_by\",\"itemLines\":[\"1x smoke test item\"],\"creditReward\":$REWARD}" \
   "$BASE/api/order/orders")"
 errand_id="$(printf '%s' "$errand" | jq -r '.data.id // empty')"
 if [ -z "$errand_id" ]; then

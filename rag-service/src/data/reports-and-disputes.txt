@@ -1,8 +1,0 @@
-Title: Reporting a problem or disputing an errand
-Questions: How do I report someone? How do I open a dispute? My courier did not deliver. The requester did not confirm. Who decides disputes? What if something goes wrong with my errand? What happens after I report someone?
-
-A report names an errand and the other person on it, with a description of what happened of 20 to 500 characters. You can report an errand once. An administrator reads every report and either dismisses it or suspends the reported account.
-
-The Report a problem page exists, but no errand page links to it yet, so you cannot send a report in the app yet. Keep the details of the errand so that you can describe what happened.
-
-Administrators resolve disputes, but there is no way to open a dispute yet, and the Disputes page in the admin console is not finished either.

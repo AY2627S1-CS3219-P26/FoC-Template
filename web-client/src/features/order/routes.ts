@@ -1,5 +1,4 @@
 import type { FeatureRoutes } from '@/lib/routing'
-import { AdminDisputesPage } from './pages/AdminDisputesPage'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { ErrandsPage } from './pages/ErrandsPage'
 import { PostErrandPage } from './pages/PostErrandPage'
@@ -13,6 +12,5 @@ export const orderRoutes: FeatureRoutes = {
   ],
   admin: [
     { path: 'orders', Component: AdminOrdersPage },
-    { path: 'disputes', Component: AdminDisputesPage },
   ],
 }

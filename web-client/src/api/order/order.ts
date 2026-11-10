@@ -70,6 +70,9 @@ export type AdminOrders = {
 
 export type MyOrders = { orders: MyOrder[]; accountId: string }
 
+// GET /orders/:id adds what the caller may do next, like /orders/mine.
+export type OrderDetail = Order & { allowed_transitions: OrderStatus[] }
+
 // Refetch while the page is visible so couriers see new errands and requesters see progress.
 const POLL_MS = 15_000
 
@@ -144,7 +147,7 @@ export function useUpdateOrderStatus() {
 export function useOrder(id: number) {
   return useQuery({
     queryKey: ['order', 'detail', id],
-    queryFn: async ({ signal }) => (await request<{ data: Order }>('order', `/orders/${id}`, { signal })).data,
+    queryFn: async ({ signal }) => (await request<{ data: OrderDetail }>('order', `/orders/${id}`, { signal })).data,
     enabled: id > 0,
     refetchInterval: POLL_MS,
   })

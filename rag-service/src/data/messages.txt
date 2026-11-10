@@ -1,8 +1,12 @@
-Title: Messages and chatting with other students
-Questions: How do I message someone? How do I contact my courier? How do I talk to the requester? Where are my messages? What is the Relay conversation? Can I message the assistant from Messages?
+Title: Messages and chatting about an errand
+Questions: How do I message someone? How do I contact my courier? How do I talk to the requester? Where are my messages? Why can't I send a message? Why is the chat closed? What is the Relay conversation? Can I message any student?
 
-Open Messages in the main menu to see your conversations with other students, newest first, with the number of unread messages. Open a conversation to read it and send a reply from the box at the bottom.
+Every errand has its own chat between its requester and its courier. You cannot message other students.
 
-To start a conversation about an errand, press Message on the errand card on the Errands page, write your message and press Send message. It goes to the other person on that errand: the courier if it is your errand, otherwise the requester. The conversation then appears under Messages.
+The chat opens when a courier accepts the errand. Open it on the errand page (View details), or press Chat on the errand card on the Errands page. Type in the box under the messages and press Send; the other person sees it right away.
 
-The conversation called Relay holds updates from the app itself. You cannot reply to it. To ask the assistant a question, use the round button in the bottom right corner instead.
+When the errand is completed, cancelled or expires, the chat closes. It shows "This chat is closed. Earlier messages stay here." and you can still read it.
+
+Messages in the main menu lists your chats, newest first, one row per errand with the other person's name, "Errand #" and its number, and the number of unread messages. Open a row to go to that errand's chat.
+
+The conversation called Relay holds messages from the app itself, such as the welcome message. You cannot reply to it. To ask the assistant a question, use the round button in the bottom right corner instead.

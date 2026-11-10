@@ -17,7 +17,7 @@ boostrap_rag_system()
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Friend on Campus NUS Rag System"}
+    return {"message": "Relay help assistant"}
 
 @app.get("/health/")
 async def health():

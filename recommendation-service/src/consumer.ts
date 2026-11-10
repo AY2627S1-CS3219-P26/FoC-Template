@@ -32,18 +32,16 @@ export async function startErrandConsumer(store: FeatureStore): Promise<void> {
                 errand = {
                     supplierId: event.data.supplierId,
                     eventId: event.eventId,
-                    reward: event.data.reward,
+                    reward: event.data.creditReward,
                     itemCount: event.data.itemCount,
                     distance: event.data.distance,
-                    leadTimeMin: event.data.leadTimeMin,
                 };
                 if (
                     typeof errand.eventId !== "string" ||
                     typeof errand.supplierId !== "string" ||
                     typeof errand.reward !== "number" ||
                     typeof errand.itemCount !== "number" ||
-                    typeof errand.distance !== "number" ||
-                    typeof errand.leadTimeMin !== "number"
+                    typeof errand.distance !== "number"
                 ) {
                     throw new Error("malformed errand event");
                 }

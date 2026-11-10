@@ -153,3 +153,19 @@ Use a commit on `dev` or `main` whose CI run has published the images.
 1. Add an entry under `services` in `deploy/helm/relay/values.yaml` (port, health path, `waitFor`, `secretEnv`, `env`). The comments there explain each field. The service name becomes the host name, so URLs from `compose.yaml` keep working.
 2. If it has a database, add it under `databases` with `kind: mongo` or `kind: postgres`.
 3. Add the service name to `SERVICES` in `deploy/scripts/local-up.sh`.
+
+## Declaration of AI-assisted work
+
+**Tool:** Claude Code (Claude Opus models).
+
+**How Claude was used:**
+
+- **Generate:** Claude was used to write the Terraform files, the Helm chart, the scripts in `deploy/scripts/`, the load test and the CI/CD workflows in `.github/workflows/`, one step at a time from a plan.
+- **Adapt:** Claude was used to adapt the other services so they run in Kubernetes.
+- **Debug:** Claude was used to debug failing pods, the certificates and the CI deploy job.
+- **Explain:** Claude was used to explain each step before it was committed.
+- **Document:** Claude was used to help write this document.
+
+**Decisions:** The choice of k3s on one EC2 instance with Helm and HPA, over Elastic Beanstalk and EKS, was made by the team, not by Claude. The decision and its reasons are in `docs/decisions/0004-cloud-deployment.md`.
+
+**Review:** Every change was reviewed, deployed by hand and checked in the cluster. The autoscaling evidence in `docs/evidence/` comes from real runs.

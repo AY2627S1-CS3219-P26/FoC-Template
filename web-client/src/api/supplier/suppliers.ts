@@ -3,7 +3,6 @@ import { request } from '@/lib/http'
 import type { Paginated } from '@/lib/http'
 import type {
   Supplier,
-  SupplierAvailabilityCheck,
   SupplierFilters,
   SupplierFilterValues,
   SupplierInput,
@@ -20,7 +19,6 @@ export const supplierKeys = {
   filterValues: (status: SupplierStatus | 'all') => ['supplier', 'filters', status] as const,
   favorites: ['supplier', 'favorites'] as const,
   detail: (id: string) => ['supplier', 'detail', id] as const,
-  availability: (id: string, at: string | undefined) => ['supplier', 'availability', id, at] as const,
   route: (id: string, to: Point | null) => ['supplier', 'route', id, to?.latitude, to?.longitude] as const,
 }
 
@@ -46,18 +44,6 @@ export function useSupplier(id: string) {
   return useQuery({
     queryKey: supplierKeys.detail(id),
     queryFn: ({ signal }) => request<Supplier>('supplier', `/suppliers/${id}`, { signal }),
-  })
-}
-
-// Whether a new errand may use the supplier at `at`, an ISO time with an offset such as
-// new Date().toISOString(). Without `at` the supplier-service answers for now.
-export function useSupplierAvailability(id: string, at?: string) {
-  return useQuery({
-    queryKey: supplierKeys.availability(id, at),
-    queryFn: ({ signal }) =>
-      request<SupplierAvailabilityCheck>('supplier', `/suppliers/${id}/availability`, { query: { at }, signal }),
-    // Nothing to ask until a supplier is chosen.
-    enabled: id !== '',
   })
 }
 

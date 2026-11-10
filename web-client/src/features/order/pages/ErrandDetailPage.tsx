@@ -1,3 +1,4 @@
+import { Flag } from 'lucide-react'
 import { createElement } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMyOrders, useOrder } from '@/api/order/order'
@@ -258,6 +259,20 @@ export function ErrandDetailPage() {
     </Link>
   )
 
+  // The report form belongs to the user feature and takes the errand and the other person from the
+  // URL. Only the two people on an errand with a courier can report each other; the user-service
+  // checks that again with the order-service.
+  const other = !data || !role ? null : role === 'Requester' ? data.courier_id : data.requester_id
+  const report = other && (
+    <Link
+      to={`/reports/new?errand=${id}&account=${encodeURIComponent(other)}`}
+      className="ds-btn ds-btn--glass"
+    >
+      <Flag aria-hidden="true" />
+      Report a problem
+    </Link>
+  )
+
   if (!validId) {
     return (
       <Page title="Errand">
@@ -268,7 +283,10 @@ export function ErrandDetailPage() {
 
   return (
     <Page title={`Errand #${id}`} subtitle={data ? `${data.credit_reward} credits` : undefined}>
-      <div>{back}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {back}
+        {report}
+      </div>
       <QueryView
         query={order}
         loadingLabel="Loading errand"

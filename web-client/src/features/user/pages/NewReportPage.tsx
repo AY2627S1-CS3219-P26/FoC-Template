@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { useName } from '@/api/user/member'
 import { useCreateReport } from '@/api/user/reports'
 import { EmptyState } from '@/components/EmptyState'
 import { FormError } from '@/components/FormError'
@@ -22,6 +23,7 @@ export function NewReportPage() {
   const reportedId = searchParams.get('account') ?? ''
   const [reason, setReason] = useState('')
   const create = useCreateReport()
+  const name = useName(reportedId, reportedId !== '')
   const fieldErrors = fieldErrorsOf(create.error)
   const sentRef = useRef<HTMLHeadingElement>(null)
 
@@ -60,8 +62,8 @@ export function NewReportPage() {
               Report sent
             </h2>
             <p className="text-muted">An administrator reads every report and decides what happens.</p>
-            <Link to="/errands" className="ds-btn ds-btn--glass justify-self-start">
-              Back to errands
+            <Link to={`/errands/${errandId}`} className="ds-btn ds-btn--glass justify-self-start">
+              Back to the errand
             </Link>
           </section>
         ) : (
@@ -77,7 +79,7 @@ export function NewReportPage() {
               </div>
               <div className="min-w-0">
                 <dt className="ds-label">Reported</dt>
-                <dd className="mt-1">The other person on this errand</dd>
+                <dd className="mt-1 wrap-anywhere">{name.data ?? 'The other person on this errand'}</dd>
                 {fieldErrors.reportedId && <dd className="ds-field-error">{sentence(fieldErrors.reportedId)}</dd>}
               </div>
             </dl>

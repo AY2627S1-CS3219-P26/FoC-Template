@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import {
   describeOrderError,
   useAcceptOrder,
@@ -281,12 +282,12 @@ const VARIANT_CLASS: Record<Variant, string> = {
   plain: 'ds-btn',
 }
 
+
 function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatus }: CardProps) {
   const isRequester = me !== null && order.requester_id === me
   const isCourier = me !== null && order.courier_id === me
   const pastDue = order.status === 'Open' && new Date(order.needed_by_time).getTime() < now
-  const firstItems = order.item_lines.slice(0, 3)
-  const extra = Math.max(0, order.item_lines.length - 3)
+  const itemCount = order.item_lines.length
 
   function confirmThen(message: string, fn: () => void) {
     if (window.confirm(message)) fn()
@@ -311,8 +312,9 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
     button(status, action.label(order), confirm ? () => confirmThen(confirm(order), change) : change, 'primary')
   }
 
-  const note = statusNote(order, isRequester, isCourier)
   const muted = order.status === 'Cancelled' || order.status === 'Expired'
+
+  const note = statusNote(order, isRequester, isCourier)
 
   return (
     <article
@@ -320,22 +322,14 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
       className={`ds-surface flex h-full flex-col gap-4 p-5 ${busy ? 'opacity-70' : muted ? 'opacity-80' : ''}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 className="wrap-anywhere">{supplier}</h2>
-        <span
-          className={`shrink-0 rounded-full border border-current px-3 py-0.5 text-xs font-semibold ${BADGE_TONE[order.status]}`}
-        >
+        <div className="min-w-0">
+          <p className="ds-label">Pick up from</p>
+          <h2 className="mt-1 wrap-anywhere">{supplier}</h2>
+        </div>
+        <span className={`shrink-0 rounded-chip px-3 py-0.5 text-xs font-[600] ${BADGE_TONE[order.status]}`}>
           {STATUS_LABEL[order.status]}
         </span>
       </div>
-
-      <ul className="m-0 grid list-disc gap-1 pl-5">
-        {firstItems.map((line, i) => (
-          <li key={i} className="wrap-anywhere">
-            {line}
-          </li>
-        ))}
-        {extra > 0 && <li className="list-none opacity-70">+{extra} more</li>}
-      </ul>
 
       <dl className="m-0 grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2">
         <dt className="ds-label">Deliver to</dt>
@@ -345,26 +339,27 @@ function ErrandCard({ order, me, allowed, now, supplier, busy, onAccept, onStatu
         <dd className="m-0">
           {formatNeededBy(order.needed_by_time)}
           {!TERMINAL.includes(order.status) && (
-            <span className={pastDue ? 'text-red-600 dark:text-red-400' : 'opacity-70'}>
-              {' '}
-              · {relativeTo(order.needed_by_time, now)}
-            </span>
+            <span className={pastDue ? 'text-danger' : 'text-muted'}> · {relativeTo(order.needed_by_time, now)}</span>
           )}
         </dd>
 
+        <dt className="ds-label">Items</dt>
+        <dd className="m-0">
+          {itemCount} {itemCount === 1 ? 'item' : 'items'}
+        </dd>
+
         <dt className="ds-label">Reward</dt>
-        <dd className="m-0 font-semibold">{order.credit_reward} credits</dd>
-
-        {isCourier && !isRequester && (
-          <>
-            <dt className="ds-label">Your role</dt>
-            <dd className="m-0">Courier</dd>
-          </>
-        )}
+        <dd className="m-0 font-[600]">{order.credit_reward} credits</dd>
       </dl>
+      
+      {note && <p className="text-sm text-muted">{note}</p>}
 
-      {note && <p className="text-sm opacity-70">{note}</p>}
-      {actions.length > 0 && <div className="mt-auto flex flex-wrap gap-2">{actions}</div>}
+      <div className="mt-auto flex flex-wrap justify-center gap-2">
+        <Link to={`/errands/${order.id}`} className="ds-btn ds-btn--glass">
+          View details
+        </Link>
+        {actions}
+      </div>
     </article>
   )
 }

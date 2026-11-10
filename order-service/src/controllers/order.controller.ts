@@ -31,9 +31,26 @@ export const OrderController = {
         res.status(201).json({ data: order });
     }),
 
+    // GET /orders/admin
+    getAllOrders: handle(async (req, res) => {
+        const page = Number(req.query.page ?? 1)
+        const pageSize = Number(req.query.pageSize ?? 10)
+        const q = String(req.query.q ?? '')
+        const status = String(req.query.status ?? '')
+
+        const result = await OrderService.getAllOrders(
+            page,
+            pageSize,
+            q,
+            status,
+        )
+
+        res.status(200).json({ data: result })
+    }),
+
     // GET /orders/open
     getOpenRequests: handle(async (_req, res) => {
-        res.status(200).json({ data: await OrderService.getOpenRequests() });
+        res.status(200).json({ data: await OrderService.getOpenRequests(res.locals.accountId) });
     }),
 
     // GET /orders/mine
@@ -59,4 +76,9 @@ export const OrderController = {
         if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
         res.status(200).json({ data: await OrderService.updateOrderStatus(orderId, res.locals.accountId, parsed.data.status) });
     }),
+
+    // GET /admin/orders/:id
+    getOrderForAdmin: handle(async (req, res) => {
+        res.status(200).json({ data: await OrderService.getOrderForAdmin(orderIdOf(req))})
+    })
 };

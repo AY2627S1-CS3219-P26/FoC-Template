@@ -12,6 +12,7 @@ import type { MyOrder, Order, OrderStatus } from '@/api/order/order'
 import { useSuppliers } from '@/api/supplier/suppliers'
 import type { Supplier } from '@/api/supplier/types'
 import { Notice } from '@/components/Notice'
+import { Page } from '@/components/Page'
 
 type Tab = 'browse' | 'requests' | 'deliveries'
 type Flash = { kind: 'ok' | 'error'; text: string }
@@ -164,12 +165,8 @@ export function ErrandsPage() {
   const counts = { browse: browse.length, requests: requests.length, deliveries: deliveries.length }
 
   return (
+    <Page title="Errands" subtitle="Pick up errands for others and track the ones you have requested.">
     <div className="mx-auto grid w-full max-w-5xl grid-cols-1 content-start gap-6 p-4 sm:p-6">
-      <header className="grid gap-2">
-        <h1>Errands</h1>
-        <p className="opacity-70">Pick up errands for others and track the ones you have requested.</p>
-      </header>
-
       {flash && (
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -244,6 +241,7 @@ export function ErrandsPage() {
         </div>
       </div>
     </div>
+  </Page>
   )
 }
 

@@ -1,4 +1,4 @@
-import type { OrderModel, Order, OrderStatus } from "../models/order.model.ts";
+import type { OrderModel, Order, OrderStatus, AdminOrders } from "../models/order.model.ts";
 import { CreateOrderSchema } from "../schemas/order.schema.ts";
 import { fieldErrorsOf, validationError, type FieldErrors } from "../util/validation.ts";
 import { AppError } from "../errors.ts";
@@ -81,8 +81,8 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             return opened;
         },
 
-        async getOpenRequests(): Promise<Order[]> {
-            return await model.findOpenRequests();
+        async getOpenRequests(accountId: string): Promise<Order[]> {
+            return await model.findOpenRequests(accountId);
         },
 
         // Anyone may look at an Open errand, since couriers browse them. Once it is taken, only
@@ -93,6 +93,14 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
             if (!participant && order.status !== "Open") throw notFound();
             return { ...order, allowed_transitions: allowedTransitions(order, accountId) };
         },
+
+        // no isErrand filter so that failed orders are visible too
+        async getOrderForAdmin(orderId: number) {
+            const order = await model.findById(orderId);        
+            if (!order) throw notFound();
+            return order;                                      
+        },
+
 
         async acceptOrder(orderId: number, courierId: string): Promise<Order> {
             const order = await findErrand(orderId);
@@ -114,6 +122,16 @@ export function createOrderService(model: typeof OrderModel, clients: ReturnType
                 role: (order.requester_id === accountId ? "requester" : "courier") as Role,
                 allowed_transitions: allowedTransitions(order, accountId),
             }));
+        },
+
+        async getAllOrders(page=1, pageSize=10, q='', status=''): Promise<AdminOrders> {
+            // default to page 1/pageSize 10 if value not valid
+            const validPage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1
+            const validSize = Number.isFinite(pageSize) ? Math.min(100, Math.floor(pageSize)) : 10
+
+            const {orders, total} = await model.findAllOrders(validPage, validSize, q, status)
+
+            return { orders, page: validPage, pageSize: validSize, total }
         },
 
         async updateOrderStatus(orderId: number, userId: string, newStatus: OrderStatus): Promise<Order> {

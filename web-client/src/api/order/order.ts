@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { ApiError, request } from '@/lib/http'
 
 export type OrderStatus =
@@ -49,6 +49,13 @@ export type MyOrder = Order & {
   transitions: OrderTransition[]
 }
 
+export type AdminOrders = {
+  orders: Order[]
+  page: number
+  pageSize: number
+  total: number
+}
+
 export type MyOrders = { orders: MyOrder[]; accountId: string }
 
 // Refetch while the page is visible so couriers see new errands and requesters see progress.
@@ -59,6 +66,21 @@ export function useOpenOrders() {
     queryKey: ['order', 'open'],
     queryFn: async ({ signal }) => (await request<{ data: Order[] }>('order', '/orders/open', { signal })).data,
     refetchInterval: POLL_MS,
+  })
+}
+
+export function useAllOrders(page: number, pageSize = 10, q = '', status = '') {
+  return useQuery<AdminOrders>({
+    queryKey: ['order', 'admin', page, pageSize, q, status],
+    queryFn: async ({ signal }): Promise<AdminOrders> => {
+      const response = await request<{ data: AdminOrders }>('order', '/orders/admin', {
+        query: { page, pageSize, q: q || undefined, status: status || undefined },
+        signal,
+      })
+      return response.data
+    },
+    // Keeps the current page on screen while the next one loads, as useSuppliers does.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -104,6 +126,8 @@ export function useUpdateOrderStatus() {
     onSettled: invalidate,
   })
 }
+
+// For order details
 
 export function useOrder(id: number) {
   return useQuery({

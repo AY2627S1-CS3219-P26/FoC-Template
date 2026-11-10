@@ -2,12 +2,16 @@ import { Router } from "express";
 import { OrderController } from "../controllers/order.controller.ts";
 import { createRequireAuth } from "../middleware/auth.middleware.ts";
 import { config } from "../config.ts";
+import { requireAdmin } from "../middleware/requireAdmin.ts";
 
 const router = Router();
 router.use(createRequireAuth(config.USER_SERVICE_URL));
 
 // POST /orders - Create a new errand request
 router.post("/", OrderController.createOrder);
+
+// GET /orders/admin - Get all orders, only for admin side
+router.get("/admin", OrderController.getAllOrders);
 
 // GET /orders/open - Browse open requests available for couriers[cite: 7]
 router.get("/open", OrderController.getOpenRequests);
@@ -24,5 +28,8 @@ router.post("/:id/accept", OrderController.acceptOrder);
 
 // PATCH /orders/:id/status - Update order lifecycle status (e.g., PICKED_UP, COMPLETED, CANCELLED)[cite: 7]
 router.patch("/:id/status", OrderController.updateStatus);
+
+// GET /admin/orders/:id
+router.get("/admin/orders/:id", requireAdmin, OrderController.getOrderForAdmin)
 
 export default router;

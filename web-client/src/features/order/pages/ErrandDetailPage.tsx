@@ -5,7 +5,7 @@ import { useSupplier } from '@/api/supplier/suppliers'
 import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
-import { SupplierThumbnail } from '@/features/supplier/components/SupplierThumbnail'
+import { SupplierThumbnail } from '@/features/order/components/SupplierThumbnail'
 
 const ERRANDS_PATH = '/errands'
 

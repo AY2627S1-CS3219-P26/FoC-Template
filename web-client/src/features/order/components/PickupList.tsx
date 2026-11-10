@@ -68,7 +68,6 @@ export function PickUpList({ selectedId, onSelect, onClose}: PickUpListProps) {
                 </header>
                 <form role="search" noValidate onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-4 md:items-end p-3">
                     <div className="md:col-span-2">
-                        {/* No hint below the box: it would push the status and the button out of line with it. */}
                         <TextField label="Search name of location" name="q" type="search" value={search} onChange={setSearch} />
                     </div>
                     <SelectField

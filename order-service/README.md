@@ -21,6 +21,9 @@ the reservation is confirmed. When the credit service refuses (`INSUFFICIENT_CRE
 no errand: no endpoint shows it, and retrying the POST is safe. Only Open orders appear
 in `GET /orders/open` and can be accepted.
 
+## Schema
+
+
 **Walking route (nice-to-have).** The drop-off needs both the address typed by the
 requester (`deliveryLocation`) and the point picked on the map (`deliveryLatitude`,
 `deliveryLongitude`). The web client measures the walk as soon as the supplier and the
@@ -47,31 +50,82 @@ client reads.
 | POST | `/orders/:id/accept` | Assign the authenticated courier |
 | PATCH | `/orders/:id/status` | `{ "status": "PickedUp" }`; only `PickedUp`, `Delivered`, `Completed` or `Cancelled`, anything else is a field error |
 | GET | `/orders/mine` | Own errands as requester or courier, newest first, with history, `role` and `allowed_transitions` |
+| GET | `/orders/admin` | Retrieve orders for Admin viewing only |
 
 `GET /internal/orders/:id` answers `{ id, requesterId, courierId, status }` for other
 services, or 404. The gateway does not forward it, so only the compose network and the
 cluster reach it.
 
-Completed requests a credit transfer to the assigned courier. Cancelled, Expired and
-Rejected request release to the requester (Rejected as `order.errand.cancelled`). These
-use a transactional PostgreSQL outbox and RabbitMQ; a credit or broker outage leaves the
-event waiting for retry. Each instance claims a batch for 30 seconds before it sends it,
-so several replicas never send the same event twice in normal operation.
-The credit consumer reuses its existing idempotent transfer/release operations.
-See [the event catalog](../docs/events.md). The broker publisher follows
-`user-service/src/broker.ts` from this repository.
+## Order lifecycle
 
-A release closes its errand reference in credit-service even if it arrives before
-reservation. A Pending order left by a crash is rejected after one minute. Creation
-is not an atomic transaction across PostgreSQL and MongoDB: recovery is eventual.
-An Open order that nobody accepted by its needed-by time is set to Expired
-automatically, which releases its reward. Users cannot set Expired themselves.
+An errand follows a defined lifecycle, with different operations available depending on its current status.
 
-For local development, run the dependencies in Compose, set the variables in
-the root `.env.example`, then run `npm ci` and `npm run dev` in `order-service`.
-Run the type check and the tests in `order-service`:
+### Order creation
+
+Creating an errand requires:
+
+`supplierId`
+
+`deliveryLocation`
+
+`deliveryLatitude`
+
+`deliveryLongitude`
+
+`neededByTime`
+
+`itemLines`
+
+`creditReward`
+
+Before creating the errand, the service checks the selected supplier's availability through: `GET /suppliers/{id}/availability?at={neededByTime}` The supplier must exist, be active and be open at the requested time. A missing, inactive or closed supplier results in a validation error associated with supplierId.
+
+The service validates all relevant input fields together. When validation fails, the response identifies every invalid field in error.details.fields. Once the validation succeeds, the service:
+
+1. Saves the order with Pending status.
+
+2. Requests a reward reservation through POST /credits/reserve.
+
+3. Waits for the reservation result.
+
+4. Changes the order to Open once the reservation is confirmed. If the Credit Service refuses the reservation or does not respond within five seconds, the order becomes Rejected.
+
+
+>Pending and Rejected orders are not exposed through the user-facing order endpoints, but can be viewed by admin in the Admin Dashboard. Only Open orders are available for browsing and acceptance.
+
+Retrying the creation request is safe when the previous attempt resulted in a Pending or Rejected order.
+
+Completed requests a credit transfer to the assigned courier. Cancelled, Expired and Rejected request release to the requester (Rejected as `order.errand.cancelled`). These use a transactional PostgreSQL outbox and RabbitMQ; a credit or broker outage leaves the event waiting for retry. Each instance claims a batch for 30 seconds before it sends it, so several replicas never send the same event twice in normal operation. The credit consumer reuses its existing idempotent transfer/release operations. See [the event catalog](../docs/events.md). The broker publisher follows `user-service/src/broker.ts` from this repository.
+
+A release closes its errand reference in credit-service even if it arrives before reservation. A Pending order left by a crash is rejected after one minute. An Open order that nobody accepted by its needed-by time is set to Expired automatically, which releases its reward.
+
+Order status transitions
+
+| Status | Description |
+|--------|-------------|
+|Pending | The order has been created and is awaiting credit reservation
+| Open |The reward has been reserved and the errand is available for acceptance
+| Accepted |A courier has accepted the errand
+|PickedUp |The courier has picked up the requested items
+|Delivered |The items have been delivered
+|Completed |The errand has been completed
+|Cancelled |The errand has been cancelled
+|Rejected |The credit reservation was refused or timed out
+|Expired |The errand was not accepted before its needed-by time
+
+![alt text](stateTransitions.png)
+
+## Local development
+For local development, run the dependencies in Compose, set the variables in the root `.env.example`, then run `npm ci` and `npm run dev` in `order-service`. Run the type check and the tests in `order-service`:
 
 ```sh
 npm run typecheck
 npm test
 ```
+
+## Declaration of AI-assisted work
+
+Architecture and schemas, workflow are human-made. Below are AI-assisted actions:
+
+**Debug:** Claude was used to debug the issues of Order Service not being able to receive/correctly parse information from Supplier Service
+**Generate:** Claude was used to generate the Order Life Cycle in this document

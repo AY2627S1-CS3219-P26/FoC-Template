@@ -9,7 +9,7 @@ import { formatDateTime } from '@/lib/format'
 import { AccountLink } from '../components/AccountLink'
 import { ReportLink } from '../components/ReportLink'
 import { ReportStateBadge } from '../components/ReportStateBadge'
-
+import { ErrandStatus } from '../components/ErrandStatus'
 const pageSize = 20
 
 // Open comes first and is the default: those reports still wait for a decision.
@@ -19,6 +19,8 @@ const stateFilters = [
   { value: 'Actioned', label: 'Actioned' },
   { value: 'all', label: 'All' },
 ]
+
+
 
 // F5.5.4: the reports held by the user-service, newest first.
 export function AdminReportsPage() {
@@ -153,7 +155,7 @@ export function AdminReportsPage() {
                       <td>
                         <AccountLink account={report.reporter} backLabel="Reports" />
                       </td>
-                      <td className="nums-tabular">#{report.errandId}</td>
+                      <td className="nums-tabular wrap-anywhere">#{report.errandId} <ErrandStatus errandId={report.errandId} /></td>
                       <td className="wrap-anywhere">{report.reason}</td>
                       <td>
                         <ReportStateBadge state={report.state} />
@@ -174,6 +176,7 @@ export function AdminReportsPage() {
                     <p className="min-w-0 text-sm text-muted">
                       Errand #{report.errandId} · {formatDateTime(report.filedAt)}
                     </p>
+                    <ErrandStatus errandId={report.errandId} />
                     <ReportStateBadge state={report.state} />
                   </div>
                   <p className="min-w-0 wrap-anywhere">

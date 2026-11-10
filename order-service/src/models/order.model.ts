@@ -58,6 +58,13 @@ export interface CreateOrderData {
     route: WalkingRoute | null;
 }
 
+export interface AdminOrders {
+    orders: Order[];
+    page: number;
+    pageSize: number;
+    total: number;
+}
+
 export const OrderModel = {
     async create(data: CreateOrderData): Promise<Order> {
         const query = `
@@ -89,8 +96,15 @@ export const OrderModel = {
         return result.rows[0];
     },
 
-    async findOpenRequests(): Promise<Order[]> {
-        const result: QueryResult<Order> = await pool.query(`SELECT * FROM orders WHERE status = 'Open' AND needed_by_time > now() ORDER BY created_at DESC;`);
+    async findOpenRequests(excludeRequesterId?: string): Promise<Order[]> {
+        const result: QueryResult<Order> = await pool.query(
+            `SELECT * FROM orders
+            WHERE status = 'Open'
+            AND needed_by_time > now()
+            AND ($1::text IS NULL OR requester_id <> $1)
+            ORDER BY created_at DESC;`,
+            [excludeRequesterId ?? null],
+        );
         return result.rows;
     },
 
@@ -124,6 +138,65 @@ export const OrderModel = {
             ORDER BY o.created_at DESC, o.id DESC;
         `, [accountId]);
         return result.rows;
+    },
+
+    async findAllOrders(page: number, pageSize: number, q= '', status= ''): Promise<AdminOrders> {
+        const offset = (page - 1) * pageSize
+
+        const search = `%${q.trim()}%`
+
+        const filters: string[] = []
+        const values: unknown[] = []
+
+        if (q.trim()) {
+            values.push(search)
+            filters.push(`
+                (
+                    delivery_location ILIKE $${values.length}
+                    OR requester_id ILIKE $${values.length}
+                    OR EXISTS (
+                        SELECT 1
+                        FROM unnest(item_lines) AS item
+                        WHERE item ILIKE $${values.length}
+                    )
+                )
+            `)
+        }
+
+        if (status) {
+            values.push(status)
+            filters.push(`status = $${values.length}`)
+        }
+
+        const whereClause = filters.length
+            ? `WHERE ${filters.join(' AND ')}`
+            : ''
+
+        const paginationValues = [...values, pageSize, offset]
+
+        const [orderResult, totalResult] = await Promise.all([
+            pool.query<Order>(`
+                SELECT *
+                FROM orders
+                ${whereClause}
+                ORDER BY created_at DESC, id DESC
+                LIMIT $${values.length + 1}
+                OFFSET $${values.length + 2};
+            `, paginationValues),
+
+            pool.query<{ total: string }>(`
+                SELECT COUNT(*) AS total
+                FROM orders
+                ${whereClause};
+            `, values),
+        ])
+
+        return {
+            orders: orderResult.rows,
+            page,
+            pageSize,
+            total: Number(totalResult.rows[0].total),
+        }
     },
 
     // The transition row is written in the same statement as the change, so a change

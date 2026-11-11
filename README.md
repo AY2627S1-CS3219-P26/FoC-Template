@@ -59,7 +59,7 @@ docker compose up --build
 | message-service | <http://localhost:3008> |
 | rag-service | <http://localhost:3080> |
 | Mailpit, catches every email locally | <http://localhost:8025> |
-| RabbitMQ management UI (user `relay`, password `change-me`) | <http://localhost:15672> |origin/dev
+| RabbitMQ management UI (user `relay`, password `change-me`) | <http://localhost:15672> |
 
 No `.env` is needed: every variable has a development default in `compose.yaml`. The first administrator is `admin` with the password `change-me`. To override a value, copy `.env.example` to `.env`. The help assistant needs a Claude API key in `CLAUDE_API_KEY`; without it the rest of the system works as usual.
 
@@ -74,6 +74,8 @@ The same Helm chart ([`deploy/helm/relay`](deploy/helm/relay)) and the same imag
 - **Local Kubernetes:** `deploy/scripts/local-up.sh` builds the images and installs the chart into a k3d cluster (<http://localhost:8081>).
 - **Cloud:** one EC2 instance with k3s in AWS Singapore, created with Terraform ([`deploy/terraform`](deploy/terraform)). HTTPS through Traefik and cert-manager, horizontal autoscaling per service.
 - **CI/CD:** GitHub Actions tests every pull request and publishes the images to GHCR on every merge into `dev` or `main`. A merge into `dev` is also rolled out to the running cloud instance. `deploy/scripts/cloud.sh start | stop | status` switches the instance on and off.
+
+To try the live deployment, register with an `@u.nus.edu` or `@nus.edu.sg` address. No real email is sent: the verification code lands in the test inbox under `/mail/`, which the verify page links to.
 
 Setup, secrets, network rules and autoscaling are described in [`docs/deployment.md`](docs/deployment.md), the reasons in [ADR 0004](docs/decisions/0004-cloud-deployment.md).
 
@@ -95,6 +97,7 @@ One folder per service at the top level. A nice-to-have feature that warrants it
 ├── supplier-service/
 ├── order-service/
 ├── credit-service/
+├── recommendation-service/  N2H
 ├── message-service/      N2H
 ├── rag-service/          N2H
 ├── web-client/           browser app and gateway

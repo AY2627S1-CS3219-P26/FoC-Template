@@ -15,9 +15,6 @@ secrets:
 ingress:
   tls: true
 
-mailpit:
-  auth: true
-
 services:
   user-service:
     env:

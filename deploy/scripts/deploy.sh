@@ -70,4 +70,4 @@ echo
 kubectl -n relay get certificate relay-tls --no-headers 2>/dev/null \
   | awk '{ print "Certificate ready: " $2 }'
 echo "Relay:   https://$host"
-echo "Mailpit: https://$host/mail/ (user relay, password MAILPIT_PASSWORD in $SECRETS_FILE)"
+echo "Mailpit: https://$host/mail/"

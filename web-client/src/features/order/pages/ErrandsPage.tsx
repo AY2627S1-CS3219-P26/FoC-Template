@@ -133,13 +133,21 @@ export function ErrandsPage() {
     }
   }
 
-  const accept = (order: Order) =>
-    run(
-      order.id,
-      () => acceptOrder.mutateAsync(order.id),
-      'Accepted. Head to the pickup to collect the items.',
-      'Could not accept this errand.',
-    )
+  // The new courier goes straight to the errand's own page, which has the pickup, the walk and the
+  // chat. Its back button leads to Deliveries, where the errand is listed from now on.
+  async function accept(order: Order) {
+    setBusy((ids) => [...ids, order.id])
+    try {
+      await acceptOrder.mutateAsync(order.id)
+      navigate(`/errands/${order.id}`, {
+        state: { from: '/errands?tab=deliveries', notice: 'Accepted. Head to the pickup to collect the items.' },
+      })
+    } catch (err) {
+      setFlash({ kind: 'error', text: describeOrderError(err, 'Could not accept this errand.') })
+    } finally {
+      setBusy((ids) => ids.filter((id) => id !== order.id))
+    }
+  }
 
   const setStatus = (order: Order, status: OrderStatus, success: string) =>
     run(order.id, () => updateStatus.mutateAsync({ id: order.id, status }), success, 'Could not update this errand.')

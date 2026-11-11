@@ -1,6 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 
-export function createRequireAuth(userServiceUrl: string, request: typeof fetch = fetch) {
+// requiredRole is the role the user-service has to confirm (F1.5.4): administrator for the admin
+// routes, member for everything else.
+export function createRequireAuth(
+    userServiceUrl: string,
+    requiredRole: "member" | "administrator" = "member",
+    request: typeof fetch = fetch,
+) {
     return async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
         const token = req.headers.cookie?.split(";")
             .map((part) => part.trim()).find((part) => part.startsWith("relay_session="))
@@ -13,7 +19,7 @@ export function createRequireAuth(userServiceUrl: string, request: typeof fetch 
             const response = await request(new URL("/internal/authorize", userServiceUrl), {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ token, requiredRole: "member" }),
+                body: JSON.stringify({ token, requiredRole }),
                 signal: AbortSignal.timeout(2000),
             });
             const body = response.ok ? await response.json() as { decision?: string; accountId?: string } : null;

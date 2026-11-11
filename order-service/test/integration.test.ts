@@ -209,6 +209,19 @@ test("a change that lost a race is reported as a conflict", async () => {
     await assert.rejects(ctx.service.updateOrderStatus(42, "courier", "PickedUp"), { status: 409, code: "STATE_CHANGED" });
 });
 
+test("an administrator can cancel an errand wrongly marked Delivered, which releases the reward, but not a Completed one", async () => {
+    const ctx = await openErrand("Delivered", "courier");
+    assert.equal((await ctx.service.adminCancelOrder(42, "admin")).status, "Cancelled");
+    assert.equal((await ctx.service.adminCancelOrder(42, "admin")).status, "Cancelled");
+    // Cancelled is what makes the credit-service release the reservation, and repeating it records nothing new.
+    assert.deepEqual(ctx.effects, ["supplier", "reserve", "Cancelled"]);
+    assert.deepEqual(ctx.transitions, [["Pending", "Open", "requester"], ["Delivered", "Cancelled", "admin"]]);
+
+    const paid = await openErrand("Completed", "courier");
+    await assert.rejects(paid.service.adminCancelOrder(42, "admin"), { status: 409, code: "INVALID_STATE_TRANSITION" });
+    assert.equal(paid.order().status, "Completed");
+});
+
 test("an errand can be accepted until its needed-by time, not after, and never by its requester", async () => {
     const ctx = await openErrand();
     await assert.rejects(ctx.service.acceptOrder(42, "requester"), { status: 403, code: "OWN_ERRAND" });

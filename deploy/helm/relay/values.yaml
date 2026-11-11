@@ -289,7 +289,8 @@ broker:
 # Catches every email and shows it under /mail/. Relay sends no real emails anywhere.
 mailpit:
   image: axllent/mailpit:v1.31.6
-  # Ask for user and MAILPIT_PASSWORD before showing the mails, in the cloud where anyone can reach /mail/.
+  # Ask for user and MAILPIT_PASSWORD before showing the mails. Off in the cloud as well: the verify
+  # page links to /mail/ so that anyone trying Relay, the graders too, can read their own code.
   auth: false
   user: relay
   # Services that send email. Only these reach Mailpit's SMTP port.

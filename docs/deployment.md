@@ -73,11 +73,10 @@ Deploy, and again after every merge into `dev`:
 
 ```bash
 deploy/scripts/deploy.sh
-MAILBOX_AUTH="relay:$(grep '^MAILPIT_PASSWORD=' deploy/cloud-secrets.env | cut -d= -f2)" \
-  deploy/scripts/smoke-test.sh https://$(terraform -chdir=deploy/terraform output -raw hostname)
+deploy/scripts/smoke-test.sh https://$(terraform -chdir=deploy/terraform output -raw hostname)
 ```
 
-On the first run `deploy.sh` writes random passwords to `deploy/cloud-secrets.env`: the administrator's is `ADMIN_PASSWORD`, Mailpit under `/mail/` asks for the user `relay` and `MAILPIT_PASSWORD`. It also adds an empty `CLAUDE_API_KEY=` line; put the Anthropic key there and run `deploy.sh` again, otherwise the help assistant cannot answer. Both `.env` files stay out of Git. `deploy.sh` also installs cert-manager; the first certificate takes about a minute.
+On the first run `deploy.sh` writes random passwords to `deploy/cloud-secrets.env`, the administrator's is `ADMIN_PASSWORD`. Mailpit under `/mail/` is open without a password, because the verify page links to it so that anyone trying Relay can read their code; it only ever holds test emails. The script also adds an empty `CLAUDE_API_KEY=` line; put the Anthropic key there and run `deploy.sh` again, otherwise the help assistant cannot answer. Both `.env` files stay out of Git. `deploy.sh` also installs cert-manager; the first certificate takes about a minute.
 
 The instance costs money only while it runs. Stop it after testing:
 

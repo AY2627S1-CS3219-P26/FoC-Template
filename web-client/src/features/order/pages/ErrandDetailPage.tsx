@@ -1,11 +1,12 @@
 import { Flag } from 'lucide-react'
-import { createElement } from 'react'
+import { createElement, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useLocation, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useMyOrders, useOrder } from '@/api/order/order'
 import type { Order, OrderStatus } from '@/api/order/order'
 import { useSupplier } from '@/api/supplier/suppliers'
 import { EmptyState } from '@/components/EmptyState'
+import { Notice } from '@/components/Notice'
 import { Page } from '@/components/Page'
 import { QueryView } from '@/components/QueryView'
 import { useErrandChatSlot } from '@/lib/errandChat'
@@ -261,7 +262,20 @@ export function ErrandDetailPage() {
 
   // The Errands page passes the tab it was showing, so going back lands on the same list.
   const location = useLocation()
+  const navigate = useNavigate()
   const from = (location.state as { from?: string } | null)?.from
+  // Accepting on the Errands page comes here with what happened. Kept in state, so it outlives the cleanup below.
+  const [notice] = useState(() => (location.state as { notice?: string } | null)?.notice)
+  const noticeRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!notice) return
+    // The Accept button that had focus is gone, so keyboard users continue from the notice.
+    noticeRef.current?.focus()
+    // The browser keeps router state across a reload and back, so the notice is cleared once read.
+    navigate(location.pathname, { replace: true, state: { from } })
+  }, [notice, navigate, location.pathname, from])
+
   const back = (
     <Link to={from ?? errandsTabFor(role)} className="ds-btn ds-btn--glass">
       Back to errands
@@ -296,6 +310,11 @@ export function ErrandDetailPage() {
         {back}
         {report}
       </div>
+      {notice && (
+        <div ref={noticeRef} tabIndex={-1}>
+          <Notice tone="success" role="status" title={notice} />
+        </div>
+      )}
       <QueryView
         query={order}
         loadingLabel="Loading errand"

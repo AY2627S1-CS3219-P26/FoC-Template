@@ -26,7 +26,10 @@ export function ReportDecision({ report }: ReportDecisionProps) {
   const cancel = useAdminCancelOrder()
 
   const status = errand.data?.status
-  const canCancel = !status || ['Accepted', 'PickedUp'].includes(status)
+  // The statuses the order-service lets an administrator cancel (ADMIN_CANCELLABLE); it still decides.
+  // Delivered is one of them: the requester has not confirmed yet, so the reward is still only
+  // reserved, and a report about an errand wrongly marked delivered can give it back.
+  const canCancel = !status || ['Open', 'Accepted', 'PickedUp', 'Delivered'].includes(status)
   const alreadyCancelled = status === 'Cancelled' || cancel.isSuccess
 
   function handleCancelErrand() {
@@ -35,8 +38,6 @@ export function ReportDecision({ report }: ReportDecisionProps) {
     if (!window.confirm(`Cancel errand #${errandId}?${reward}`)) return
     cancel.mutate(errandId)
   }
-
-  console.log(errand.data)
 
   const busy = decide.isPending || cancel.isPending
 
@@ -94,7 +95,11 @@ export function ReportDecision({ report }: ReportDecisionProps) {
             {cancel.isPending ? 'Cancelling…' : 'Cancel errand'}
           </button>
         ) : (
-          <p className="text-sm text-muted">This errand is {status} and cannot be cancelled.</p>
+          <p className="text-sm text-muted">
+            {status === 'Completed'
+              ? 'This errand is Completed and the courier has been paid, so it cannot be cancelled.'
+              : `This errand is ${status} and cannot be cancelled.`}
+          </p>
         )}
       <TextAreaField
         label="Justification"

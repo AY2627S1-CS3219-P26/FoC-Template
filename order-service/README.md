@@ -9,7 +9,8 @@ The order tables are created on startup; existing data is preserved.
 
 Every `/orders` request needs the `relay_session` cookie from user-service login.
 Order-service asks user-service to authorize the session as a member, then uses
-the returned account id. Supplier and credit HTTP requests forward the same cookie.
+the returned account id. Everything under `/orders/admin` needs the administrator
+role instead, and a member gets 403 there. Supplier and credit HTTP requests forward the same cookie.
 
 Creation checks `/suppliers/{id}/availability?at=<neededByTime>`, so a missing,
 inactive or closed supplier is a field error on `supplierId`. A refusal names every
@@ -50,7 +51,9 @@ client reads.
 | POST | `/orders/:id/accept` | Assign the authenticated courier |
 | PATCH | `/orders/:id/status` | `{ "status": "PickedUp" }`; only `PickedUp`, `Delivered`, `Completed` or `Cancelled`, anything else is a field error |
 | GET | `/orders/mine` | Own errands as requester or courier, newest first, with history, `role` and `allowed_transitions` |
-| GET | `/orders/admin` | Retrieve orders for Admin viewing only |
+| GET | `/orders/admin` | Retrieve orders for Admin viewing only (administrator) |
+| GET | `/orders/admin/:id` | Read any errand, for the admin console (administrator) |
+| POST | `/orders/admin/:id/cancel` | Cancel an Open, Accepted, PickedUp or Delivered errand after a report, which releases the reserved reward (administrator) |
 
 `GET /internal/orders/:id` answers `{ id, requesterId, courierId, status }` for other
 services, or 404. The gateway does not forward it, so only the compose network and the

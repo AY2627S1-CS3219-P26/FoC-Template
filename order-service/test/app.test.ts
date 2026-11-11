@@ -6,10 +6,15 @@ import type { AddressInfo } from "node:net";
 process.env.DATABASE_URL ??= "postgres://unused@127.0.0.1:1/unused";
 process.env.LOG_LEVEL = "silent";
 // Only the user-service call is answered here; the test's own requests to the app go out for real.
+// Every session is a member, and only the session "admin" is an administrator as well.
 const realFetch = globalThis.fetch;
-globalThis.fetch = async (url, init) => String(url).endsWith("/internal/authorize")
-    ? Response.json({ decision: "authorized", accountId: "account" })
-    : realFetch(url, init);
+globalThis.fetch = async (url, init) => {
+    if (!String(url).endsWith("/internal/authorize")) return realFetch(url, init);
+    const { token, requiredRole } = JSON.parse(String(init?.body));
+    return requiredRole === "administrator" && token !== "admin"
+        ? Response.json({ decision: "denied" })
+        : Response.json({ decision: "authorized", accountId: "account" });
+};
 const { createApp } = await import("../src/app.ts");
 
 async function withApp(run: (base: string) => Promise<void>) {
@@ -50,5 +55,22 @@ test("errors use the shape the web client reads", async () => {
         const noSession = await fetch(`${base}/orders/open`);
         assert.equal(noSession.status, 401);
         assert.deepEqual(await noSession.json(), { error: { code: "UNAUTHENTICATED", message: "A session is required" } });
+    });
+});
+
+test("the admin routes need the administrator role, and a member is refused before the id is even read", async () => {
+    await withApp(async (base) => {
+        for (const [method, path] of [["GET", "/orders/admin"], ["GET", "/orders/admin/abc"], ["POST", "/orders/admin/abc/cancel"]]) {
+            const member = await fetch(`${base}${path}`, { method, headers: session });
+            assert.equal(member.status, 403, `${method} ${path} as a member`);
+            assert.equal((await member.json()).error.code, "FORBIDDEN");
+        }
+        // Past the role check the invalid id is the answer, so the administrator got through.
+        const admin = { ...session, cookie: "relay_session=admin" };
+        for (const [method, path] of [["GET", "/orders/admin/abc"], ["POST", "/orders/admin/abc/cancel"]]) {
+            const response = await fetch(`${base}${path}`, { method, headers: admin });
+            assert.equal(response.status, 404, `${method} ${path} as an administrator`);
+            assert.equal((await response.json()).error.code, "ORDER_NOT_FOUND");
+        }
     });
 });

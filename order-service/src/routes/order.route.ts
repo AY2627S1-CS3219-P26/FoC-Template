@@ -4,13 +4,28 @@ import { createRequireAuth } from "../middleware/auth.middleware.ts";
 import { config } from "../config.ts";
 
 const router = Router();
+
+// The admin routes have their own router with the administrator check in front, registered before
+// the member check below, so every /admin path needs the administrator role and a member is
+// refused before anything is looked up.
+const admin = Router();
+admin.use(createRequireAuth(config.USER_SERVICE_URL, "administrator"));
+
+// GET /orders/admin - Get all orders, only for admin side
+admin.get("/", OrderController.getAllOrders);
+
+// GET /orders/admin/:id - Get specific order details, for admin view
+admin.get("/:id", OrderController.getOrderForAdmin);
+
+// POST /orders/admin/:id/cancel - Cancel an order through report decision by admin
+admin.post("/:id/cancel", OrderController.adminCancelOrder);
+
+router.use("/admin", admin);
+
 router.use(createRequireAuth(config.USER_SERVICE_URL));
 
 // POST /orders - Create a new errand request
 router.post("/", OrderController.createOrder);
-
-// GET /orders/admin - Get all orders, only for admin side
-router.get("/admin", OrderController.getAllOrders);
 
 // GET /orders/open - Browse open requests available for couriers[cite: 7]
 router.get("/open", OrderController.getOpenRequests);
@@ -27,11 +42,5 @@ router.post("/:id/accept", OrderController.acceptOrder);
 
 // PATCH /orders/:id/status - Update order lifecycle status (e.g., PICKED_UP, COMPLETED, CANCELLED)[cite: 7]
 router.patch("/:id/status", OrderController.updateStatus);
-
-// GET /admin/:id - Get specific order details, for admin view
-router.get("/admin/:id", OrderController.getOrderForAdmin);
-
-// POST /admin/:id/cancel - Cancel an order through report decision by admin
-router.post("/admin/:id/cancel", OrderController.adminCancelOrder);
 
 export default router;

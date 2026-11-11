@@ -1,4 +1,4 @@
-import { CirclePlus, Flag, List, Package, Store, TriangleAlert, User, Users, Wallet } from 'lucide-react'
+import { CirclePlus, Coins, Flag, List, Package, Store, User, Users, Wallet, MessageSquareText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
@@ -16,6 +16,7 @@ export const appNav: NavItem[] = [
   { to: '/errands', label: 'Errands', icon: Package, end: true },
   { to: '/errands/new', label: 'Post an errand', shortLabel: 'Post', icon: CirclePlus },
   { to: '/wallet', label: 'Wallet', icon: Wallet },
+  { to: '/message', label: 'Messages', icon: MessageSquareText },
   { to: '/profile', label: 'Profile', icon: User },
 ]
 
@@ -23,6 +24,6 @@ export const adminNav: NavItem[] = [
   { to: '/admin/orders', label: 'Orders', icon: List },
   { to: '/admin/students', label: 'Students', icon: Users },
   { to: '/admin/reports', label: 'Reports', icon: Flag },
-  { to: '/admin/disputes', label: 'Disputes', icon: TriangleAlert },
   { to: '/admin/suppliers', label: 'Suppliers', icon: Store },
+  { to: '/admin/credits', label: 'Credits', icon: Coins },
 ]

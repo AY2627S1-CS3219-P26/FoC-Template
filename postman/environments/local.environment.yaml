@@ -10,3 +10,11 @@ values:
     value: ''
   - key: targetUserId
     value: ''
+  - key: reportId
+    value: ''
+  - key: messageServiceUrl
+    value: ''
+  - key: myUserId
+    value: ''
+  - key: otherUserId
+    value: ''

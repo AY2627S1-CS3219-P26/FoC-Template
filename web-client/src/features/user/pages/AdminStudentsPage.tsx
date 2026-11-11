@@ -1,31 +1,66 @@
-import { useSearchParams } from 'react-router'
+import { useState } from 'react'
+import type { SubmitEvent } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { useUsers } from '@/api/user/admin'
-import type { AccountState, Role } from '@/api/user/types'
+import type { AccountState } from '@/api/user/types'
 import { EmptyState } from '@/components/EmptyState'
 import { Page } from '@/components/Page'
 import { Pagination } from '@/components/Pagination'
 import { QueryView } from '@/components/QueryView'
+import { SelectField } from '@/components/SelectField'
+import { TextField } from '@/components/TextField'
 import { formatDateTime } from '@/lib/format'
+import { AccountStateBadge } from '../components/AccountStateBadge'
+import { RoleBadges } from '../components/RoleBadges'
 
 const pageSize = 20
 
-const roleBadges: Record<Role, { label: string; className: string }> = {
-  member: { label: 'Member', className: 'ds-badge ds-badge--neutral' },
-  administrator: { label: 'Administrator', className: 'ds-badge ds-badge--info' },
-}
-
-const stateBadges: Record<AccountState, { label: string; className: string }> = {
-  Active: { label: 'Active', className: 'ds-badge ds-badge--success' },
-  PendingVerification: { label: 'Pending verification', className: 'ds-badge ds-badge--info' },
-  Suspended: { label: 'Suspended', className: 'ds-badge ds-badge--danger' },
-}
+const stateOptions = [
+  { value: '', label: 'All states' },
+  { value: 'Active', label: 'Active' },
+  { value: 'Suspended', label: 'Suspended' },
+  { value: 'PendingVerification', label: 'Pending verification' },
+]
 
 export function AdminStudentsPage() {
-  // The page lives in the URL, so reload and back keep it. What is not a page number shows page 1.
+  // Search, state and page live in the URL, so reload, back and a shared link keep them.
+  // What is not a page number shows page 1; an unknown state is refused by the user-service.
   const [searchParams, setSearchParams] = useSearchParams()
+  const q = searchParams.get('q') ?? ''
+  const state = searchParams.get('state') ?? ''
   const page = Math.max(1, Math.trunc(Number(searchParams.get('page'))) || 1)
-  const users = useUsers({ page, pageSize })
+  const users = useUsers({
+    page,
+    pageSize,
+    q: q || undefined,
+    state: (state || undefined) as AccountState | undefined,
+  })
   const total = users.data?.total
+  const filtered = Boolean(q || state)
+
+  // The box holds what is typed until the search runs. When back, forward or "Clear filters"
+  // change q in the URL, the box follows.
+  const [search, setSearch] = useState(q)
+  const [shownQ, setShownQ] = useState(q)
+  if (shownQ !== q) {
+    setShownQ(q)
+    setSearch(q)
+  }
+
+  // A new filter always starts again at page 1.
+  function setFilter(name: 'q' | 'state', value: string) {
+    setSearchParams((params) => {
+      if (value) params.set(name, value)
+      else params.delete(name)
+      params.delete('page')
+      return params
+    })
+  }
+
+  function handleSearch(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFilter('q', search.trim())
+  }
 
   function setPage(next: number) {
     setSearchParams((params) => {
@@ -36,19 +71,38 @@ export function AdminStudentsPage() {
 
   return (
     <Page title="Students" subtitle={total === undefined ? undefined : `${total} ${total === 1 ? 'account' : 'accounts'}`}>
+      <form role="search" noValidate onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">
+        {/* No hint below the field: it would push the field above the select and button next to it. */}
+        <TextField label="Name, username, email or id" name="q" type="search" value={search} onChange={setSearch} />
+        <SelectField label="State" name="state" value={state} onChange={(value) => setFilter('state', value)} options={stateOptions} />
+        <button type="submit" className="ds-btn ds-btn--glass">
+          Search
+        </button>
+      </form>
       <QueryView
         query={users}
         loadingLabel="Loading accounts"
         isEmpty={(result) => result.items.length === 0}
         empty={
-          <EmptyState
-            title={total ? `There is no page ${page}` : 'No accounts yet'}
-            action={
-              <button type="button" className="ds-btn ds-btn--glass" onClick={() => setSearchParams({})}>
-                Go to page 1
-              </button>
-            }
-          />
+          total ? (
+            <EmptyState
+              title={`There is no page ${page}`}
+              action={
+                <button type="button" className="ds-btn ds-btn--glass" onClick={() => setPage(1)}>
+                  Go to page 1
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={filtered ? 'No accounts match these filters' : 'No accounts yet'}
+              action={
+                <button type="button" className="ds-btn ds-btn--glass" onClick={() => setSearchParams({})}>
+                  {filtered ? 'Clear filters' : 'Go to page 1'}
+                </button>
+              }
+            />
+          )
         }
       >
         {(result) => (
@@ -70,22 +124,18 @@ export function AdminStudentsPage() {
                   {result.items.map((user) => (
                     <tr key={user.id}>
                       <td>
-                        <p className="font-medium">{user.fullName}</p>
+                        <Link to={`/admin/students/${user.id}`} state={{ backLabel: 'Students' }} className="block">
+                          {user.fullName}
+                        </Link>
                         <p className="font-mono text-xs text-muted">{user.id}</p>
                       </td>
                       <td>{user.username}</td>
                       <td>{user.email}</td>
                       <td>
-                        <div className="flex flex-wrap gap-1">
-                          {user.roles.map((role) => (
-                            <span key={role} className={roleBadges[role].className}>
-                              {roleBadges[role].label}
-                            </span>
-                          ))}
-                        </div>
+                        <RoleBadges roles={user.roles} />
                       </td>
                       <td>
-                        <span className={stateBadges[user.state].className}>{stateBadges[user.state].label}</span>
+                        <AccountStateBadge state={user.state} />
                       </td>
                       <td className="nums-tabular">{formatDateTime(user.createdAt)}</td>
                     </tr>
@@ -98,19 +148,15 @@ export function AdminStudentsPage() {
               {result.items.map((user) => (
                 <li key={user.id} className="grid grid-cols-1 gap-2 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="min-w-0 font-medium wrap-anywhere">{user.fullName}</p>
-                    <span className={stateBadges[user.state].className}>{stateBadges[user.state].label}</span>
+                    <Link to={`/admin/students/${user.id}`} state={{ backLabel: 'Students' }} className="min-w-0 wrap-anywhere">
+                      {user.fullName}
+                    </Link>
+                    <AccountStateBadge state={user.state} />
                   </div>
                   <p className="text-sm text-muted wrap-anywhere">
                     {user.username} · {user.email}
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                    {user.roles.map((role) => (
-                      <span key={role} className={roleBadges[role].className}>
-                        {roleBadges[role].label}
-                      </span>
-                    ))}
-                  </div>
+                  <RoleBadges roles={user.roles} />
                   <p className="text-sm text-muted">Joined {formatDateTime(user.createdAt)}</p>
                   <p className="font-mono text-xs text-subtle wrap-anywhere">{user.id}</p>
                 </li>

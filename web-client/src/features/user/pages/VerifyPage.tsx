@@ -55,10 +55,10 @@ export function VerifyPage() {
       }
     >
       <p className="text-muted">Enter the 6-digit code from the email we sent you.</p>
-      {/* Only set while emails land in a local test inbox instead of being sent. */}
+      {/* Only set while emails land in a test inbox instead of being sent, locally and in the cloud demo. */}
       {devMailboxUrl && (
         <Notice tone="info" title="Test mode: no real email is sent">
-          Every email lands in the local test inbox.{' '}
+          Every email lands in a shared test inbox.{' '}
           <a href={devMailboxUrl} target="_blank" rel="noreferrer">
             Open Mailpit
           </a>{' '}

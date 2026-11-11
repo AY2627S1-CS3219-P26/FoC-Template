@@ -29,7 +29,8 @@ export function ReportDecision({ report }: ReportDecisionProps) {
   // The statuses the order-service lets an administrator cancel (ADMIN_CANCELLABLE); it still decides.
   // Delivered is one of them: the requester has not confirmed yet, so the reward is still only
   // reserved, and a report about an errand wrongly marked delivered can give it back.
-  const canCancel = !status || ['Open', 'Accepted', 'PickedUp', 'Delivered'].includes(status)
+  // Offered only once the errand has loaded, so its status and reward are known before confirming.
+  const canCancel = status !== undefined && ['Open', 'Accepted', 'PickedUp', 'Delivered'].includes(status)
   const alreadyCancelled = status === 'Cancelled' || cancel.isSuccess
 
   function handleCancelErrand() {
@@ -79,28 +80,32 @@ export function ReportDecision({ report }: ReportDecisionProps) {
       <p className="text-muted">
         {alreadySuspended
           ? 'The reported account is already suspended. Actioning the report keeps it that way.'
-          : 'Suspending marks the report actioned and suspends the reported account with this justification. Cancel order will release the reserved credit to the requestor.'}
+          : 'Suspending marks the report actioned and suspends the reported account with this justification.'}{' '}
+        Cancelling the errand gives its reserved credits back to the requester.
       </p>
       <FormError error={decide.error} fields={['justification']} />
-        {alreadyCancelled ? (
-          <Notice tone="success" role="status" title={`Errand #${errandId} is cancelled`} />
-        ) : canCancel ? (
-          <button
-            type="button"
-            className="ds-btn ds-btn--glass"
-            aria-disabled={busy || undefined}
-            aria-busy={cancel.isPending || undefined}
-            onClick={handleCancelErrand}
-          >
-            {cancel.isPending ? 'Cancelling…' : 'Cancel errand'}
-          </button>
-        ) : (
-          <p className="text-sm text-muted">
-            {status === 'Completed'
-              ? 'This errand is Completed and the courier has been paid, so it cannot be cancelled.'
-              : `This errand is ${status} and cannot be cancelled.`}
-          </p>
-        )}
+      <FormError error={cancel.error} />
+      {alreadyCancelled ? (
+        <Notice tone="success" role="status" title={`Errand #${errandId} is cancelled`} />
+      ) : canCancel ? (
+        <button
+          type="button"
+          className="ds-btn ds-btn--glass"
+          aria-disabled={busy || undefined}
+          aria-busy={cancel.isPending || undefined}
+          onClick={handleCancelErrand}
+        >
+          {cancel.isPending ? 'Cancelling…' : 'Cancel errand'}
+        </button>
+      ) : status ? (
+        <p className="text-sm text-muted">
+          {status === 'Completed'
+            ? 'This errand is Completed and the courier has been paid, so it cannot be cancelled.'
+            : `This errand is ${status} and cannot be cancelled.`}
+        </p>
+      ) : errand.isError ? (
+        <p className="text-sm text-muted">Errand #{errandId} could not be loaded, so it cannot be cancelled right now.</p>
+      ) : null}
       <TextAreaField
         label="Justification"
         name="justification"

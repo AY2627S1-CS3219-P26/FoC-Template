@@ -109,3 +109,24 @@ One folder per service at the top level. A nice-to-have feature that warrants it
 ```
 
 `web-client/` has no `-service` suffix on purpose: it owns no bounded context, no data store and no domain API. It is a peer deployable, not a peer service.
+
+---
+
+## Declaration of AI-assisted work
+
+Every member used Claude Code (Anthropic's Claude Opus and Sonnet models) to explain, generate, debug and review code and documentation. Requirements, architecture, service boundaries, data schemas, interfaces and the reasons behind each decision are the team's own work. Every AI-assisted result was reviewed, tested and, where needed, edited by the member who owns that part.
+
+Each owner declares the details for their part in its README:
+
+| Part | Owner | Declaration |
+| --- | --- | --- |
+| user-service | Felix Soeren Haag | [user-service/README.md](user-service/README.md#declaration-of-ai-assisted-work) |
+| web-client (foundation, user and admin screens) | Felix Soeren Haag | [web-client/README.md](web-client/README.md#declaration-of-ai-assisted-work) |
+| Deployment (Kubernetes, AWS, CI/CD) | Felix Soeren Haag | [docs/deployment.md](docs/deployment.md#declaration-of-ai-assisted-work) |
+| supplier-service, maps and walking routes | Nguyen Viet Quang | [supplier-service/README.md](supplier-service/README.md#declaration-of-ai-assisted-work) |
+| order-service, Admin Dashboard (Orders) | Truong Kim Mai | [order-service/README.md](order-service/README.md#declaration-of-ai-assisted-work) |
+| credit-service | Dinh Khoat Hoang Long | [credit-service/README.md](credit-service/README.md#declaration-of-ai-assisted-work) |
+| recommendation-service | Dinh Khoat Hoang Long | [recommendation-service/README.md](recommendation-service/README.md#declaration-of-ai-assisted-work) |
+| rag-service | William Kento Rasmussen | [rag-service/README.md](rag-service/README.md#declaration-of-ai-assisted-work) |
+
+The instructions the coding agents worked under are in the repository: [`AGENTS.md`](AGENTS.md) and the `AGENTS.md` in each service folder.
